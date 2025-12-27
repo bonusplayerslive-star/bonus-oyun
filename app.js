@@ -22,8 +22,13 @@ const io = socketIo(server);
 const PORT = process.env.PORT || 10000; 
 app.set('trust proxy', 1);
 
-const activeMeetings = {};
-let ipLoginAttempts = {};
+const LOG_PATHS = {
+    MARKET: 'public/caracter/burning/market.txt',
+    ARENA: 'public/caracter/burning/arena.dat',
+    GIFT: 'data/gift/interruption.txt',
+    MEETING: 'public/caracter/burning/meeting.txt',
+    WALLET: 'data/game/wallet/wallet.dat'
+};
 
 const authLimiter = rateLimit({ windowMs: 15 * 60 * 1000, max: 15, message: "Çok fazla deneme yaptınız." });
 
@@ -46,14 +51,6 @@ const logToFile = (relativePath, content) => {
         const logLine = `${new Date().toLocaleString('tr-TR')} | ${content}\n`;
         fs.appendFileSync(fullPath, logLine, 'utf8');
     } catch (err) { console.error("Log hatası:", err.message); }
-};
-
-const LOG_PATHS = {
-    MARKET: 'public/caracter/burning/market.txt',
-    ARENA: 'public/caracter/burning/arena.dat',
-    GIFT: 'data/gift/interruption.txt',
-    MEETING: 'public/caracter/burning/meeting.txt',
-    WALLET: 'data/game/wallet/wallet.dat'
 };
 
 const checkAuth = (req, res, next) => {
@@ -113,6 +110,22 @@ app.get('/meeting', checkAuth, async (req, res) => {
         const roomId = req.query.roomId || 'GlobalMasa';
         res.render('meeting', { user, roomId }); 
     } catch (e) { res.redirect('/profil'); }
+});
+
+// --- ELITE MASA KURMA (POST) ---
+app.post('/create-meeting', checkAuth, async (req, res) => {
+    try {
+        const user = await User.findById(req.session.userId);
+        if (user && user.bpl >= 50) {
+            user.bpl -= 50;
+            await user.save();
+            const roomId = "Masa_" + Math.random().toString(36).substr(2, 5);
+            logToFile(LOG_PATHS.MEETING, `${user.nickname} masa kurdu: ${roomId}`);
+            res.redirect(`/meeting?roomId=${roomId}&userId=${user._id}`);
+        } else {
+            res.send('<script>alert("Yetersiz Bakiye! Masa kurmak için 50 BPL gereklidir."); window.location.href="/chat";</script>');
+        }
+    } catch (e) { res.redirect('/chat'); }
 });
 
 // --- AUTH VE OYUN İŞLEMLERİ ---
@@ -196,29 +209,65 @@ app.post('/withdraw', checkAuth, async (req, res) => {
 
 io.on('connection', (socket) => {
     
-    // --- MEETING (TOPLANTI) SİSTEMİ ---
+    // --- CHAT VE TOPLANTI SİSTEMİ ---
     socket.on('join-chat', (data) => {
         socket.join(data.room);
         socket.nickname = data.nickname;
-        socket.roomId = data.room; // Toplantı takibi için
+        socket.roomId = data.room; 
         
-        // Diğer kullanıcılara yeni birinin geldiğini ve socket ID'sini bildir
         socket.to(data.room).emit('user-joined', { 
             nickname: data.nickname, 
             socketId: socket.id 
         });
 
-        // Toplantı başlangıç süresini senkronize et (Örn: 90 dk)
         socket.emit('sync-meeting', { remaining: 90 * 60 * 1000 });
+        
+        // Sistem mesajı: Birisi odaya katıldı
+        io.to(data.room).emit('new-message', { sender: "SİSTEM", text: `${data.nickname} lobiye bağlandı.` });
     });
 
+    // Chat Mesajları (chat.ejs)
+    socket.on('chat-message', (data) => {
+        io.to(data.room).emit('new-message', { sender: data.nickname, text: data.message });
+    });
+
+    // Toplantı Mesajları (meeting.ejs)
     socket.on('meeting-msg', (data) => {
         io.to(data.room).emit('new-meeting-msg', { sender: data.sender, text: data.text });
     });
 
+    // Özel Davet / Sinyal Mekanizması
     socket.on('send-private-invite', (data) => {
-        // Davet mantığı: Burada tüm odaya veya nickname üzerinden belirli kişiye iletilebilir
-        socket.broadcast.emit('receive-invite', data);
+        // Chat sayfasındaki herkese bu sinyali gönder (Frontend'de toNick kontrolü var)
+        io.emit('receive-meeting-invite', data);
+    });
+
+    // Hediye Gönderme Sistemi (chat.ejs)
+    socket.on('send-gift', async (data) => {
+        try {
+            const sender = await User.findById(data.userId);
+            const receiver = await User.findOne({ nickname: data.to });
+
+            if (sender && receiver && sender.bpl >= 6000 && data.amount <= 500) {
+                sender.bpl -= data.amount;
+                receiver.bpl += data.amount;
+                await sender.save();
+                await receiver.save();
+
+                logToFile(LOG_PATHS.GIFT, `${sender.nickname} -> ${receiver.nickname}: ${data.amount} BPL`);
+
+                socket.emit('gift-result', { 
+                    success: true, 
+                    message: `${data.to} kullanıcısına ${data.amount} BPL gönderildi!`,
+                    newBalance: sender.bpl 
+                });
+
+                io.to(data.room).emit('new-message', { 
+                    sender: "SİSTEM", 
+                    text: `🎁 ${sender.nickname}, ${receiver.nickname} kullanıcısına ${data.amount} BPL hediye etti!` 
+                });
+            }
+        } catch (err) { console.error("Hediye hatası:", err); }
     });
 
     // --- WebRTC SİNYALLEŞME ---
@@ -257,7 +306,7 @@ io.on('connection', (socket) => {
         const lobby = io.sockets.adapter.rooms.get("arena_lobby");
         if (lobby && lobby.size >= 1) {
             const botData = { nickname: "Savaşçı_Bot", animal: "Snake", userId: "BOT123" };
-            const winnerId = Math.random() > 0.4 ? socket.userData.userId : "BOT123";
+            const winnerId = Math.random() > 0.4 ? (socket.userData ? socket.userData.userId : "BOT123") : "BOT123";
             socket.emit('match-found', { matchId: `match_${Date.now()}`, winnerId, opponent: botData });
         }
     });
