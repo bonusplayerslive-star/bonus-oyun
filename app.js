@@ -12,7 +12,7 @@ const nodemailer = require('nodemailer');
 
 const connectDB = require('./db');
 const User = require('./models/User');
-
+const Log = require('./models/Log'); // Yeni eklenen satır
 connectDB();
 
 const app = express();
@@ -51,6 +51,19 @@ const logToFile = (relativePath, content) => {
         const logLine = `${new Date().toLocaleString('tr-TR')} | ${content}\n`;
         fs.appendFileSync(fullPath, logLine, 'utf8');
     } catch (err) { console.error("Log hatası:", err.message); }
+
+const dbLog = async (type, content) => {
+    try {
+        const newLog = new Log({ type, content });
+        await newLog.save();
+        console.log(`[DB LOG] ${type}: ${content}`);
+    } catch (err) {
+        console.error("MongoDB Log hatası:", err.message);
+    }
+};
+
+
+    
 };
 
 const checkAuth = (req, res, next) => {
@@ -327,3 +340,4 @@ io.on('connection', (socket) => {
 server.listen(PORT, "0.0.0.0", () => {
     console.log(`BPL SİSTEMİ ÇALIŞIYOR | PORT: ${PORT}`);
 });
+
