@@ -12,7 +12,6 @@ const rateLimit = require('express-rate-limit');
 const connectDB = require('./db');
 const User = require('./models/User');
 
-// Veritabanı bağlantısı
 connectDB();
 
 const app = express();
@@ -22,14 +21,11 @@ const io = socketIo(server);
 const PORT = process.env.PORT || 10000; 
 app.set('trust proxy', 1);
 
-// ODA YÖNETİM MERKEZİ
 const activeMeetings = {};
 let ipLoginAttempts = {};
 
-// GÜVENLİK
 const authLimiter = rateLimit({ windowMs: 15 * 60 * 1000, max: 15, message: "Çok fazla deneme yaptınız." });
 
-// MIDDLEWARE
 app.use(bodyParser.json()); 
 app.use(bodyParser.urlencoded({ extended: true }));
 app.use(express.static('public'));
@@ -41,7 +37,6 @@ app.use(session({
 }));
 app.set('view engine', 'ejs');
 
-// LOG SİSTEMİ
 const logToFile = (relativePath, content) => {
     const fullPath = path.join(__dirname, relativePath);
     const dir = path.dirname(fullPath);
@@ -60,12 +55,11 @@ const LOG_PATHS = {
     WALLET: 'data/game/wallet/wallet.dat'
 };
 
-// AUTH KONTROLÜ
 const checkAuth = (req, res, next) => {
     if (req.session.userId) next(); else res.redirect('/');
 };
 
-// --- ROTALAR (SAYFALAR) ---
+// --- ROTALAR (GÜNCELLENMİŞ) ---
 
 app.get('/', (req, res) => {
     const userIp = req.headers['x-forwarded-for'] || req.socket.remoteAddress;
@@ -80,8 +74,13 @@ app.get('/market', checkAuth, async (req, res) => {
     try { const user = await User.findById(req.session.userId); res.render('market', { user }); } catch (e) { res.redirect('/profil'); }
 });
 
+// DEVELOPMENT: Seçilen hayvanı sayfaya gönderir
 app.get('/development', checkAuth, async (req, res) => {
-    try { const user = await User.findById(req.session.userId); res.render('development', { user }); } catch (e) { res.redirect('/profil'); }
+    try { 
+        const user = await User.findById(req.session.userId); 
+        const selectedAnimal = req.query.animal; // Profil sayfasından gelen ?animal=...
+        res.render('development', { user, selectedAnimal }); 
+    } catch (e) { res.redirect('/profil'); }
 });
 
 app.get('/wallet', checkAuth, async (req, res) => {
@@ -96,8 +95,13 @@ app.get('/payment', checkAuth, async (req, res) => {
     } catch (e) { res.redirect('/profil'); }
 });
 
+// ARENA: Seçilen hayvanı sayfaya gönderir
 app.get('/arena', checkAuth, async (req, res) => {
-    try { const user = await User.findById(req.session.userId); res.render('arena', { user }); } catch (e) { res.redirect('/profil'); }
+    try { 
+        const user = await User.findById(req.session.userId); 
+        const selectedAnimal = req.query.animal;
+        res.render('arena', { user, selectedAnimal }); 
+    } catch (e) { res.redirect('/profil'); }
 });
 
 app.get('/chat', checkAuth, async (req, res) => {
@@ -112,7 +116,7 @@ app.get('/meeting', checkAuth, async (req, res) => {
     } catch (e) { res.redirect('/profil'); }
 });
 
-// --- AUTH İŞLEMLERİ ---
+// --- AUTH VE OYUN İŞLEMLERİ (Öncekiyle Aynı) ---
 
 app.post('/login', authLimiter, async (req, res) => {
     const { email, password } = req.body;
@@ -140,15 +144,15 @@ app.post('/change-password', checkAuth, async (req, res) => {
     } catch (e) { res.json({ status: 'error' }); }
 });
 
-// --- OYUN VE MARKET SİSTEMLERİ ---
-
 app.post('/buy-animal', checkAuth, async (req, res) => {
     const { animalName, price } = req.body;
     try {
         const user = await User.findById(req.session.userId);
         if (user && user.bpl >= price) {
             user.bpl -= price;
-            user.inventory.push(animalName);
+            if (!user.inventory.includes(animalName)) {
+                user.inventory.push(animalName);
+            }
             if(!user.stats) user.stats = {};
             user.stats[animalName] = { hp: 100, atk: 15, def: 10 };
             user.markModified('stats'); 
@@ -167,6 +171,7 @@ app.post('/upgrade-stat', checkAuth, async (req, res) => {
         const price = prices[statType];
         if (user && user.bpl >= price) {
             user.bpl -= price;
+            if (!user.stats[animalName]) user.stats[animalName] = { hp: 100, atk: 15, def: 10 };
             user.stats[animalName][statType] += (statType === 'hp' ? 10 : 5);
             user.markModified('stats');
             await user.save();
@@ -188,10 +193,9 @@ app.post('/withdraw', checkAuth, async (req, res) => {
     } catch (e) { res.json({ status: 'error' }); }
 });
 
-// --- SOCKET.IO (ARENA, CHAT, MEETING) ---
+// --- SOCKET.IO ---
 
 io.on('connection', (socket) => {
-    // Chat & Meeting
     socket.on('join-chat', (data) => {
         socket.join(data.room);
         socket.nickname = data.nickname;
@@ -202,22 +206,20 @@ io.on('connection', (socket) => {
         io.to(data.room).emit('new-message', { sender: data.nickname, text: data.message });
     });
 
-    // Arena Sistemi
     socket.on('join-arena', async (data) => {
         socket.join("arena_lobby");
         const user = await User.findById(data.userId);
         if (user) {
-            socket.userData = { userId: user._id.toString(), nickname: user.nickname, animal: data.selectedAnimal || "Kurd" };
+            socket.userData = { userId: user._id.toString(), nickname: user.nickname, animal: data.selectedAnimal };
         }
     });
 
     socket.on('start-search', () => {
         const lobby = io.sockets.adapter.rooms.get("arena_lobby");
-        if (lobby && lobby.size >= 1) { // 1 kişi bile olsa botla eşleştir
-            const matchId = `match_${Date.now()}`;
+        if (lobby && lobby.size >= 1) {
             const botData = { nickname: "Savaşçı_Bot", animal: "Snake", userId: "BOT123" };
             const winnerId = Math.random() > 0.4 ? socket.userData.userId : "BOT123";
-            socket.emit('match-found', { matchId, winnerId, opponent: botData });
+            socket.emit('match-found', { matchId: `match_${Date.now()}`, winnerId, opponent: botData });
         }
     });
 
@@ -226,7 +228,6 @@ io.on('connection', (socket) => {
         if (user) { user.bpl += 50; await user.save(); logToFile(LOG_PATHS.ARENA, `${user.nickname} +50 BPL`); }
     });
 
-    // WebRTC (Meeting)
     socket.on('webrtc-offer', (data) => socket.to(data.toSocket).emit('webrtc-offer', data));
     socket.on('webrtc-answer', (data) => socket.to(data.toSocket).emit('webrtc-answer', data));
 });
