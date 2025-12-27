@@ -440,6 +440,39 @@ io.on('connection', (socket) => {
                 socket.emit('match-found', { matchId, winnerId, opponent: oppSocket.userData });
                 oppSocket.emit('match-found', { matchId, winnerId, opponent: socket.userData });
             }
+else {
+        // --- BOT SİSTEMİ BAŞLANGIÇ ---
+        // 5 saniye sonra hala kimse yoksa botu gönder
+        setTimeout(() => {
+            const currentLobby = io.sockets.adapter.rooms.get("arena_lobby");
+            if (currentLobby && currentLobby.has(socket.id)) {
+                const animals = ["Aslan", "Kurt", "Kaplan", "Ayı"];
+                const randomAnimal = animals[Math.floor(Math.random() * animals.length)];
+                
+                const matchId = `bot_match_${Date.now()}`;
+                socket.leave("arena_lobby");
+                socket.join(matchId);
+
+                // Bot verisi (Sanki gerçek bir kullanıcıymış gibi)
+                const botData = {
+                    nickname: "Kara_Pençe_BOT",
+                    animal: randomAnimal,
+                    userId: "bot_user"
+                };
+
+                // Oyuncuya rakip bulundu sinyali gönder
+                socket.emit('match-found', { 
+                    matchId, 
+                    winnerId: socket.userData.userId, // Test için hep oyuncu kazansın
+                    winnerAnimal: socket.userData.animal,
+                    opponent: botData 
+                });
+            }
+        }, 5000); // 5 saniye bekleme süresi
+    }
+});
+
+            
         }
     });
 
@@ -563,4 +596,5 @@ server.listen(PORT, "0.0.0.0", () => {
     console.log(`SUNUCU AKTİF | Port: ${PORT}`);
     console.log(`=========================================`);
 });
+
 
