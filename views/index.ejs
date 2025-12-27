@@ -344,6 +344,39 @@
                     <button type="button" onclick="submitSupportForm()" class="btn btn-info btn-sm px-4 fw-bold">KAYDET VE GÖNDER</button>
                 </div>
             </div>
+<div class="ip-footer">
+    <div>IP ADRESİNİZ: <span><%= locals.userIp || '0.0.0.0' %></span></div>
+    <div style="margin-top: 5px; font-size: 0.7rem;">
+        <span class="online-dot"></span> 
+        AKTİF: <span id="active-players" style="color: var(--neon-green)">Yükleniyor...</span>
+    </div>
+</div>
+
+<style>
+    .online-dot {
+        height: 7px;
+        width: 7px;
+        background-color: #39FF14;
+        border-radius: 50%;
+        display: inline-block;
+        margin-right: 5px;
+        box-shadow: 0 0 5px #39FF14;
+        animation: blink 2s infinite;
+    }
+    @keyframes blink {
+        0% { opacity: 0.4; }
+        50% { opacity: 1; }
+        100% { opacity: 0.4; }
+    }
+</style>
+
+<script>
+    const socket = io();
+    socket.on('update-active-count', (count) => {
+        document.getElementById('active-players').innerText = count + " OYUNCU";
+    });
+    // ... diğer fonksiyonların (openContactModal vs.) devam etsin ...
+</script>
         </div>
     </div>
 
@@ -441,3 +474,4 @@
     </script>
 </body>
 </html>
+
