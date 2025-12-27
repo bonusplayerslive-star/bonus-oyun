@@ -190,6 +190,23 @@
             color: var(--neon-green);
             text-shadow: 0 0 10px var(--neon-green);
         }
+.online-dot {
+    height: 8px;
+    width: 8px;
+    background-color: #39FF14;
+    border-radius: 50%;
+    display: inline-block;
+    margin-right: 5px;
+    box-shadow: 0 0 8px #39FF14;
+    animation: blink-dot 2s infinite;
+}
+@keyframes blink-dot {
+    0% { opacity: 0.4; }
+    50% { opacity: 1; }
+    100% { opacity: 0.4; }
+}
+
+
     </style>
 </head>
 <body>
@@ -474,4 +491,5 @@
     </script>
 </body>
 </html>
+
 
