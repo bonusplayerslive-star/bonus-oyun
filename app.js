@@ -18,7 +18,22 @@ connectDB();
 
 const app = express();
 const server = http.createServer(app);
-const io = socketIo(server);
+
+const io = socketIo(server, {
+    cors: {
+        origin: "*", // Tüm bağlantılara izin ver
+        methods: ["GET", "POST"]
+    }
+});
+
+app.use((req, res, next) => {
+    if (req.header('x-forwarded-proto') !== 'https' && process.env.NODE_ENV === 'production') {
+        res.redirect(`https://${req.header('host')}${req.url}`);
+    } else {
+        next();
+    }
+});
+
 
 // --- RENDER İÇİN KRİTİK PORT VE PROXY AYARI ---
 const PORT = process.env.PORT || 10000; 
@@ -548,3 +563,4 @@ server.listen(PORT, "0.0.0.0", () => {
     console.log(`SUNUCU AKTİF | Port: ${PORT}`);
     console.log(`=========================================`);
 });
+
