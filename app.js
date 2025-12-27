@@ -60,7 +60,7 @@ const checkAuth = (req, res, next) => {
     if (req.session.userId) next(); else res.redirect('/');
 };
 
-// --- ROTALAR (GÜNCELLENMİŞ) ---
+// --- ROTALAR ---
 
 app.get('/', (req, res) => {
     const userIp = req.headers['x-forwarded-for'] || req.socket.remoteAddress;
@@ -75,11 +75,10 @@ app.get('/market', checkAuth, async (req, res) => {
     try { const user = await User.findById(req.session.userId); res.render('market', { user }); } catch (e) { res.redirect('/profil'); }
 });
 
-// DEVELOPMENT: Seçilen hayvanı sayfaya gönderir
 app.get('/development', checkAuth, async (req, res) => {
     try { 
         const user = await User.findById(req.session.userId); 
-        const selectedAnimal = req.query.animal; // Profil sayfasından gelen ?animal=...
+        const selectedAnimal = req.query.animal;
         res.render('development', { user, selectedAnimal }); 
     } catch (e) { res.redirect('/profil'); }
 });
@@ -96,7 +95,6 @@ app.get('/payment', checkAuth, async (req, res) => {
     } catch (e) { res.redirect('/profil'); }
 });
 
-// ARENA: Seçilen hayvanı sayfaya gönderir
 app.get('/arena', checkAuth, async (req, res) => {
     try { 
         const user = await User.findById(req.session.userId); 
@@ -112,12 +110,12 @@ app.get('/chat', checkAuth, async (req, res) => {
 app.get('/meeting', checkAuth, async (req, res) => {
     try { 
         const user = await User.findById(req.session.userId); 
-        const roomId = req.query.roomId;
+        const roomId = req.query.roomId || 'GlobalMasa';
         res.render('meeting', { user, roomId }); 
     } catch (e) { res.redirect('/profil'); }
 });
 
-// --- AUTH VE OYUN İŞLEMLERİ (Öncekiyle Aynı) ---
+// --- AUTH VE OYUN İŞLEMLERİ ---
 
 app.post('/login', authLimiter, async (req, res) => {
     const { email, password } = req.body;
@@ -194,19 +192,59 @@ app.post('/withdraw', checkAuth, async (req, res) => {
     } catch (e) { res.json({ status: 'error' }); }
 });
 
-// --- SOCKET.IO ---
+// --- SOCKET.IO (ARENA, CHAT, MEETING) ---
 
 io.on('connection', (socket) => {
+    
+    // --- MEETING (TOPLANTI) SİSTEMİ ---
     socket.on('join-chat', (data) => {
         socket.join(data.room);
         socket.nickname = data.nickname;
-        socket.to(data.room).emit('user-joined', { nickname: data.nickname });
+        socket.roomId = data.room; // Toplantı takibi için
+        
+        // Diğer kullanıcılara yeni birinin geldiğini ve socket ID'sini bildir
+        socket.to(data.room).emit('user-joined', { 
+            nickname: data.nickname, 
+            socketId: socket.id 
+        });
+
+        // Toplantı başlangıç süresini senkronize et (Örn: 90 dk)
+        socket.emit('sync-meeting', { remaining: 90 * 60 * 1000 });
     });
 
-    socket.on('chat-message', (data) => {
-        io.to(data.room).emit('new-message', { sender: data.nickname, text: data.message });
+    socket.on('meeting-msg', (data) => {
+        io.to(data.room).emit('new-meeting-msg', { sender: data.sender, text: data.text });
     });
 
+    socket.on('send-private-invite', (data) => {
+        // Davet mantığı: Burada tüm odaya veya nickname üzerinden belirli kişiye iletilebilir
+        socket.broadcast.emit('receive-invite', data);
+    });
+
+    // --- WebRTC SİNYALLEŞME ---
+    socket.on('webrtc-offer', (data) => {
+        socket.to(data.toSocket).emit('webrtc-offer', {
+            offer: data.offer,
+            fromSocket: socket.id,
+            senderNick: data.senderNick
+        });
+    });
+
+    socket.on('webrtc-answer', (data) => {
+        socket.to(data.toSocket).emit('webrtc-answer', {
+            answer: data.answer,
+            fromSocket: socket.id
+        });
+    });
+
+    socket.on('webrtc-ice-candidate', (data) => {
+        socket.to(data.toSocket).emit('webrtc-ice-candidate', {
+            candidate: data.candidate,
+            fromSocket: socket.id
+        });
+    });
+
+    // --- ARENA SİSTEMİ ---
     socket.on('join-arena', async (data) => {
         socket.join("arena_lobby");
         const user = await User.findById(data.userId);
@@ -229,11 +267,14 @@ io.on('connection', (socket) => {
         if (user) { user.bpl += 50; await user.save(); logToFile(LOG_PATHS.ARENA, `${user.nickname} +50 BPL`); }
     });
 
-    socket.on('webrtc-offer', (data) => socket.to(data.toSocket).emit('webrtc-offer', data));
-    socket.on('webrtc-answer', (data) => socket.to(data.toSocket).emit('webrtc-answer', data));
+    // --- AYRILMA ---
+    socket.on('disconnect', () => {
+        if (socket.roomId) {
+            socket.to(socket.roomId).emit('user-left', socket.id);
+        }
+    });
 });
 
 server.listen(PORT, "0.0.0.0", () => {
     console.log(`BPL SİSTEMİ ÇALIŞIYOR | PORT: ${PORT}`);
 });
-
