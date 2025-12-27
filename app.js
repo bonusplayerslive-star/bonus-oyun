@@ -8,6 +8,7 @@ const socketIo = require('socket.io');
 const axios = require('axios');
 const session = require('express-session');
 const rateLimit = require('express-rate-limit');
+const nodemailer = require('nodemailer');
 
 const connectDB = require('./db');
 const User = require('./models/User');
@@ -235,3 +236,4 @@ io.on('connection', (socket) => {
 server.listen(PORT, "0.0.0.0", () => {
     console.log(`BPL SİSTEMİ ÇALIŞIYOR | PORT: ${PORT}`);
 });
+
