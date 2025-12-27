@@ -1,4 +1,4 @@
-<!DOCTYPE html>
+
 <html lang="tr">
 <head>
     <meta charset="UTF-8">
@@ -99,37 +99,42 @@
         const userId = "<%= user._id %>";
         let matchData = null;
         let opponent = null;
-        let currentMatchId = null;
         
+        // Klasör ve dosya isimleriyle tam eşleşme (Büyük/Küçük harf duyarlı)
         const animalMap = {
-            "Gökdoğan": "Peregrinefalcon", "Yılan": "Snake", "Aslan": "Lion",
-            "Kaplan": "Tiger", "Kurt": "Kurd", "Ayı": "Bear",
-            "Timsah": "Crocodile", "Kartal": "Eagle", "Goril": "Gorilla", "Gergedan": "Rhino"
+            "Gökdoğan": "Peregrinefalcon",
+            "SNAKE": "Snake", "Snake": "Snake", "Yılan": "Snake",
+            "KURD": "Kurd", "Kurd": "Kurd", "Kurt": "Kurd",
+            "LION": "Lion", "Lion": "Lion", "Aslan": "Lion",
+            "Ayı": "Bear", "Bear": "Bear",
+            "Kaplan": "Tiger", "Tiger": "Tiger",
+            "Timsah": "Crocodile", "Crocodile": "Crocodile",
+            "Kartal": "Eagle", "Eagle": "Eagle",
+            "Goril": "Gorilla", "Gorilla": "Gorilla",
+            "Gergedan": "Rhino", "Rhino": "Rhino"
         };
 
         const urlParams = new URLSearchParams(window.location.search);
-        const myAnimalTr = urlParams.get('animal') || urlParams.get('select') || "Gökdoğan";
+        const myAnimalTr = urlParams.get('animal') || "Gökdoğan";
         const myAnimalEn = animalMap[myAnimalTr] || myAnimalTr;
 
-        const myImgName = myAnimalTr.toLowerCase().replace('ö','o').replace('ğ','g');
-        document.getElementById('my-img').src = `/caracter/profile/${myImgName}.jpg`;
+        // Profil resmi ayarı
+        document.getElementById('my-img').src = `/caracter/profile/${myAnimalEn}.jpg`;
 
         socket.emit('join-arena', { userId, selectedAnimal: myAnimalTr });
         
-        // 4 Saniye bekleyip kimse gelmezse BOT başlat sinyali (start-search zaten botu tetikleyecek şekilde app.js'de ayarlandı)
+        // Arama başlatma
         setTimeout(() => { socket.emit('start-search'); }, 2000);
 
         socket.on('match-found', (data) => {
             matchData = data;
-            currentMatchId = data.matchId;
             opponent = data.opponent;
             
             document.getElementById('status-text').innerText = "RAKİP BULUNDU!";
             document.getElementById('opp-nick').innerText = opponent.nickname;
             
-            const oppTr = opponent.animal;
-            const oppImgName = oppTr.toLowerCase().replace('ö','o').replace('ğ','g');
-            document.getElementById('opp-img').src = `/caracter/profile/${oppImgName}.jpg`;
+            const oppEn = animalMap[opponent.animal] || opponent.animal;
+            document.getElementById('opp-img').src = `/caracter/profile/${oppEn}.jpg`;
             document.getElementById('attack-btn').style.display = 'inline-block';
         });
 
@@ -150,40 +155,57 @@
 
             const oppEn = animalMap[opponent.animal] || opponent.animal;
             const isMeWinner = (matchData.winnerId === userId);
-            const winnerEn = animalMap[matchData.winnerAnimal] || matchData.winnerAnimal;
+            const winnerEn = isMeWinner ? myAnimalEn : oppEn;
 
-            // --- 1. SAHNE: ÇİFTLİ SALDIRI ---
-            status.innerText = "SAVAŞ BAŞLADI!";
             overlay.style.display = 'flex';
-            splitScreen.style.display = 'flex';
-            winnerScreen.style.display = 'none';
+            status.innerText = "SAVAŞ BAŞLADI!";
 
-            myVid.src = `/caracter/move/${myAnimalEn}/${myAnimalEn}1.mp4`;
-            oppVid.src = `/caracter/move/${oppEn}/${oppEn}1.mp4`;
+            // --- 1. SAHNE: HAMLELER (Karakter1.mp4) ---
+            try {
+                myVid.src = `/caracter/move/${myAnimalEn}/${myAnimalEn}1.mp4`;
+                oppVid.src = `/caracter/move/${oppEn}/${oppEn}1.mp4`;
 
-            // İki videonun da bitmesini bekle
-            await Promise.all([
-                new Promise(res => { myVid.play(); myVid.onended = res; }),
-                new Promise(res => { oppVid.play(); oppVid.onended = res; })
-            ]);
+                await Promise.all([
+                    myVid.play().catch(e => console.log("Video 1 oynatma hatası")),
+                    oppVid.play().catch(e => console.log("Video 2 oynatma hatası"))
+                ]);
 
-            // --- 2. SAHNE: KAZANANIN FİNALİ ---
+                // Videoların bitmesini veya max 4.5 saniye bekle (Donma koruması)
+                await Promise.race([
+                    Promise.all([
+                        new Promise(res => myVid.onended = res),
+                        new Promise(res => oppVid.onended = res)
+                    ]),
+                    new Promise(res => setTimeout(res, 4500))
+                ]);
+            } catch (err) {
+                console.error("Hamle aşaması hatası:", err);
+            }
+
+            // --- 2. SAHNE: FİNAL (Karakter.mp4) ---
             splitScreen.style.display = 'none';
             winnerScreen.style.display = 'flex';
             status.innerText = isMeWinner ? "TEBRİKLER! KAZANDIN" : "MAĞLUP OLDUN!";
             
-            winVid.src = `/caracter/move/${winnerEn}/${winnerEn}.mp4`;
-
             if(isMeWinner) {
                 socket.emit('claim-victory', { userId: userId });
             }
 
-            await new Promise(res => { winVid.play(); winVid.onended = res; });
+            try {
+                winVid.src = `/caracter/move/${winnerEn}/${winnerEn}.mp4`;
+                await winVid.play();
 
-            // Otomatik Yönlendirme
-            setTimeout(() => {
-                location.href = `/profil?id=${userId}`;
-            }, 1000);
+                // Video bitince veya max 4 saniye sonra yönlendir
+                await Promise.race([
+                    new Promise(res => winVid.onended = res),
+                    new Promise(res => setTimeout(res, 4000))
+                ]);
+            } catch (err) {
+                console.error("Final aşaması hatası:", err);
+            }
+
+            // Profile yönlendirme
+            window.location.href = `/profil?id=${userId}`;
         }
     </script>
 </body>
