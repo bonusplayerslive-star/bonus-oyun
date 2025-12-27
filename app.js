@@ -133,11 +133,22 @@ const checkAuth = (req, res, next) => {
 app.post('/contact-submit', async (req, res) => {
     const { email, message } = req.body;
     const userIp = req.headers['x-forwarded-for'] || req.socket.remoteAddress;
+    
     try {
-        const logContent = `DESTEK TALEBİ: [IP: ${userIp}] [Email: ${email}] Mesaj: ${message}`;
-        logToFile(LOG_PATHS.SUPPORT, logContent);
-        res.json({ status: 'success', msg: 'Mesajınız iletildi.' });
-    } catch (e) { res.json({ status: 'error', msg: 'Hata oluştu.' }); }
+        // Satır formatı: Tarih | IP | Email | Mesaj
+        const logContent = `[${new Date().toLocaleString('tr-TR')}] IP: ${userIp} | E-posta: ${email} | Mesaj: ${message}\n`;
+        
+        // Log dosyasına ekle (LOG_PATHS.SUPPORT = 'data/support/tickets.txt')
+        fs.appendFileSync(path.join(__dirname, LOG_PATHS.SUPPORT), logContent, 'utf8');
+
+        res.json({ 
+            status: 'success', 
+            msg: 'Mesajınız kaydedildi. Destek için: bonusplayerslive@gmail.com' 
+        });
+    } catch (e) {
+        console.error("Yazma Hatası:", e.message);
+        res.json({ status: 'error', msg: 'Mesaj iletilemedi, lütfen mail atın.' });
+    }
 });
 
 // --- SAYFA ROUTE'LARI ---
@@ -309,3 +320,4 @@ io.on('connection', (socket) => {
 server.listen(PORT, "0.0.0.0", () => {
     console.log(`BPL ELITE AKTİF | Port: ${PORT}`);
 });
+
