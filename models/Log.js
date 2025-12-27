@@ -6,4 +6,4 @@ const logSchema = new mongoose.Schema({
     date: { type: Date, default: Date.now } // İşlem zamanı
 });
 
-module.exports = mongoose.model('Log', logSchema);
+module.exports = mongoose.model('Log', logSchema); 
