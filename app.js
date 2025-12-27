@@ -1,4 +1,4 @@
-// Path: app.js
+
 require('dotenv').config();
 const express = require('express');
 const bodyParser = require('body-parser');
@@ -21,7 +21,7 @@ const server = http.createServer(app);
 
 const io = socketIo(server, {
     cors: {
-        origin: "*", // Tüm bağlantılara izin ver
+        origin: "*", 
         methods: ["GET", "POST"]
     }
 });
@@ -34,10 +34,9 @@ app.use((req, res, next) => {
     }
 });
 
-
 // --- RENDER İÇİN KRİTİK PORT VE PROXY AYARI ---
 const PORT = process.env.PORT || 10000; 
-app.set('trust proxy', 1); // Render proxy üzerinden IP'yi doğru almak için şart
+app.set('trust proxy', 1); 
 
 // ODA YÖNETİM MERKEZİ (Zamanlama burada tutulur)
 const activeMeetings = {};
@@ -57,7 +56,6 @@ const authLimiter = rateLimit({
 
 // IP bazlı yasakları takip etmek için nesne
 let ipLoginAttempts = {};
-
 
 // --- MIDDLEWARE ---
 app.use(bodyParser.json()); 
@@ -98,7 +96,6 @@ const LOG_PATHS = {
 
 // --- ANA SAYFA VE IP YÖNETİMİ ---
 app.get('/', (req, res) => {
-    // Render/Proxy üzerinden gerçek kullanıcı IP'sini alıyoruz
     const userIp = req.headers['x-forwarded-for'] || req.socket.remoteAddress;
     
     let isBlocked = false;
@@ -123,8 +120,6 @@ app.get('/', (req, res) => {
     });
 });
 
-
-// Giriş yapmamış kullanıcıyı ana sayfaya kovar
 const checkAuth = (req, res, next) => {
     if (req.session.userId) {
         next(); 
@@ -133,12 +128,10 @@ const checkAuth = (req, res, next) => {
     }
 };
 
-
 // --- DESTEK / ŞİKAYET FORMU ---
 app.post('/contact-submit', async (req, res) => {
     const { email, message } = req.body;
     const userIp = req.headers['x-forwarded-for'] || req.socket.remoteAddress;
-
     try {
         const logContent = `DESTEK TALEBİ: [IP: ${userIp}] [Email: ${email}] Mesaj: ${message}`;
         logToFile(LOG_PATHS.SUPPORT, logContent);
@@ -148,7 +141,7 @@ app.post('/contact-submit', async (req, res) => {
     }
 });
 
-// --- ŞİFRE SİFİRLEME TALEBİ ---
+// --- ŞİFRE SIFIRLAMA TALEBİ ---
 app.post('/forgot-password', async (req, res) => {
     const { email } = req.body;
     try {
@@ -166,8 +159,7 @@ app.post('/forgot-password', async (req, res) => {
 // --- SAYFA YÖNLENDİRMELERİ ---
 app.get('/profil', checkAuth, async (req, res) => { 
     try {
-        const userId = req.session.userId; 
-        const user = await User.findById(userId);
+        const user = await User.findById(req.session.userId);
         if (!user) return res.redirect('/');
         res.render('profil', { user });
     } catch (e) { res.redirect('/'); }
@@ -175,8 +167,7 @@ app.get('/profil', checkAuth, async (req, res) => {
 
 app.get('/market', checkAuth, async (req, res) => {
     try {
-        const userId = req.session.userId;
-        const user = await User.findById(userId);
+        const user = await User.findById(req.session.userId);
         if (!user) return res.redirect('/');
         res.render('market', { user }); 
     } catch (e) { res.redirect('/'); }
@@ -184,8 +175,7 @@ app.get('/market', checkAuth, async (req, res) => {
 
 app.get('/wallet', checkAuth, async (req, res) => {
     try {
-        const userId = req.session.userId;
-        const user = await User.findById(userId);
+        const user = await User.findById(req.session.userId);
         if (!user) return res.redirect('/');
         res.render('wallet', { user }); 
     } catch (e) { res.redirect('/'); }
@@ -193,8 +183,7 @@ app.get('/wallet', checkAuth, async (req, res) => {
 
 app.get('/arena', checkAuth, async (req, res) => {
     try {
-        const userId = req.session.userId;
-        const user = await User.findById(userId);
+        const user = await User.findById(req.session.userId);
         if (!user) return res.redirect('/');
         res.render('arena', { user }); 
     } catch (e) { res.redirect('/'); }
@@ -202,8 +191,7 @@ app.get('/arena', checkAuth, async (req, res) => {
 
 app.get('/chat', checkAuth, async (req, res) => {
     try {
-        const userId = req.session.userId;
-        const user = await User.findById(userId);
+        const user = await User.findById(req.session.userId);
         if (!user) return res.redirect('/');
         res.render('chat', { user, room: 'Global' }); 
     } catch (e) { res.redirect('/'); }
@@ -211,8 +199,7 @@ app.get('/chat', checkAuth, async (req, res) => {
 
 app.get('/development', checkAuth, async (req, res) => {
     try {
-        const userId = req.session.userId;
-        const user = await User.findById(userId);
+        const user = await User.findById(req.session.userId);
         if (!user) return res.redirect('/');
         res.render('development', { user }); 
     } catch (e) { res.redirect('/'); }
@@ -220,8 +207,7 @@ app.get('/development', checkAuth, async (req, res) => {
 
 app.get('/payment', checkAuth, async (req, res) => {
     try {
-        const userId = req.session.userId;
-        const user = await User.findById(userId);
+        const user = await User.findById(req.session.userId);
         if (!user) return res.redirect('/');
         const packages = [{ usd: 10, bpl: 1000 }, { usd: 50, bpl: 5500 }, { usd: 100, bpl: 12000 }];
         res.render('payment', { user, packages, paymentText: process.env.WALLET_ADDRESS }); 
@@ -230,14 +216,14 @@ app.get('/payment', checkAuth, async (req, res) => {
 
 app.get('/meeting', checkAuth, async (req, res) => {
     try {
-        const userId = req.session.userId;
         const roomId = req.query.roomId;
-        const user = await User.findById(userId);
+        const user = await User.findById(req.session.userId);
         if (!user || !roomId) return res.redirect('/profil');
         res.render('meeting', { user, roomId }); 
     } catch (e) { res.redirect('/profil'); }
 });
 
+// --- AUTH İŞLEMLERİ ---
 app.post('/login', authLimiter, async (req, res) => {
     const { email, password } = req.body;
     const userIp = req.headers['x-forwarded-for'] || req.socket.remoteAddress;
@@ -262,7 +248,7 @@ app.post('/login', authLimiter, async (req, res) => {
         if (!ipLoginAttempts[userIp]) {
             ipLoginAttempts[userIp] = { count: 1 };
         } else {
-            ipLoginAttempts[ipLoginAttempts].count++;
+            ipLoginAttempts[userIp].count++;
         }
 
         if (ipLoginAttempts[userIp].count >= 4) {
@@ -287,8 +273,7 @@ app.post('/register', authLimiter, async (req, res) => {
 
 app.post('/create-meeting', checkAuth, async (req, res) => {
     try {
-        const userId = req.session.userId; 
-        const user = await User.findById(userId);
+        const user = await User.findById(req.session.userId);
 
         if (user && user.bpl >= 50) {
             user.bpl -= 50;
@@ -358,60 +343,30 @@ io.on('connection', (socket) => {
             const sender = await User.findById(data.userId);
             const receiver = await User.findOne({ nickname: data.to });
 
-            if (!sender || !receiver) {
-                return socket.emit('gift-result', { message: "Kullanıcı bulunamadı!" });
-            }
-            if (sender.nickname === receiver.nickname) {
-                return socket.emit('gift-result', { message: "Kendinize hediye gönderemezsiniz!" });
-            }
-            if (sender.bpl < 6000) {
-                return socket.emit('gift-result', { message: "Hediye göndermek için en az 6000 BPL bakiyeniz olmalıdır!" });
-            }
-            if (data.amount > 500) {
-                return socket.emit('gift-result', { message: "Tek seferde en fazla 500 BPL gönderebilirsiniz!" });
-            }
-            if (data.amount <= 0) return;
-            if (sender.bpl < data.amount) {
-                return socket.emit('gift-result', { message: "Bakiyeniz yetersiz!" });
-            }
+            if (!sender || !receiver) return socket.emit('gift-result', { message: "Kullanıcı bulunamadı!" });
+            if (sender.nickname === receiver.nickname) return socket.emit('gift-result', { message: "Kendinize hediye gönderemezsiniz!" });
+            if (sender.bpl < 6000) return socket.emit('gift-result', { message: "Hediye için en az 6000 BPL olmalı!" });
+            if (data.amount > 500) return socket.emit('gift-result', { message: "Tek seferde max 500 BPL!" });
+            if (data.amount <= 0 || sender.bpl < data.amount) return socket.emit('gift-result', { message: "Yetersiz bakiye!" });
 
             sender.bpl -= data.amount;
             receiver.bpl += data.amount;
+            await sender.save(); await receiver.save();
 
-            await sender.save();
-            await receiver.save();
-
-            logToFile(LOG_PATHS.GIFT, `GIFT: ${sender.nickname} -> ${receiver.nickname} | ${data.amount} BPL`);
-
-            socket.emit('gift-result', { 
-                newBalance: sender.bpl, 
-                message: `${receiver.nickname} kullanıcısına ${data.amount} BPL gönderildi!` 
-            });
-
-            io.to(data.room).emit('new-message', { 
-                sender: "SİSTEM", 
-                text: `🎁 ${sender.nickname}, ${receiver.nickname} kullanıcısına ${data.amount} BPL hediye etti!` 
-            });
-
-        } catch (e) {
-            socket.emit('gift-result', { message: "Hata oluştu." });
-        }
+            logToFile(LOG_PATHS.GIFT, `GIFT: ${sender.nickname} -> ${receiver.nickname} | ${data.amount}`);
+            socket.emit('gift-result', { newBalance: sender.bpl, message: "Başarılı!" });
+            io.to(data.room).emit('new-message', { sender: "SİSTEM", text: `🎁 ${sender.nickname}, ${receiver.nickname}'a ${data.amount} BPL gönderdi!` });
+        } catch (e) { socket.emit('gift-result', { message: "Hata!" }); }
     });
 
-    socket.on('webrtc-offer', (data) => {
-        socket.to(data.toSocket).emit('webrtc-offer', { offer: data.offer, fromSocket: socket.id, senderNick: data.senderNick });
-    });
-    socket.on('webrtc-answer', (data) => {
-        socket.to(data.toSocket).emit('webrtc-answer', { answer: data.answer, fromSocket: socket.id });
-    });
-    socket.on('webrtc-ice-candidate', (data) => {
-        socket.to(data.toSocket).emit('webrtc-ice-candidate', { candidate: data.candidate, fromSocket: socket.id });
-    });
+    // WebRTC Sinyalleşme
+    socket.on('webrtc-offer', (data) => { socket.to(data.toSocket).emit('webrtc-offer', { offer: data.offer, fromSocket: socket.id, senderNick: data.senderNick }); });
+    socket.on('webrtc-answer', (data) => { socket.to(data.toSocket).emit('webrtc-answer', { answer: data.answer, fromSocket: socket.id }); });
+    socket.on('webrtc-ice-candidate', (data) => { socket.to(data.toSocket).emit('webrtc-ice-candidate', { candidate: data.candidate, fromSocket: socket.id }); });
 
-    socket.on('disconnect', () => {
-        if (socket.roomName) socket.to(socket.roomName).emit('user-left', socket.id);
-    });
+    socket.on('disconnect', () => { if (socket.roomName) socket.to(socket.roomName).emit('user-left', socket.id); });
 
+    // Arena Mantığı
     socket.on('join-arena', async (data) => {
         socket.join("arena_lobby");
         try {
@@ -419,9 +374,7 @@ io.on('connection', (socket) => {
             if (!user) return;
             const animalName = data.selectedAnimal || user.inventory[0] || "Gökdoğan";
             socket.userData = {
-                userId: user._id.toString(),
-                nickname: user.nickname,
-                animal: animalName,
+                userId: user._id.toString(), nickname: user.nickname, animal: animalName,
                 stats: { hp: user.stats[animalName]?.hp || 100, atk: user.stats[animalName]?.atk || 10 }
             };
         } catch (err) { }
@@ -440,161 +393,111 @@ io.on('connection', (socket) => {
                 socket.emit('match-found', { matchId, winnerId, opponent: oppSocket.userData });
                 oppSocket.emit('match-found', { matchId, winnerId, opponent: socket.userData });
             }
-else {
-        // --- BOT SİSTEMİ BAŞLANGIÇ ---
-        // 5 saniye sonra hala kimse yoksa botu gönder
-        setTimeout(() => {
-            const currentLobby = io.sockets.adapter.rooms.get("arena_lobby");
-            if (currentLobby && currentLobby.has(socket.id)) {
-                const animals = ["Aslan", "Kurt", "Kaplan", "Ayı"];
-                const randomAnimal = animals[Math.floor(Math.random() * animals.length)];
-                
-                const matchId = `bot_match_${Date.now()}`;
-                socket.leave("arena_lobby");
-                socket.join(matchId);
-
-                // Bot verisi (Sanki gerçek bir kullanıcıymış gibi)
-                const botData = {
-                    nickname: "Kara_Pençe_BOT",
-                    animal: randomAnimal,
-                    userId: "bot_user"
-                };
-
-                // Oyuncuya rakip bulundu sinyali gönder
-                socket.emit('match-found', { 
-                    matchId, 
-                    winnerId: socket.userData.userId, // Test için hep oyuncu kazansın
-                    winnerAnimal: socket.userData.animal,
-                    opponent: botData 
-                });
-            }
-        }, 5000); // 5 saniye bekleme süresi
-    }
-});
-
-            
+        } else {
+            // BOT SİSTEMİ
+            setTimeout(() => {
+                const currentLobby = io.sockets.adapter.rooms.get("arena_lobby");
+                if (currentLobby && currentLobby.has(socket.id)) {
+                    const animals = ["Aslan", "Kurt", "Kaplan", "Ayı"];
+                    const matchId = `bot_match_${Date.now()}`;
+                    socket.leave("arena_lobby"); socket.join(matchId);
+                    socket.emit('match-found', { 
+                        matchId, winnerId: socket.userData.userId, 
+                        opponent: { nickname: "Kara_Pençe_BOT", animal: animals[Math.floor(Math.random() * animals.length)], userId: "bot" } 
+                    });
+                }
+            }, 5000);
         }
     });
 
     socket.on('claim-victory', async (data) => {
         try {
             const user = await User.findById(data.userId);
-            if (user) {
-                user.bpl += 50;
-                await user.save();
-                logToFile(LOG_PATHS.ARENA, `ZAFER: ${user.nickname} +50 BPL`);
-            }
+            if (user) { user.bpl += 50; await user.save(); logToFile(LOG_PATHS.ARENA, `ZAFER: ${user.nickname} +50 BPL`); }
         } catch (e) { }
     });
 });
 
-// --- DİĞER API UÇ NOKTALARI ---
-
+// --- DİĞER API'LAR ---
 app.post('/save-wallet-address', checkAuth, async (req, res) => {
-    const { bnbAddress, usdtAddress } = req.body;
-    const userId = req.session.userId;
     try {
-        await User.findByIdAndUpdate(userId, { bnb_address: bnbAddress, usdt_address: usdtAddress });
-        res.json({ status: 'success', msg: 'Cüzdan adresleri kaydedildi.' });
+        await User.findByIdAndUpdate(req.session.userId, { bnb_address: req.body.bnbAddress, usdt_address: req.body.usdtAddress });
+        res.json({ status: 'success', msg: 'Kaydedildi.' });
     } catch (e) { res.json({ status: 'error' }); }
 });
 
 app.post('/sell-character', checkAuth, async (req, res) => {
-    const { hayvan, fiyat } = req.body;
-    const userId = req.session.userId;
     try {
-        const user = await User.findById(userId);
+        const user = await User.findById(req.session.userId);
         if (user.inventory.length <= 1) return res.json({ status: 'error', msg: 'En az 1 karakter kalmalı!' });
-        const index = user.inventory.indexOf(hayvan);
+        const index = user.inventory.indexOf(req.body.hayvan);
         if (index > -1) {
             user.inventory.splice(index, 1);
-            const netKazanc = fiyat * 0.70;
-            user.bpl += netKazanc;
+            user.bpl += (req.body.fiyat * 0.70);
             await user.save();
-            logToFile(LOG_PATHS.MARKET, `${user.nickname} sattı: ${hayvan}`);
-            res.json({ status: 'success', msg: `Satıldı: ${netKazanc} BPL eklendi.` });
+            res.json({ status: 'success', msg: 'Satıldı.' });
         }
     } catch (e) { res.json({ status: 'error' }); }
 });
 
 app.post('/withdraw', checkAuth, async (req, res) => {
-    const { amount } = req.body;
-    const userId = req.session.userId;
     try {
-        const user = await User.findById(userId);
-        if (amount < 7500 || user.bpl < amount) return res.json({ status: 'error', msg: 'Hatalı bakiye veya limit.' });
-        user.bpl -= amount;
+        const user = await User.findById(req.session.userId);
+        if (req.body.amount < 7500 || user.bpl < req.body.amount) return res.json({ status: 'error', msg: 'Limit yetersiz.' });
+        user.bpl -= req.body.amount;
         await user.save();
-        logToFile(LOG_PATHS.WALLET_WITHDRAW, `${user.nickname} çekim: ${amount} BPL`);
-        res.json({ status: 'success', msg: 'Çekim talebiniz alındı.' });
+        logToFile(LOG_PATHS.WALLET_WITHDRAW, `${user.nickname} çekim: ${req.body.amount}`);
+        res.json({ status: 'success', msg: 'Talep alındı.' });
     } catch (e) { res.json({ status: 'error' }); }
 });
 
 app.post('/verify-payment', checkAuth, async (req, res) => {
     const { txid, usd, bpl } = req.body;
-    const userId = req.session.userId;
     try {
-        const user = await User.findById(userId);
-        if (user.usedHashes.includes(txid)) return res.json({ status: 'error', msg: 'Bu işlem zaten kullanıldı!' });
-
+        const user = await User.findById(req.session.userId);
+        if (user.usedHashes.includes(txid)) return res.json({ status: 'error', msg: 'Zaten kullanıldı!' });
         const bscUrl = `https://api.bscscan.com/api?module=account&action=tokentx&address=${process.env.WALLET_ADDRESS}&apikey=${process.env.BSCSCAN_API_KEY}`;
         const response = await axios.get(bscUrl);
         const tx = response.data.result.find(t => t.hash.toLowerCase() === txid.toLowerCase());
-
         if (tx && tx.to.toLowerCase() === process.env.WALLET_ADDRESS.toLowerCase()) {
             const miktar = parseFloat(tx.value) / 10**parseInt(tx.tokenDecimal);
             if (miktar >= (parseFloat(usd) * 0.98)) {
-                user.bpl += parseInt(bpl);
-                user.usedHashes.push(txid);
-                await user.save();
-                logToFile(LOG_PATHS.PAYMENT_LOG, `${user.nickname} ödeme onaylandı: ${txid}`);
-                return res.json({ status: 'success', msg: 'BPL Yüklendi!' });
+                user.bpl += parseInt(bpl); user.usedHashes.push(txid);
+                await user.save(); return res.json({ status: 'success', msg: 'BPL Yüklendi!' });
             }
         }
-        res.json({ status: 'error', msg: 'Ödeme doğrulanamadı.' });
+        res.json({ status: 'error', msg: 'Doğrulanamadı.' });
     } catch (e) { res.json({ status: 'error' }); }
 });
 
 app.post('/buy-animal', checkAuth, async (req, res) => {
-    const { animalName, price } = req.body;
-    const userId = req.session.userId;
     try {
-        const user = await User.findById(userId);
-        if (user && user.bpl >= price) {
-            user.bpl -= price;
-            user.inventory.push(animalName);
+        const user = await User.findById(req.session.userId);
+        if (user && user.bpl >= req.body.price) {
+            user.bpl -= req.body.price;
+            user.inventory.push(req.body.animalName);
             if(!user.stats) user.stats = {};
-            user.stats[animalName] = { hp: 100, atk: 10, def: 10, tempPower: false };
-            user.markModified('stats');
-            await user.save();
-            logToFile(LOG_PATHS.MARKET, `${user.nickname} satın aldı: ${animalName}`);
+            user.stats[req.body.animalName] = { hp: 100, atk: 10, def: 10 };
+            user.markModified('stats'); await user.save();
             res.json({ status: 'success', newBalance: user.bpl });
-        } else res.json({ status: 'error', msg: 'Yetersiz Bakiye!' });
+        } else res.json({ status: 'error', msg: 'Bakiye yetersiz.' });
     } catch (e) { res.json({ status: 'error' }); }
 });
 
 app.post('/upgrade-stat', checkAuth, async (req, res) => {
-    const { animalName, statType } = req.body;
-    const userId = req.session.userId;
-    const prices = { hp: 50, atk: 40, def: 35, battleMode: 15 };
+    const prices = { hp: 50, atk: 40, def: 35 };
     try {
-        const user = await User.findById(userId);
-        const price = prices[statType];
+        const user = await User.findById(req.session.userId);
+        const price = prices[req.body.statType];
         if (user && user.bpl >= price) {
             user.bpl -= price;
-            user.stats[animalName][statType] += statType === 'hp' ? 10 : 5;
-            user.markModified('stats');
-            await user.save();
+            user.stats[req.body.animalName][req.body.statType] += (req.body.statType === 'hp' ? 10 : 5);
+            user.markModified('stats'); await user.save();
             res.json({ status: 'success', newBalance: user.bpl });
         } else res.json({ status: 'error' });
     } catch (e) { res.json({ status: 'error' }); }
 });
 
-// Render için 0.0.0.0 hostu ile dinleme yapıyoruz
 server.listen(PORT, "0.0.0.0", () => {
-    console.log(`=========================================`);
     console.log(`SUNUCU AKTİF | Port: ${PORT}`);
-    console.log(`=========================================`);
 });
-
-
