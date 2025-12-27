@@ -13,12 +13,16 @@ const rateLimit = require('express-rate-limit');
 const connectDB = require('./db');
 const User = require('./models/User');
 
+// Veritabanı bağlantısı
 connectDB();
 
 const app = express();
 const server = http.createServer(app);
 const io = socketIo(server);
-const PORT = process.env.PORT || 3000;
+
+// --- RENDER İÇİN KRİTİK PORT VE PROXY AYARI ---
+const PORT = process.env.PORT || 10000; 
+app.set('trust proxy', 1); // Render proxy üzerinden IP'yi doğru almak için şart
 
 // ODA YÖNETİM MERKEZİ (Zamanlama burada tutulur)
 const activeMeetings = {};
@@ -41,7 +45,6 @@ let ipLoginAttempts = {};
 
 
 // --- MIDDLEWARE ---
-app.set('trust proxy', true); // IP adresini doğru yakalamak için (Proxy arkasındaysa)
 app.use(bodyParser.json()); 
 app.use(bodyParser.urlencoded({ extended: true }));
 app.use(express.static('public'));
@@ -58,9 +61,13 @@ app.set('view engine', 'ejs');
 const logToFile = (relativePath, content) => {
     const fullPath = path.join(__dirname, relativePath);
     const dir = path.dirname(fullPath);
-    if (!fs.existsSync(dir)) fs.mkdirSync(dir, { recursive: true });
-    const logLine = `${new Date().toLocaleString('tr-TR')} | ${content}\n`;
-    fs.appendFileSync(fullPath, logLine, 'utf8');
+    try {
+        if (!fs.existsSync(dir)) fs.mkdirSync(dir, { recursive: true });
+        const logLine = `${new Date().toLocaleString('tr-TR')} | ${content}\n`;
+        fs.appendFileSync(fullPath, logLine, 'utf8');
+    } catch (err) {
+        console.error("Log yazma hatası:", err.message);
+    }
 };
 
 const LOG_PATHS = {
@@ -71,15 +78,14 @@ const LOG_PATHS = {
     MEETING: 'public/caracter/burning/meeting.txt',
     WALLET_WITHDRAW: 'data/game/wallet/wallet.dat',
     PAYMENT_LOG: 'data/game/wallet/payment.dat',
-    SUPPORT: 'data/support/tickets.txt' // Yeni: Destek talepleri için
+    SUPPORT: 'data/support/tickets.txt' 
 };
 
 // --- ANA SAYFA VE IP YÖNETİMİ ---
 app.get('/', (req, res) => {
-    // Kullanıcının IP adresini alıyoruz
-    const userIp = req.ip || req.headers['x-forwarded-for'] || req.socket.remoteAddress;
+    // Render/Proxy üzerinden gerçek kullanıcı IP'sini alıyoruz
+    const userIp = req.headers['x-forwarded-for'] || req.socket.remoteAddress;
     
-    // IP Ban Kontrol Mantığı
     let isBlocked = false;
     let remainingTime = 0;
 
@@ -89,11 +95,10 @@ app.get('/', (req, res) => {
             isBlocked = true;
             remainingTime = Math.ceil((ipLoginAttempts[userIp].banUntil - simdi) / (1000 * 60));
         } else {
-            delete ipLoginAttempts[userIp]; // Süre bittiyse kaydı temizle
+            delete ipLoginAttempts[userIp]; 
         }
     }
 
-    // index.ejs'ye IP adresini ve makaleleri gönderiyoruz
     res.render('index', { 
         articles: ["Arena Yayında!", "Market Güncellendi"],
         userIp: userIp,
@@ -107,29 +112,28 @@ app.get('/', (req, res) => {
 // Giriş yapmamış kullanıcıyı ana sayfaya kovar
 const checkAuth = (req, res, next) => {
     if (req.session.userId) {
-        next(); // Giriş yapmış, devam et
+        next(); 
     } else {
-        res.redirect('/'); // Giriş yapmamış, ana sayfaya yolla
+        res.redirect('/'); 
     }
 };
 
 
-// --- YENİ ÖZELLİK: DESTEK / ŞİKAYET FORMU ---
+// --- DESTEK / ŞİKAYET FORMU ---
 app.post('/contact-submit', async (req, res) => {
     const { email, message } = req.body;
-    const userIp = req.ip;
+    const userIp = req.headers['x-forwarded-for'] || req.socket.remoteAddress;
 
     try {
         const logContent = `DESTEK TALEBİ: [IP: ${userIp}] [Email: ${email}] Mesaj: ${message}`;
         logToFile(LOG_PATHS.SUPPORT, logContent);
-        
         res.json({ status: 'success', msg: 'Mesajınız başarıyla iletildi. En kısa sürede döneceğiz.' });
     } catch (e) {
         res.json({ status: 'error', msg: 'Mesaj iletilemedi.' });
     }
 });
 
-// --- YENİ ÖZELLİK: ŞİFRE SIFIRLAMA TALEBİ ---
+// --- ŞİFRE SİFİRLEME TALEBİ ---
 app.post('/forgot-password', async (req, res) => {
     const { email } = req.body;
     try {
@@ -137,11 +141,7 @@ app.post('/forgot-password', async (req, res) => {
         if (!user) {
             return res.json({ status: 'error', msg: 'Bu e-posta adresi sistemde kayıtlı değil.' });
         }
-        
-        // Burada gerçek bir mail gönderme (Nodemailer vb.) eklenebilir. 
-        // Şimdilik sadece logluyoruz.
         logToFile(LOG_PATHS.DEV, `ŞİFRE SIFIRLAMA TALEBİ: ${email}`);
-        
         res.json({ status: 'success', msg: 'Şifre sıfırlama bağlantısı e-posta adresinize gönderildi.' });
     } catch (e) {
         res.json({ status: 'error', msg: 'İşlem sırasında bir hata oluştu.' });
@@ -225,35 +225,32 @@ app.get('/meeting', checkAuth, async (req, res) => {
 
 app.post('/login', authLimiter, async (req, res) => {
     const { email, password } = req.body;
-    const userIp = req.ip || req.headers['x-forwarded-for'] || req.socket.remoteAddress;
+    const userIp = req.headers['x-forwarded-for'] || req.socket.remoteAddress;
 
-    // 1. IP BAN KONTROLÜ
     if (ipLoginAttempts[userIp] && ipLoginAttempts[userIp].count >= 4) {
         const simdi = Date.now();
         if (simdi < ipLoginAttempts[userIp].banUntil) {
             const kalanDakika = Math.ceil((ipLoginAttempts[userIp].banUntil - simdi) / (1000 * 60));
             return res.send(`<script>alert("IP adresiniz engellendi! Kalan: ${kalanDakika} dakika."); window.location.href="/";</script>`);
         } else {
-            delete ipLoginAttempts[userIp]; // Süre dolmuşsa engeli kaldır
+            delete ipLoginAttempts[userIp]; 
         }
     }
 
     const user = await User.findOne({ email, password });
 
     if (user) {
-        delete ipLoginAttempts[userIp]; // Giriş başarılıysa denemeleri sıfırla
+        delete ipLoginAttempts[userIp]; 
         req.session.userId = user._id;
         res.redirect(`/profil`);
     } else {
-        // 2. HATALI GİRİŞ SAYACINI ARTIR
         if (!ipLoginAttempts[userIp]) {
             ipLoginAttempts[userIp] = { count: 1 };
         } else {
-            ipLoginAttempts[userIp].count++;
+            ipLoginAttempts[ipLoginAttempts].count++;
         }
 
         if (ipLoginAttempts[userIp].count >= 4) {
-            // 4. denemede 120 dakika (120 * 60 * 1000 ms) banla
             ipLoginAttempts[userIp].banUntil = Date.now() + (120 * 60 * 1000);
             return res.send('<script>alert("4 kez hatalı giriş! 120 dakika boyunca form kilitlendi."); window.location.href="/";</script>');
         }
@@ -267,7 +264,10 @@ app.post('/register', authLimiter, async (req, res) => {
         const newUser = new User({ ...req.body, bpl: 2500 });
         await newUser.save();
         res.send('<script>alert("Kayıt Başarılı!"); window.location.href="/";</script>');
-    } catch (e) { res.send("Kayıt Hatası: Veriler geçersiz."); }
+    } catch (e) { 
+        console.error("Kayıt Hatası:", e.message);
+        res.send("Kayıt Hatası: Veriler geçersiz."); 
+    }
 });
 
 app.post('/create-meeting', checkAuth, async (req, res) => {
@@ -338,7 +338,6 @@ io.on('connection', (socket) => {
         io.emit('receive-meeting-invite', { from: data.from, toNick: data.toNick ? data.toNick.trim() : "Herkes", room: data.room });
     });
 
-    // --- HEDİYELEŞME SİSTEMİ ---
     socket.on('send-gift', async (data) => {
         try {
             const sender = await User.findById(data.userId);
@@ -535,10 +534,7 @@ app.post('/upgrade-stat', checkAuth, async (req, res) => {
         const price = prices[statType];
         if (user && user.bpl >= price) {
             user.bpl -= price;
-            if (statType === 'hp') user.stats[animalName].hp += 10;
-            else if (statType === 'atk') user.stats[animalName].atk += 5;
-            else if (statType === 'def') user.stats[animalName].def += 5;
-            else if (statType === 'battleMode') user.stats[animalName].tempPower = true;
+            user.stats[animalName][statType] += statType === 'hp' ? 10 : 5;
             user.markModified('stats');
             await user.save();
             res.json({ status: 'success', newBalance: user.bpl });
@@ -546,4 +542,9 @@ app.post('/upgrade-stat', checkAuth, async (req, res) => {
     } catch (e) { res.json({ status: 'error' }); }
 });
 
-server.listen(PORT, () => console.log(`Sunucu ${PORT} portunda aktif.`));
+// Render için 0.0.0.0 hostu ile dinleme yapıyoruz
+server.listen(PORT, "0.0.0.0", () => {
+    console.log(`=========================================`);
+    console.log(`SUNUCU AKTİF | Port: ${PORT}`);
+    console.log(`=========================================`);
+});
