@@ -1,0 +1,223 @@
+// Path: views\meeting.ejs
+<!DOCTYPE html>
+<html lang="tr">
+<head>
+    <meta charset="UTF-8">
+    <title>BPL | Elite Beşgen Masa</title>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+    <script src="/socket.io/socket.io.js"></script>
+    <style>
+        :root { --neon-green: #39FF14; --neon-yellow: #FFFF00; --dark-bg: #0d0d0d; }
+        body { background: var(--dark-bg); color: var(--neon-green); font-family: 'Segoe UI', sans-serif; overflow: hidden; height: 100vh; margin: 0; }
+        .layout { display: grid; grid-template-columns: 1fr 340px; height: 100vh; }
+        .arena { position: relative; display: flex; justify-content: center; align-items: center; }
+        .pentagon-container { position: relative; width: 600px; height: 600px; }
+        
+        .table-center {
+            position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%);
+            width: 220px; height: 220px; background: #000; border: 2px solid var(--neon-green);
+            clip-path: polygon(50% 0%, 100% 38%, 82% 100%, 18% 100%, 0% 38%);
+            display: flex; justify-content: center; align-items: center; flex-direction: column;
+        }
+
+        .cam-slot {
+            position: absolute; width: 140px; height: 100px;
+            background: #1a1a1a; border: 2px solid var(--neon-green); border-radius: 8px; overflow: hidden;
+            display: flex; flex-direction: column; align-items: center; justify-content: center;
+        }
+        .cam-slot video { width: 100%; height: 100%; object-fit: cover; background: #000; }
+        .tag { width: 100%; background: rgba(57, 255, 20, 0.2); color: var(--neon-green); font-size: 0.7rem; text-align: center; padding: 2px 0; border-top: 1px solid var(--neon-green); }
+
+        /* KESİN KÖŞE KOORDİNATLARI */
+        #slot-1 { top: 0%; left: 50%; transform: translate(-50%, -50%); border-color: var(--neon-yellow); }
+        #slot-2 { top: 35%; right: 0%; transform: translate(20%, -50%); }
+        #slot-3 { bottom: 5%; right: 10%; }
+        #slot-4 { bottom: 5%; left: 10%; }
+        #slot-5 { top: 35%; left: 0%; transform: translate(-20%, -50%); }
+
+        .side { background: #050505; border-left: 1px solid var(--neon-green); padding: 15px; display: flex; flex-direction: column; }
+        #msgs { flex: 1; overflow-y: auto; border: 1px solid #222; margin-bottom: 10px; padding: 5px; font-size: 0.8rem; }
+    </style>
+</head>
+<body>
+
+<div class="layout">
+    <div class="arena">
+        <div class="pentagon-container">
+            <div class="table-center">
+                <div id="clock" style="font-size: 2rem; color: var(--neon-yellow);">90:00</div>
+            </div>
+
+            <div class="cam-slot" id="slot-1">
+                <video id="myCam" autoplay muted playsinline></video>
+                <div class="tag" id="tag-1">MASA SAHİBİ</div>
+            </div>
+
+            <div class="cam-slot" id="slot-2"><video id="v2" autoplay playsinline></video><div class="tag" id="tag-2">BOŞ</div></div>
+            <div class="cam-slot" id="slot-3"><video id="v3" autoplay playsinline></video><div class="tag" id="tag-3">BOŞ</div></div>
+            <div class="cam-slot" id="slot-4"><video id="v4" autoplay playsinline></video><div class="tag" id="tag-4">BOŞ</div></div>
+            <div class="cam-slot" id="slot-5"><video id="v5" autoplay playsinline></video><div class="tag" id="tag-5">BOŞ</div></div>
+        </div>
+    </div>
+
+    <div class="side">
+        <h6 class="text-center text-warning">MASA PANELİ</h6>
+        <div id="msgs"></div>
+        <div class="input-group mb-2">
+            <input type="text" id="chatInp" class="form-control bg-dark text-white border-success">
+            <button onclick="msg()" class="btn btn-success">></button>
+        </div>
+        <input type="text" id="target" class="form-control bg-dark text-white border-warning mb-2" placeholder="Davet Nick">
+        <button onclick="sendInv()" class="btn btn-warning btn-sm">DAVET ET</button>
+        <a href="/profil" class="btn btn-outline-danger btn-sm mt-auto">MASADAN AYRIL</a>
+    </div>
+</div>
+
+<script>
+    const socket = io();
+    const room = "<%= roomId %>";
+    const myNick = "<%= user.nickname %>";
+    let myStream;
+    const peers = {};
+
+    // KOLTUK TAKİBİ
+    // Her slot bir kullanıcıya (socketId) zimmetlenir.
+    const slotMap = {
+        "slot-2": { busy: false, sid: null },
+        "slot-3": { busy: false, sid: null },
+        "slot-4": { busy: false, sid: null },
+        "slot-5": { busy: false, sid: null }
+    };
+
+    async function init() {
+        // Kamera denemesi (Hata alsa da devam eder)
+        try {
+            myStream = await navigator.mediaDevices.getUserMedia({ video: true, audio: true });
+            document.getElementById('myCam').srcObject = myStream;
+        } catch (e) {
+            console.log("Kamera yok veya izin verilmedi, sadece ses/metin.");
+        }
+        
+        // Kamera olsa da olmasa da odaya gir
+        socket.emit('join-chat', { room, nickname: myNick, userId: "<%= user.id %>" });
+    }
+
+    init();
+
+    // SAYAÇ (Oda kurulduğu andan itibaren akar)
+    socket.on('sync-meeting', (data) => {
+        let rem = Math.floor(data.remaining / 1000);
+        setInterval(() => {
+            if(rem <= 0) window.location.href = "/profil";
+            let m = Math.floor(rem / 60); let s = rem % 60;
+            document.getElementById('clock').innerText = `${m}:${s < 10 ? '0'+s : s}`;
+            rem--;
+        }, 1000);
+    });
+
+    // BİRİ GİRDİĞİNDE (KAMERADAN BAĞIMSIZ KOLTUĞA OTURT)
+    socket.on('user-joined', (data) => {
+        assignSlot(data.socketId, data.nickname);
+        
+        // WebRTC teklifi (Eğer kamera varsa/açıksa)
+        if(myStream) {
+            const pc = createPeer(data.socketId, data.nickname);
+            pc.createOffer().then(offer => {
+                pc.setLocalDescription(offer);
+                socket.emit('webrtc-offer', { toSocket: data.socketId, offer, senderNick: myNick });
+            });
+        }
+    });
+
+    function assignSlot(sid, nickname) {
+        for (let key in slotMap) {
+            if (!slotMap[key].busy) {
+                slotMap[key].busy = true;
+                slotMap[key].sid = sid;
+                const tagId = "tag-" + key.split('-')[1];
+                document.getElementById(tagId).innerText = nickname;
+                document.getElementById(tagId).style.background = "rgba(57, 255, 20, 0.6)";
+                break;
+            }
+        }
+    }
+
+    // WebRTC İşlemleri (Görüntü varsa akar, yoksa hata vermez)
+    socket.on('webrtc-offer', async (data) => {
+        assignSlot(data.fromSocket, data.senderNick); // Koltuğa oturt (Eğer henüz oturmadıysa)
+        const pc = createPeer(data.fromSocket, data.senderNick);
+        await pc.setRemoteDescription(new RTCSessionDescription(data.offer));
+        const answer = await pc.createAnswer();
+        await pc.setLocalDescription(answer);
+        socket.emit('webrtc-answer', { toSocket: data.fromSocket, answer });
+    });
+
+    socket.on('webrtc-answer', async (data) => {
+        if (peers[data.fromSocket]) {
+            await peers[data.fromSocket].setRemoteDescription(new RTCSessionDescription(data.answer));
+        }
+    });
+
+    socket.on('webrtc-ice-candidate', (data) => {
+        if (peers[data.fromSocket]) {
+            peers[data.fromSocket].addIceCandidate(new RTCIceCandidate(data.candidate)).catch(e=>{});
+        }
+    });
+
+    function createPeer(sid, nick) {
+        if (peers[sid]) return peers[sid];
+        const pc = new RTCPeerConnection({ iceServers: [{ urls: 'stun:stun.l.google.com:19302' }] });
+        peers[sid] = pc;
+
+        if(myStream) myStream.getTracks().forEach(t => pc.addTrack(t, myStream));
+
+        pc.onicecandidate = (e) => {
+            if (e.candidate) socket.emit('webrtc-ice-candidate', { toSocket: sid, candidate: e.candidate });
+        };
+
+        pc.ontrack = (e) => {
+            // Hangi slotta olduğunu bul ve videoyu oraya bağla
+            for (let key in slotMap) {
+                if (slotMap[key].sid === sid) {
+                    const vId = "v" + key.split('-')[1];
+                    document.getElementById(vId).srcObject = e.streams[0];
+                }
+            }
+        };
+        return pc;
+    }
+
+    socket.on('user-left', (sid) => {
+        if (peers[sid]) { peers[sid].close(); delete peers[sid]; }
+        for (let key in slotMap) {
+            if (slotMap[key].sid === sid) {
+                slotMap[key].busy = false; slotMap[key].sid = null;
+                const num = key.split('-')[1];
+                document.getElementById("tag-"+num).innerText = "BOŞ";
+                document.getElementById("tag-"+num).style.background = "rgba(57, 255, 20, 0.2)";
+                document.getElementById("v"+num).srcObject = null;
+            }
+        }
+    });
+
+    function msg() {
+        const t = document.getElementById('chatInp').value;
+        if(t) socket.emit('meeting-msg', { room, sender: myNick, text: t });
+        document.getElementById('chatInp').value = "";
+    }
+
+    socket.on('new-meeting-msg', (d) => {
+        const div = document.createElement('div');
+        div.innerHTML = `<b class="text-warning">${d.sender}:</b> ${d.text}`;
+        const m = document.getElementById('msgs');
+        m.appendChild(div); m.scrollTop = m.scrollHeight;
+    });
+
+    function sendInv() {
+        const t = document.getElementById('target').value;
+        if(t) socket.emit('send-private-invite', { from: myNick, toNick: t, room: room });
+        document.getElementById('target').value = "";
+    }
+</script>
+</body>
+</html>

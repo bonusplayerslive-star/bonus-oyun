@@ -1,0 +1,113 @@
+// Path: views\development.ejs
+<!DOCTYPE html>
+<html lang="tr">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>BPL - Geliştirme Merkezi</title>
+    <style>
+        body { background-color: #050505; color: #39FF14; font-family: 'Courier New', Courier, monospace; }
+        .dev-container { max-width: 600px; margin: 50px auto; padding: 20px; border: 2px solid #39FF14; box-shadow: 0 0 15px rgba(57, 255, 20, 0.3); border-radius: 15px; }
+        .stat-card { background: rgba(57, 255, 20, 0.05); border: 1px solid #222; padding: 15px; margin-bottom: 15px; display: flex; justify-content: space-between; align-items: center; border-radius: 10px; }
+        .stat-info h3 { margin: 0; color: #FFFF00; }
+        .stat-info p { margin: 5px 0; font-size: 0.9em; color: #888; }
+        .btn-upgrade { background: transparent; border: 1px solid #39FF14; color: #39FF14; padding: 10px 20px; cursor: pointer; transition: 0.3s; border-radius: 5px; font-weight: bold; }
+        .btn-upgrade:hover { background: #39FF14; color: #000; box-shadow: 0 0 10px #39FF14; }
+        .balance-box { text-align: center; font-size: 1.2em; margin-bottom: 20px; border-bottom: 1px solid #333; padding-bottom: 15px; color: #FFFF00; }
+        .back-btn { display: block; text-align: center; margin-top: 20px; color: #ff4444; text-decoration: none; font-weight: bold; }
+        .back-btn:hover { text-decoration: underline; }
+    </style>
+</head>
+<body>
+
+    <div class="dev-container">
+        <h1 style="text-align: center; letter-spacing: 3px;">GELİŞTİRME MERKEZİ</h1>
+        
+        <div class="balance-box">
+            Mevcut Bakiye: <span id="current-bpl"><%= user.bpl %></span> BPL
+        </div>
+
+        <div class="stat-card">
+            <div class="stat-info">
+                <h3>HP (CAN)</h3>
+                <p>+10 Can Puanı Ekler</p>
+            </div>
+            <div>
+                <span style="margin-right: 10px; color: #FFFF00;">50 BPL</span>
+                <button class="btn-upgrade" onclick="upgrade('hp', 50)">YÜKSELT</button>
+            </div>
+        </div>
+
+        <div class="stat-card">
+            <div class="stat-info">
+                <h3>SALDIRI</h3>
+                <p>+5 Hasar Gücü Ekler</p>
+            </div>
+            <div>
+                <span style="margin-right: 10px; color: #FFFF00;">40 BPL</span>
+                <button class="btn-upgrade" onclick="upgrade('atk', 40)">YÜKSELT</button>
+            </div>
+        </div>
+
+        <div class="stat-card">
+            <div class="stat-info">
+                <h3>SAVUNMA</h3>
+                <p>Gelen Hasarı -5 Azaltır</p>
+            </div>
+            <div>
+                <span style="margin-right: 10px; color: #FFFF00;">35 BPL</span>
+                <button class="btn-upgrade" onclick="upgrade('def', 35)">YÜKSELT</button>
+            </div>
+        </div>
+
+        <div class="stat-card" style="border: 1px solid #FFFF00;">
+            <div class="stat-info">
+                <h3 style="color: #FFFF00;">ANLIK GÜÇ</h3>
+                <p>Sıradaki Savaş İçin +20 ATK!</p>
+            </div>
+            <div>
+                <span style="margin-right: 10px; color: #FFFF00;">15 BPL</span>
+                <button class="btn-upgrade" style="border-color: #FFFF00; color: #FFFF00;" onclick="upgrade('battleMode', 15)">AKTİF ET</button>
+            </div>
+        </div>
+
+        <a href="/profil?id=<%= user._id %>" class="back-btn">PROFİLE GERİ DÖN</a>
+    </div>
+
+    <script>
+        const userId = "<%= user._id %>";
+        // Envanter kontrolü
+        const animalName = "<%= user.inventory && user.inventory.length > 0 ? user.inventory[0] : 'Gökdoğan' %>";
+
+        async function upgrade(type, cost) {
+            if (!confirm(cost + " BPL karşılığında bu geliştirmeyi onaylıyor musunuz?")) return;
+
+            try {
+                const response = await fetch('/upgrade-stat', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        userId: userId,
+                        animalName: animalName,
+                        statType: type,
+                        cost: cost // ARTIK COST BİLGİSİ GİDİYOR
+                    })
+                });
+
+                const result = await response.json();
+
+                if (result.status === 'success') {
+                    // Sayfayı yenilemeden bakiyeyi güncelle
+                    document.getElementById('current-bpl').innerText = result.newBalance;
+                    alert("Geliştirme Başarılı! Yeni statlar bir sonraki savaşta aktif olacak.");
+                } else {
+                    alert("İşlem Başarısız: " + result.msg);
+                }
+            } catch (err) {
+                console.error(err);
+                alert("Bağlantı Hatası! Sunucu şu an yanıt vermiyor.");
+            }
+        }
+    </script>
+</body>
+</html>

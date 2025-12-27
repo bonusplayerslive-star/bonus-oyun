@@ -1,0 +1,264 @@
+// Path: views\arena.ejs
+<!DOCTYPE html>
+<html lang="tr">
+<head>
+    <meta charset="UTF-8">
+    <title>BPL - Arena Meydanı</title>
+    <link rel="stylesheet" href="/css/style.css">
+    <script src="/socket.io/socket.io.js"></script>
+    <style>
+        body { background: #000; color: #00ff00; font-family: 'Courier New', monospace; margin: 0; overflow: hidden; }
+        
+        /* Video Katmanı */
+        #video-overlay {
+            display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%;
+            background: rgba(0,0,0,0.9); z-index: 10000; justify-content: center; align-items: center;
+        }
+        #arena-video { max-width: 90%; max-height: 90%; border: 3px solid #00ff00; box-shadow: 0 0 20px #00ff00; }
+
+        .arena-container { height: 100vh; display: flex; flex-direction: column; align-items: center; justify-content: space-around; }
+        .fighters { display: flex; width: 100%; justify-content: space-around; align-items: center; }
+        .fighter-box { text-align: center; width: 300px; }
+        .fighter-img { width: 250px; height: 250px; object-fit: cover; border: 2px solid #00ff00; background: #111; }
+        
+        .hp-bar-bg { width: 100%; height: 25px; background: #222; border: 1px solid #00ff00; margin-top: 10px; position: relative; }
+        .hp-bar-fill { height: 100%; background: linear-gradient(to right, #006600, #00ff00); width: 100%; transition: 0.5s; }
+        .hp-text { position: absolute; width: 100%; text-align: center; top: 0; color: white; font-weight: bold; line-height: 25px; }
+
+        .controls { border-top: 2px solid #00ff00; width: 100%; padding: 30px; text-align: center; background: #050505; }
+        .btn-attack { background: #880000; color: #fff; font-size: 24px; padding: 15px 60px; border: 2px solid #ff0000; cursor: pointer; transition: 0.3s; }
+        .btn-attack:hover:not(:disabled) { background: #ff0000; box-shadow: 0 0 15px #ff0000; }
+        .btn-attack:disabled { opacity: 0.5; cursor: not-allowed; }
+    </style>
+</head>
+<body>
+
+    <div id="video-overlay">
+        <video id="arena-video" preload="auto"></video>
+    </div>
+
+    <div class="arena-container">
+        <h1 id="status-text" style="color: #ffcc00;">RAKİP BEKLENİYOR...</h1>
+
+        <div class="fighters">
+            <div class="fighter-box">
+                <img src="" id="my-img" class="fighter-img">
+                <h2 id="my-nick"><%= user.nickname %></h2>
+                <div class="hp-bar-bg">
+                    <div id="my-hp-fill" class="hp-bar-fill"></div>
+                    <div class="hp-text">HP: <span id="my-hp-val">100</span></div>
+                </div>
+            </div>
+
+            <div style="font-size: 5rem; color: #ff0000; text-shadow: 0 0 10px #ff0000;">VS</div>
+
+            <div class="fighter-box">
+                <img src="/images/searching.jpg" id="opp-img" class="fighter-img">
+                <h2 id="opp-nick">Savaşçı...</h2>
+                <div class="hp-bar-bg">
+                    <div id="opp-hp-fill" class="hp-bar-fill"></div>
+                    <div class="hp-text">HP: <span id="opp-hp-val">100</span></div>
+                </div>
+            </div>
+        </div>
+
+        <div class="controls">
+            <button id="attack-btn" class="btn-attack" style="display:none;">SALDIR!</button>
+        </div>
+    </div>
+
+    <script>
+        const socket = io();
+        const userId = "<%= user._id %>";
+        
+        // Boşluksuz ve PascalCase Sözlüğü
+        const animalMap = {
+            "Gökdoğan": "Peregrinefalcon",
+            "Yılan": "Snake",
+            "Aslan": "Lion",
+            "Kaplan": "Tiger",
+            "Kurt": "Kurd",
+            "Ayı": "Bear",
+            "Timsah": "Crocodile",
+            "Kartal": "Eagle",
+            "Goril": "Gorilla",
+            "Gergedan": "Rhino"
+        };
+
+        const urlParams = new URLSearchParams(window.location.search);
+        const myAnimalTr = urlParams.get('animal') || urlParams.get('select') || "Gökdoğan";
+        const myAnimalEn = animalMap[myAnimalTr] || myAnimalTr;
+
+        // Kendi Profil Resmimizi Ayarla
+        const myImgName = myAnimalTr.toLowerCase().replace('ö','o').replace('ğ','g');
+        document.getElementById('my-img').src = `/caracter/profile/${myImgName}.jpg`;
+
+        let currentMatchId = null;
+        let opponent = null;
+
+        // Arenaya Giriş
+        socket.emit('join-arena', { userId, selectedAnimal: myAnimalTr });
+        
+        // Rakip Aramayı Başlat (Kısa bir gecikmeyle)
+        setTimeout(() => { socket.emit('start-search'); }, 2000);
+
+        socket.on('match-found', (data) => {
+            currentMatchId = data.matchId;
+            opponent = data.opponent;
+            
+            document.getElementById('status-text').innerText = "SAVAŞ BAŞLADI!";
+            document.getElementById('opp-nick').innerText = opponent.nickname;
+            
+            const oppTr = opponent.animal;
+            const oppImgName = oppTr.toLowerCase().replace('ö','o').replace('ğ','g');
+            document.getElementById('opp-img').src = `/caracter/profile/${oppImgName}.jpg`;
+            document.getElementById('attack-btn').style.display = 'inline-block';
+        });
+
+        // Saldırı Mekanizması
+        document.getElementById('attack-btn').onclick = () => {
+            if(!currentMatchId) return;
+            
+            // Kendi hamle videomu oynat (Örn: Peregrinefalcon1.mp4)
+            playVideo(myAnimalEn, true);
+            
+            socket.emit('attack-enemy', { matchId: currentMatchId, damage: 10 });
+            
+            document.getElementById('attack-btn').disabled = true;
+            setTimeout(() => { document.getElementById('attack-btn').disabled = false; }, 3500);
+        };
+
+        // Hasar Alma
+        socket.on('take-damage', (data) => {
+            const oppEn = animalMap[opponent.animal] || opponent.animal;
+            // Rakibin hamle videosunu oynat (Örn: Snake1.mp4)
+            playVideo(oppEn, true);
+            
+            let currentHp = parseInt(document.getElementById('my-hp-val').innerText);
+            let newHp = currentHp - 10;
+            if(newHp < 0) newHp = 0;
+
+            document.getElementById('my-hp-val').innerText = newHp;
+            document.getElementById('my-hp-fill').style.width = newHp + "%";
+
+            if(newHp <= 0) {
+                socket.emit('victory', { 
+                    userId: opponent.userId, 
+                    matchId: currentMatchId, 
+                    winnerAnimal: opponent.animal 
+                });
+            }
+        });
+
+        // Video Oynatıcı Fonksiyonu
+        function playVideo(animalFolder, isAction) {
+            const overlay = document.getElementById('video-overlay');
+            const video = document.getElementById('arena-video');
+            
+            const suffix = isAction ? "1" : ""; 
+            // Yol: /caracter/move/Peregrinefalcon/Peregrinefalcon1.mp4
+            const path = `/caracter/move/${animalFolder}/${animalFolder}${suffix}.mp4`;
+
+            video.src = path;
+            overlay.style.display = 'flex';
+            
+            video.play().catch(err => {
+                console.error("Video oynatılamadı:", err);
+                overlay.style.display = 'none';
+            });
+
+            video.onended = () => {
+                overlay.style.display = 'none';
+            };
+        }
+
+        // Maç Sonu
+        socket.on('match-over', (data) => {
+            document.getElementById('attack-btn').style.display = 'none';
+            document.getElementById('status-text').innerText = (data.winnerId === userId) ? "ZAFER!" : "BOZGUN!";
+            
+            const winnerEn = animalMap[data.winnerAnimal] || data.winnerAnimal;
+            // Kazananın final videosunu oynat (Örn: Peregrinefalcon.mp4)
+            playVideo(winnerEn, false);
+
+            setTimeout(() => {
+                location.href = `/profil?id=${userId}`;
+            }, 6500);
+        });
+
+
+        // arena.ejs içindeki script kısmını bu mantıkla güncelle
+
+let matchData = null; // Gelen tüm veriyi burada tutacağız
+
+socket.on('match-found', (data) => {
+    matchData = data; // winnerId ve matchId burada saklı
+    currentMatchId = data.matchId;
+    opponent = data.opponent;
+    
+    document.getElementById('status-text').innerText = "RAKİP BULUNDU!";
+    document.getElementById('opp-nick').innerText = opponent.nickname;
+    
+    const oppTr = opponent.animal;
+    const oppImgName = oppTr.toLowerCase().replace('ö','o').replace('ğ','g');
+    document.getElementById('opp-img').src = `/caracter/profile/${oppImgName}.jpg`;
+    
+    document.getElementById('attack-btn').style.display = 'inline-block';
+});
+
+document.getElementById('attack-btn').onclick = function() {
+    this.style.display = 'none'; // Kontrol kullanıcıdan çıkar
+    startCinematicBattle();
+};
+
+async function startCinematicBattle() {
+    const status = document.getElementById('status-text');
+    const myAnimalEn = animalMap[myAnimalTr] || myAnimalTr;
+    const oppEn = animalMap[opponent.animal] || opponent.animal;
+    const isMeWinner = (matchData.winnerId === userId);
+
+    // 1. VİDEO: Sen Saldırıyorsun
+    status.innerText = "SALDIRI BAŞLATILDI!";
+    await playVideoPromise(myAnimalEn, true);
+    document.getElementById('opp-hp-fill').style.width = "50%"; // Görsel efekt
+
+    // 2. VİDEO: Rakip Karşılık Veriyor
+    status.innerText = "RAKİP SAVUNMAYA GEÇTİ!";
+    await playVideoPromise(oppEn, true);
+    document.getElementById('my-hp-fill').style.width = isMeWinner ? "30%" : "0%";
+
+    // 3. VİDEO: Final ve Zafer
+    const winnerEn = animalMap[matchData.winnerAnimal] || matchData.winnerAnimal;
+    status.innerText = isMeWinner ? "TEBRİKLER! KAZANDIN" : "MAĞLUP OLDUN!";
+    
+    if(isMeWinner) {
+        // Sunucuya hediyeyi işlemesi için sinyal gönder
+        socket.emit('claim-victory', { userId: userId });
+    }
+
+    await playVideoPromise(winnerEn, false);
+
+    // Otomatik Yönlendirme
+    setTimeout(() => {
+        location.href = `/profil?id=${userId}`;
+    }, 2000);
+}
+
+// Videoları bekletmek için Promise fonksiyonu
+function playVideoPromise(animalFolder, isAction) {
+    return new Promise((resolve) => {
+        const overlay = document.getElementById('video-overlay');
+        const video = document.getElementById('arena-video');
+        const suffix = isAction ? "1" : ""; 
+        video.src = `/caracter/move/${animalFolder}/${animalFolder}${suffix}.mp4`;
+        overlay.style.display = 'flex';
+        video.play().catch(e => resolve());
+        video.onended = () => {
+            overlay.style.display = 'none';
+            resolve();
+        };
+    });
+}
+    </script>
+</body>
+</html>

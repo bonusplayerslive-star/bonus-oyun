@@ -1,0 +1,225 @@
+// Path: views\wallet.ejs
+<!DOCTYPE html>
+<html lang="tr">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Cüzdan & Varlıklar - BPL</title>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+    <style>
+        body { background: #0f0f0f; color: #fff; padding-top: 20px; font-family: 'Courier New', monospace; }
+        .neon-border { border: 1px solid #39FF14; box-shadow: 0 0 10px rgba(57, 255, 20, 0.3); background: rgba(0,0,0,0.8); border-radius: 15px; }
+        .text-neon { color: #39FF14; text-shadow: 0 0 5px #39FF14; }
+        .btn-neon { border: 1px solid #39FF14; color: #39FF14; background: transparent; transition: 0.3s; font-weight: bold; }
+        .btn-neon:hover { background: #39FF14; color: #000; box-shadow: 0 0 20px #39FF14; }
+        
+        /* BEP20 Kritik Uyarı Animasyonu */
+        .bep20-alert {
+            background: rgba(255, 0, 0, 0.15);
+            border: 3px solid #ff0000;
+            color: #fff;
+            padding: 15px;
+            border-radius: 10px;
+            text-align: center;
+            animation: pulse-red 1.5s infinite;
+        }
+
+        @keyframes pulse-red {
+            0% { box-shadow: 0 0 5px #ff0000; transform: scale(1); }
+            50% { box-shadow: 0 0 25px #ff0000; transform: scale(1.01); }
+            100% { box-shadow: 0 0 5px #ff0000; transform: scale(1); }
+        }
+
+        .asset-card {
+            background: rgba(30, 30, 30, 0.9);
+            border: 1px solid #444;
+            border-radius: 10px;
+            transition: 0.3s;
+            overflow: hidden;
+        }
+        .asset-card:hover { border-color: #39FF14; transform: translateY(-5px); }
+        .asset-img { height: 140px; width: 100%; object-fit: cover; border-bottom: 1px solid #333; }
+        
+        .withdraw-note { font-size: 0.8rem; color: #ffa500; background: rgba(255,165,0,0.1); padding: 10px; border-radius: 5px; }
+    </style>
+</head>
+<body>
+
+<div class="container pb-5">
+    <div class="d-flex justify-content-between align-items-center mb-4 p-3 neon-border">
+        <div>
+            <h2 class="text-neon m-0">WALLET & ASSETS</h2>
+            <small class="text-muted">Finansal İşlem Merkezi</small>
+        </div>
+        <div class="text-end">
+            <span class="h4 d-block mb-1 text-warning"><%= user.bpl.toLocaleString() %> BPL</span>
+            <a href="/profil?id=<%= user.id %>" class="btn btn-sm btn-outline-light">Geri Dön</a>
+        </div>
+    </div>
+
+    <div class="bep20-alert mb-5">
+        <h5 class="m-0 fw-bold">⚠️ DİKKAT: SADECE BEP20 (BNB SMART CHAIN) AĞINI KULLANIN</h5>
+        <small>USDT gönderimlerinizde ağ seçeneğini BEP20 yapmayı unutmayın. Diğer ağlar desteklenmez.</small>
+    </div>
+
+    <div class="row">
+        <div class="col-md-6 mb-4">
+            <div class="card p-4 neon-border h-100">
+                <h4 class="text-info mb-4 border-bottom border-info pb-2">Ödeme Altyapısı</h4>
+                
+                <div class="mb-4">
+                    <label class="form-label text-info small">Ödeme Yapılacak Şirket Cüzdanı (USDT BEP20)</label>
+                    <div class="p-2 bg-dark rounded border border-secondary text-break font-monospace small">
+                        0x9f63e92E8B316b7119b4586998966dF4446Dc754
+                    </div>
+                </div>
+
+                <div class="mb-4">
+                    <label class="form-label">Sizin USDT (BEP20) Adresiniz</label>
+                    <input type="text" id="usdtAddress" class="form-control bg-dark text-white border-secondary" 
+                           value="<%= user.usdt_address || '' %>" placeholder="0x ile başlayan cüzdan adresiniz">
+                    <button onclick="saveAddress()" class="btn btn-sm btn-neon mt-2 w-100">CÜZDAN ADRESİMİ KAYDET</button>
+                </div>
+
+                <div class="mt-auto">
+                    <a href="/payment?id=<%= user.id %>" class="btn btn-warning w-100 py-3 fw-bold shadow">
+                        BPL PAKETİ SATIN AL (İNDİRİMLİ)
+                    </a>
+                </div>
+            </div>
+        </div>
+
+        <div class="col-md-6 mb-4">
+            <div class="card p-4 neon-border h-100">
+                <h4 class="text-danger mb-4 border-bottom border-danger pb-2">BPL Çekim (Withdraw)</h4>
+                
+                <div class="withdraw-note mb-4">
+                    <b>Kurallar:</b><br>
+                    • Minimum Çekim: 7,500 BPL<br>
+                    • İşlem Kesintisi: %25 (Otomatik hesaplanır)<br>
+                    • Talep sonrası manuel inceleme yapılır.
+                </div>
+
+                <div class="mb-3">
+                    <label class="form-label">Çekmek İstediğiniz BPL Miktarı</label>
+                    <input type="number" id="withdrawAmount" class="form-control bg-dark text-white border-danger" placeholder="Min: 7500">
+                </div>
+
+                <div id="calcBox" class="p-3 mb-4 bg-danger bg-opacity-10 border border-danger rounded" style="display:none;">
+                    <div class="d-flex justify-content-between">
+                        <span>Net Gönderilecek (BPL):</span>
+                        <span id="netAmount" class="fw-bold">0</span>
+                    </div>
+                </div>
+
+                <button onclick="withdrawRequest()" class="btn btn-danger w-100 py-3 fw-bold">ÇEKİM TALEBİ OLUŞTUR</button>
+            </div>
+        </div>
+    </div>
+
+    <div class="row mt-5">
+        <div class="col-12">
+            <h3 class="text-neon mb-4">VARLIKLARIM (KARAKTERLER)</h3>
+            <div class="row">
+                <% if(!user.inventory || user.inventory.length === 0) { %>
+                    <div class="col-12 text-center text-muted py-5 border rounded border-secondary">
+                        <p>Henüz bir varlığınız bulunmuyor.</p>
+                    </div>
+                <% } else { %>
+                    <% 
+                        const animalTranslate = {
+                            "YILAN": "Snake", "SNAKE": "Snake", "KAPLAN": "Tiger", "TIGER": "Tiger",
+                            "AYI": "Bear", "BEAR": "Bear", "TIMSAH": "Crocodile", "CROCODILE": "Crocodile",
+                            "KARTAL": "Eagle", "EAGLE": "Eagle", "KURT": "Kurd", "WOLF": "Kurd", "KURD": "Kurd",
+                            "ASLAN": "Lion", "LION": "Lion", "GORIL": "Gorilla", "GORILLA": "Gorilla",
+                            "GERGEDAN": "Rhino", "RHINO": "Rhino", "GÖKDOĞAN": "Peregrinefalcon"
+                        };
+                    %>
+                    <% user.inventory.forEach((item) => { 
+                        let upperName = item.toUpperCase();
+                        let engName = animalTranslate[upperName] || "logo";
+                        let originalPrice = ['ASLAN','LION','GERGEDAN','RHINO','GORIL','GORILLA','KAPLAN','TIGER'].includes(upperName) ? 5000 : 1000;
+                        let sellPrice = originalPrice * 0.70; // %30 KESİNTİ UYGULANMIŞ HALİ
+                    %>
+                        <div class="col-6 col-md-3 mb-4">
+                            <div class="asset-card text-center pb-3">
+                                <img src="/caracter/profile/<%= engName %>.jpg" onerror="this.src='/caracter/page/logo.jpeg'" class="asset-img mb-2">
+                                <h6 class="text-white text-uppercase mb-1"><%= item %></h6>
+                                <p class="text-success small fw-bold mb-3">Satış: <%= sellPrice %> BPL</p>
+                                
+                                <% if(user.inventory.length > 1) { %>
+                                    <button onclick="sellCharacter('<%= item %>', <%= originalPrice %>)" class="btn btn-sm btn-outline-danger mx-2">
+                                        SAT (%30 KESİNTİ)
+                                    </button>
+                                <% } else { %>
+                                    <span class="badge bg-secondary">ANA KARAKTER</span>
+                                <% } %>
+                            </div>
+                        </div>
+                    <% }) %>
+                <% } %>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script>
+    const userId = '<%= user.id %>';
+
+    // Çekim hesaplama motoru (%25 Kesinti)
+    document.getElementById('withdrawAmount').addEventListener('input', function(e) {
+        const amount = parseFloat(e.target.value);
+        const box = document.getElementById('calcBox');
+        if(amount >= 7500) {
+            box.style.display = 'block';
+            const net = amount * 0.75; 
+            document.getElementById('netAmount').innerText = net.toLocaleString();
+        } else {
+            box.style.display = 'none';
+        }
+    });
+
+    function saveAddress() {
+        const usdt = document.getElementById('usdtAddress').value.trim();
+        if(!usdt.startsWith('0x') || usdt.length < 40) return alert("Geçerli bir BEP20 (Metamask/TrustWallet) adresi giriniz!");
+
+        fetch('/save-wallet-address', {
+            method: 'POST',
+            headers: {'Content-Type': 'application/x-www-form-urlencoded'},
+            body: `userId=${userId}&usdtAddress=${usdt}`
+        }).then(r => r.json()).then(d => alert(d.msg));
+    }
+
+    function sellCharacter(hayvan, orijinalFiyat) {
+        const iade = orijinalFiyat * 0.70;
+        if(!confirm(`${hayvan} karakterini %30 kesinti ile ${iade} BPL'ye satmak istediğinize emin misiniz?`)) return;
+        
+        fetch('/sell-character', {
+            method: 'POST',
+            headers: {'Content-Type': 'application/x-www-form-urlencoded'},
+            body: `userId=${userId}&hayvan=${hayvan}&fiyat=${orijinalFiyat}`
+        }).then(r => r.json()).then(d => {
+            alert(d.msg);
+            if(d.status === 'success') location.reload();
+        });
+    }
+
+    function withdrawRequest() {
+        const amount = document.getElementById('withdrawAmount').value;
+        const usdt = document.getElementById('usdtAddress').value;
+
+        if(!usdt || usdt.length < 10) return alert("Önce geçerli bir USDT (BEP20) adresi kaydetmelisiniz!");
+        if(amount < 7500) return alert("Minimum çekim limiti 7500 BPL'dir.");
+        
+        fetch('/withdraw', {
+            method: 'POST',
+            headers: {'Content-Type': 'application/x-www-form-urlencoded'},
+            body: `userId=${userId}&amount=${amount}&network=BEP20`
+        }).then(r => r.json()).then(d => {
+            alert(d.msg);
+            if(d.status === 'success') location.reload();
+        });
+    }
+</script>
+</body>
+</html>

@@ -1,0 +1,279 @@
+// Path: views\profil.ejs
+<!DOCTYPE html>
+<html lang="tr">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>BPL - Profil</title>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+    <link rel="stylesheet" href="/css/style.css">
+    <style>
+        #bg-video {
+            position: fixed;
+            right: 0;
+            bottom: 0;
+            min-width: 100%;
+            min-height: 100%;
+            z-index: -1;
+            object-fit: cover;
+        }
+
+        body { 
+            color: #0f0; 
+            background: #000; 
+            font-family: 'Courier New', Courier, monospace;
+            overflow-x: hidden; 
+        }
+        
+        .glass-panel {
+            background: rgba(0, 0, 0, 0.75);
+            border: 1px solid #0f0;
+            box-shadow: 0 0 15px rgba(0, 255, 0, 0.2);
+            border-radius: 10px;
+            padding: 20px;
+            margin-bottom: 20px;
+        }
+
+        .nav-link-custom {
+            color: #0f0;
+            border: 1px solid #0f0;
+            padding: 8px 15px;
+            margin: 5px;
+            text-decoration: none;
+            display: inline-block;
+            transition: 0.3s;
+        }
+        .nav-link-custom:hover, .active-nav {
+            background: #0f0;
+            color: #000;
+            box-shadow: 0 0 20px #0f0;
+        }
+
+        .animal-card {
+            border: 1px solid #0f0;
+            padding: 15px;
+            text-align: center;
+            background: rgba(0, 40, 0, 0.5);
+            cursor: pointer;
+            transition: 0.2s ease-in-out;
+            position: relative;
+            height: 320px;
+            display: flex;
+            flex-direction: column;
+            justify-content: space-between;
+        }
+
+        .animal-card:hover {
+            background: rgba(0, 60, 0, 0.6);
+        }
+
+        .animal-card img {
+            width: 100%;
+            height: 180px;
+            object-fit: contain;
+            border-radius: 5px;
+            margin-bottom: 10px;
+            filter: drop-shadow(0 0 5px #0f0);
+        }
+
+        .animal-card.selected {
+            border: 2px solid #ff0;
+            box-shadow: 0 0 25px #ff0;
+            background: rgba(40, 40, 0, 0.6);
+            transform: scale(1.02);
+        }
+
+        .selected-badge {
+            display: none;
+            position: absolute;
+            top: 10px;
+            right: 10px;
+            background: #ff0;
+            color: #000;
+            padding: 2px 8px;
+            font-weight: bold;
+            border-radius: 5px;
+            font-size: 0.8rem;
+            z-index: 5;
+        }
+
+        .animal-card.selected .selected-badge { display: block; }
+        
+        .modal-content { background: #000; border: 2px solid #0f0; color: #0f0; }
+        .modal-header { border-bottom: 1px solid #030; }
+        .modal-footer { border-top: 1px solid #030; }
+        .form-control { background: #111; border: 1px solid #0f0; color: #0f0; }
+        .form-control:focus { background: #1a1a1a; border-color: #ff0; color: #fff; box-shadow: 0 0 10px #ff0; }
+    </style>
+</head>
+<body>
+
+    <video autoplay muted loop id="bg-video">
+        <source src="/caracter/page/profil.mp4" type="video/mp4">
+    </video>
+
+    <div class="container-fluid">
+        <div class="row py-3 glass-panel align-items-center">
+            <div class="col-md-2 text-center">
+                <img src="/caracter/page/logo.jpeg" alt="Logo" style="height: 60px;"> 
+            </div>
+            <div class="col-md-10 text-center">
+                <a href="/profil?id=<%= user.id %>" class="nav-link-custom active-nav">BAG</a>
+                <a href="/market?id=<%= user.id %>" class="nav-link-custom">MARKET</a>
+                <a href="/development?id=<%= user.id %>" class="nav-link-custom">DEVELOPMENT</a>
+                <a href="/payment?id=<%= user.id %>" class="nav-link-custom">WALLET</a>
+                <a href="/chat?id=<%= user.id %>" class="nav-link-custom">CHAT</a>
+                <a href="javascript:void(0)" onclick="goToArena()" class="nav-link-custom" style="color: #ff0; border-color: #ff0;">ARENA</a>
+            </div>
+        </div>
+
+        <div class="row mt-4">
+            <div class="col-md-3">
+                <div class="glass-panel text-center">
+                    <h3 class="mb-3">PROFIL</h3>
+                    <hr style="border-color: #0f0;">
+                    <p><strong>Nick:</strong> <%= user.nickname %></p>
+                    <p class="small text-muted"><%= user.email %></p>
+                    
+                    <div class="p-3 border border-warning rounded mb-3" style="background: rgba(255, 255, 0, 0.05);">
+                        <p class="m-0" style="color: #ff0;">Mevcut Bakiye</p>
+                        <h2 class="m-0" style="color: #ff0;"><%= user.bpl %> BPL</h2>
+                        <a href="/payment?id=<%= user.id %>" class="btn btn-outline-warning btn-sm w-100 mt-2">BPL YÜKLE (+)</a>
+                    </div>
+
+                    <p>Envanter: <%= user.inventory.length %> / 3</p>
+                    
+                    <button class="btn btn-outline-light w-100 mb-2" data-bs-toggle="modal" data-bs-target="#passModal">Şifre Yenile</button>
+                    <a href="/" class="btn btn-danger w-100">Güvenli Çıkış</a>
+                </div>
+            </div>
+
+            <div class="col-md-9">
+                <div class="glass-panel">
+                    <h4 class="mb-3">Karakterleriniz <small class="text-warning" style="font-size: 0.8rem;">(Savaşmak için seçin)</small></h4>
+                    <div class="row g-3">
+                        <% if(user.inventory.length > 0) { %>
+                            <% 
+                                // Dil ve Resim Eşleştirme Sözlüğü
+                                const animalTranslate = {
+                                    "YILAN": "Snake", "SNAKE": "Snake",
+                                    "KAPLAN": "Tiger", "TIGER": "Tiger",
+                                    "AYI": "Bear", "BEAR": "Bear",
+                                    "TIMSAH": "Crocodile", "CROCODILE": "Crocodile",
+                                    "KARTAL": "Eagle", "EAGLE": "Eagle",
+                                    "KURT": "Kurd", "WOLF": "Kurd", "KURD": "Kurd",
+                                    "ASLAN": "Lion", "LION": "Lion",
+                                    "GORIL": "Gorilla", "GORILLA": "Gorilla",
+                                    "GERGEDAN": "Rhino", "RHINO": "Rhino",
+                                    "GÖKDOĞAN": "Peregrinefalcon", "FALCON": "Peregrinefalcon"
+                                };
+                            %>
+                            <% user.inventory.forEach((animal) => { %>
+                                <% 
+                                    let dbName = animal.toUpperCase();
+                                    let engName = animalTranslate[dbName] || (animal.charAt(0).toUpperCase() + animal.slice(1).toLowerCase());
+                                %>
+                                <div class="col-md-4">
+                                    <div class="animal-card" onclick="selectAnimal('<%= engName %>', this)">
+                                        <div class="selected-badge">SEÇİLİ</div>
+                                        <img src="/caracter/profile/<%= engName %>.jpg" 
+                                             alt="<%= engName %>" 
+                                             onerror="this.onerror=null; this.src='/caracter/page/logo.jpeg';">
+                                        
+                                        <h5 class="text-uppercase" style="color: #0f0;"><%= engName %></h5>
+                                        
+                                        <div class="d-flex justify-content-between px-2">
+                                            <span class="badge bg-danger">HP: <%= (user.stats && user.stats[animal]) ? user.stats[animal].hp : 100 %></span>
+                                            <span class="badge bg-primary">ATK: <%= (user.stats && user.stats[animal]) ? user.stats[animal].atk : 15 %></span>
+                                        </div>
+                                    </div>
+                                </div>
+                            <% }) %>
+                        <% } else { %>
+                            <div class="col-12 text-center py-5">
+                                <p class="text-muted">Henüz bir karakteriniz yok.</p>
+                                <a href="/market?id=<%= user.id %>" class="btn btn-success btn-sm">Markete Git</a>
+                            </div>
+                        <% } %>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div class="modal fade" id="passModal" tabindex="-1" aria-hidden="true">
+        <div class="modal-dialog modal-dialog-centered">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h5 class="modal-title">Şifre Yenileme</h5>
+                    <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="Kapat"></button>
+                </div>
+                <form id="passForm">
+                    <div class="modal-body">
+                        <div class="mb-3">
+                            <label class="form-label">Yeni Şifre</label>
+                            <input type="password" class="form-control" id="newPass" required minlength="6">
+                        </div>
+                        <div class="mb-3">
+                            <label class="form-label">Şifre Tekrar</label>
+                            <input type="password" class="form-control" id="newPassConfirm" required minlength="6">
+                        </div>
+                    </div>
+                    <div class="modal-footer">
+                        <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Vazgeç</button>
+                        <button type="submit" class="btn btn-success">Güncelle</button>
+                    </div>
+                </form>
+            </div>
+        </div>
+    </div>
+
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
+    <script>
+        let selectedAnimalName = null;
+
+        function selectAnimal(animalName, element) {
+            document.querySelectorAll('.animal-card').forEach(card => card.classList.remove('selected'));
+            element.classList.add('selected');
+            selectedAnimalName = animalName;
+            localStorage.setItem('activeAnimal', animalName);
+        }
+
+        function goToArena() {
+            if (!selectedAnimalName) {
+                alert("Lütfen önce savaşacağınız karakteri seçin!");
+            } else {
+                window.location.href = `/arena?id=<%= user.id %>&animal=${selectedAnimalName}`;
+            }
+        }
+
+        // Şifre Yenileme API Çağrısı
+        document.getElementById('passForm').addEventListener('submit', function(e) {
+            e.preventDefault();
+            const p1 = document.getElementById('newPass').value;
+            const p2 = document.getElementById('newPassConfirm').value;
+
+            if (p1 !== p2) {
+                alert("Şifreler uyuşmuyor!");
+                return;
+            }
+
+            fetch('/change-password', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ userId: '<%= user.id %>', password: p1 })
+            })
+            .then(res => res.json())
+            .then(data => {
+                if(data.status === 'success') {
+                    alert('Şifre başarıyla değiştirildi.');
+                    location.reload();
+                } else {
+                    alert('Hata oluştu: ' + (data.message || 'Bilinmiyor'));
+                }
+            })
+            .catch(err => alert("Sunucuyla bağlantı kurulamadı."));
+        });
+    </script>
+</body>
+</html>
