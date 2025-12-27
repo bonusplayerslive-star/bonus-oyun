@@ -1,4 +1,3 @@
-// Path: views\arena.ejs
 <!DOCTYPE html>
 <html lang="tr">
 <head>
@@ -9,12 +8,28 @@
     <style>
         body { background: #000; color: #00ff00; font-family: 'Courier New', monospace; margin: 0; overflow: hidden; }
         
-        /* Video Katmanı */
+        /* Video Katmanı Tasarımı */
         #video-overlay {
             display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%;
-            background: rgba(0,0,0,0.9); z-index: 10000; justify-content: center; align-items: center;
+            background: rgba(0,0,0,0.95); z-index: 10000; flex-direction: column;
         }
-        #arena-video { max-width: 90%; max-height: 90%; border: 3px solid #00ff00; box-shadow: 0 0 20px #00ff00; }
+
+        /* Bölünmüş Ekran (Saldırı Anı) */
+        .split-container {
+            display: flex; width: 100%; height: 100%;
+        }
+        .video-half {
+            width: 50%; height: 100%; display: flex; flex-direction: column; 
+            justify-content: center; align-items: center; border: 1px solid #222;
+        }
+        .video-half video { width: 90%; border: 2px solid #00ff00; box-shadow: 0 0 15px #00ff00; }
+        .video-label { color: #fff; margin-bottom: 10px; font-size: 1.2rem; text-shadow: 0 0 5px #00ff00; }
+
+        /* Kazanan Ekranı (Final) */
+        .winner-container {
+            display: none; width: 100%; height: 100%; justify-content: center; align-items: center;
+        }
+        .winner-container video { max-width: 90%; max-height: 90%; border: 4px solid gold; box-shadow: 0 0 30px gold; }
 
         .arena-container { height: 100vh; display: flex; flex-direction: column; align-items: center; justify-content: space-around; }
         .fighters { display: flex; width: 100%; justify-content: space-around; align-items: center; }
@@ -34,7 +49,19 @@
 <body>
 
     <div id="video-overlay">
-        <video id="arena-video" preload="auto"></video>
+        <div id="split-screen" class="split-container">
+            <div class="video-half">
+                <div class="video-label">SENİN HAMLEN</div>
+                <video id="my-attack-vid" muted playsinline></video>
+            </div>
+            <div class="video-half">
+                <div class="video-label">RAKİBİN HAMLESİ</div>
+                <video id="opp-attack-vid" muted playsinline></video>
+            </div>
+        </div>
+        <div id="winner-screen" class="winner-container">
+            <video id="winner-vid" muted playsinline></video>
+        </div>
     </div>
 
     <div class="arena-container">
@@ -70,43 +97,34 @@
     <script>
         const socket = io();
         const userId = "<%= user._id %>";
+        let matchData = null;
+        let opponent = null;
+        let currentMatchId = null;
         
-        // Boşluksuz ve PascalCase Sözlüğü
         const animalMap = {
-            "Gökdoğan": "Peregrinefalcon",
-            "Yılan": "Snake",
-            "Aslan": "Lion",
-            "Kaplan": "Tiger",
-            "Kurt": "Kurd",
-            "Ayı": "Bear",
-            "Timsah": "Crocodile",
-            "Kartal": "Eagle",
-            "Goril": "Gorilla",
-            "Gergedan": "Rhino"
+            "Gökdoğan": "Peregrinefalcon", "Yılan": "Snake", "Aslan": "Lion",
+            "Kaplan": "Tiger", "Kurt": "Kurd", "Ayı": "Bear",
+            "Timsah": "Crocodile", "Kartal": "Eagle", "Goril": "Gorilla", "Gergedan": "Rhino"
         };
 
         const urlParams = new URLSearchParams(window.location.search);
         const myAnimalTr = urlParams.get('animal') || urlParams.get('select') || "Gökdoğan";
         const myAnimalEn = animalMap[myAnimalTr] || myAnimalTr;
 
-        // Kendi Profil Resmimizi Ayarla
         const myImgName = myAnimalTr.toLowerCase().replace('ö','o').replace('ğ','g');
         document.getElementById('my-img').src = `/caracter/profile/${myImgName}.jpg`;
 
-        let currentMatchId = null;
-        let opponent = null;
-
-        // Arenaya Giriş
         socket.emit('join-arena', { userId, selectedAnimal: myAnimalTr });
         
-        // Rakip Aramayı Başlat (Kısa bir gecikmeyle)
+        // 4 Saniye bekleyip kimse gelmezse BOT başlat sinyali (start-search zaten botu tetikleyecek şekilde app.js'de ayarlandı)
         setTimeout(() => { socket.emit('start-search'); }, 2000);
 
         socket.on('match-found', (data) => {
+            matchData = data;
             currentMatchId = data.matchId;
             opponent = data.opponent;
             
-            document.getElementById('status-text').innerText = "SAVAŞ BAŞLADI!";
+            document.getElementById('status-text').innerText = "RAKİP BULUNDU!";
             document.getElementById('opp-nick').innerText = opponent.nickname;
             
             const oppTr = opponent.animal;
@@ -115,150 +133,58 @@
             document.getElementById('attack-btn').style.display = 'inline-block';
         });
 
-        // Saldırı Mekanizması
-        document.getElementById('attack-btn').onclick = () => {
-            if(!currentMatchId) return;
-            
-            // Kendi hamle videomu oynat (Örn: Peregrinefalcon1.mp4)
-            playVideo(myAnimalEn, true);
-            
-            socket.emit('attack-enemy', { matchId: currentMatchId, damage: 10 });
-            
-            document.getElementById('attack-btn').disabled = true;
-            setTimeout(() => { document.getElementById('attack-btn').disabled = false; }, 3500);
+        document.getElementById('attack-btn').onclick = function() {
+            this.style.display = 'none';
+            startCinematicBattle();
         };
 
-        // Hasar Alma
-        socket.on('take-damage', (data) => {
-            const oppEn = animalMap[opponent.animal] || opponent.animal;
-            // Rakibin hamle videosunu oynat (Örn: Snake1.mp4)
-            playVideo(oppEn, true);
-            
-            let currentHp = parseInt(document.getElementById('my-hp-val').innerText);
-            let newHp = currentHp - 10;
-            if(newHp < 0) newHp = 0;
-
-            document.getElementById('my-hp-val').innerText = newHp;
-            document.getElementById('my-hp-fill').style.width = newHp + "%";
-
-            if(newHp <= 0) {
-                socket.emit('victory', { 
-                    userId: opponent.userId, 
-                    matchId: currentMatchId, 
-                    winnerAnimal: opponent.animal 
-                });
-            }
-        });
-
-        // Video Oynatıcı Fonksiyonu
-        function playVideo(animalFolder, isAction) {
+        async function startCinematicBattle() {
             const overlay = document.getElementById('video-overlay');
-            const video = document.getElementById('arena-video');
-            
-            const suffix = isAction ? "1" : ""; 
-            // Yol: /caracter/move/Peregrinefalcon/Peregrinefalcon1.mp4
-            const path = `/caracter/move/${animalFolder}/${animalFolder}${suffix}.mp4`;
+            const splitScreen = document.getElementById('split-screen');
+            const winnerScreen = document.getElementById('winner-screen');
+            const status = document.getElementById('status-text');
 
-            video.src = path;
+            const myVid = document.getElementById('my-attack-vid');
+            const oppVid = document.getElementById('opp-attack-vid');
+            const winVid = document.getElementById('winner-vid');
+
+            const oppEn = animalMap[opponent.animal] || opponent.animal;
+            const isMeWinner = (matchData.winnerId === userId);
+            const winnerEn = animalMap[matchData.winnerAnimal] || matchData.winnerAnimal;
+
+            // --- 1. SAHNE: ÇİFTLİ SALDIRI ---
+            status.innerText = "SAVAŞ BAŞLADI!";
             overlay.style.display = 'flex';
+            splitScreen.style.display = 'flex';
+            winnerScreen.style.display = 'none';
+
+            myVid.src = `/caracter/move/${myAnimalEn}/${myAnimalEn}1.mp4`;
+            oppVid.src = `/caracter/move/${oppEn}/${oppEn}1.mp4`;
+
+            // İki videonun da bitmesini bekle
+            await Promise.all([
+                new Promise(res => { myVid.play(); myVid.onended = res; }),
+                new Promise(res => { oppVid.play(); oppVid.onended = res; })
+            ]);
+
+            // --- 2. SAHNE: KAZANANIN FİNALİ ---
+            splitScreen.style.display = 'none';
+            winnerScreen.style.display = 'flex';
+            status.innerText = isMeWinner ? "TEBRİKLER! KAZANDIN" : "MAĞLUP OLDUN!";
             
-            video.play().catch(err => {
-                console.error("Video oynatılamadı:", err);
-                overlay.style.display = 'none';
-            });
+            winVid.src = `/caracter/move/${winnerEn}/${winnerEn}.mp4`;
 
-            video.onended = () => {
-                overlay.style.display = 'none';
-            };
-        }
+            if(isMeWinner) {
+                socket.emit('claim-victory', { userId: userId });
+            }
 
-        // Maç Sonu
-        socket.on('match-over', (data) => {
-            document.getElementById('attack-btn').style.display = 'none';
-            document.getElementById('status-text').innerText = (data.winnerId === userId) ? "ZAFER!" : "BOZGUN!";
-            
-            const winnerEn = animalMap[data.winnerAnimal] || data.winnerAnimal;
-            // Kazananın final videosunu oynat (Örn: Peregrinefalcon.mp4)
-            playVideo(winnerEn, false);
+            await new Promise(res => { winVid.play(); winVid.onended = res; });
 
+            // Otomatik Yönlendirme
             setTimeout(() => {
                 location.href = `/profil?id=${userId}`;
-            }, 6500);
-        });
-
-
-        // arena.ejs içindeki script kısmını bu mantıkla güncelle
-
-let matchData = null; // Gelen tüm veriyi burada tutacağız
-
-socket.on('match-found', (data) => {
-    matchData = data; // winnerId ve matchId burada saklı
-    currentMatchId = data.matchId;
-    opponent = data.opponent;
-    
-    document.getElementById('status-text').innerText = "RAKİP BULUNDU!";
-    document.getElementById('opp-nick').innerText = opponent.nickname;
-    
-    const oppTr = opponent.animal;
-    const oppImgName = oppTr.toLowerCase().replace('ö','o').replace('ğ','g');
-    document.getElementById('opp-img').src = `/caracter/profile/${oppImgName}.jpg`;
-    
-    document.getElementById('attack-btn').style.display = 'inline-block';
-});
-
-document.getElementById('attack-btn').onclick = function() {
-    this.style.display = 'none'; // Kontrol kullanıcıdan çıkar
-    startCinematicBattle();
-};
-
-async function startCinematicBattle() {
-    const status = document.getElementById('status-text');
-    const myAnimalEn = animalMap[myAnimalTr] || myAnimalTr;
-    const oppEn = animalMap[opponent.animal] || opponent.animal;
-    const isMeWinner = (matchData.winnerId === userId);
-
-    // 1. VİDEO: Sen Saldırıyorsun
-    status.innerText = "SALDIRI BAŞLATILDI!";
-    await playVideoPromise(myAnimalEn, true);
-    document.getElementById('opp-hp-fill').style.width = "50%"; // Görsel efekt
-
-    // 2. VİDEO: Rakip Karşılık Veriyor
-    status.innerText = "RAKİP SAVUNMAYA GEÇTİ!";
-    await playVideoPromise(oppEn, true);
-    document.getElementById('my-hp-fill').style.width = isMeWinner ? "30%" : "0%";
-
-    // 3. VİDEO: Final ve Zafer
-    const winnerEn = animalMap[matchData.winnerAnimal] || matchData.winnerAnimal;
-    status.innerText = isMeWinner ? "TEBRİKLER! KAZANDIN" : "MAĞLUP OLDUN!";
-    
-    if(isMeWinner) {
-        // Sunucuya hediyeyi işlemesi için sinyal gönder
-        socket.emit('claim-victory', { userId: userId });
-    }
-
-    await playVideoPromise(winnerEn, false);
-
-    // Otomatik Yönlendirme
-    setTimeout(() => {
-        location.href = `/profil?id=${userId}`;
-    }, 2000);
-}
-
-// Videoları bekletmek için Promise fonksiyonu
-function playVideoPromise(animalFolder, isAction) {
-    return new Promise((resolve) => {
-        const overlay = document.getElementById('video-overlay');
-        const video = document.getElementById('arena-video');
-        const suffix = isAction ? "1" : ""; 
-        video.src = `/caracter/move/${animalFolder}/${animalFolder}${suffix}.mp4`;
-        overlay.style.display = 'flex';
-        video.play().catch(e => resolve());
-        video.onended = () => {
-            overlay.style.display = 'none';
-            resolve();
-        };
-    });
-}
+            }, 1000);
+        }
     </script>
 </body>
 </html>
