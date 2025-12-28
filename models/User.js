@@ -34,5 +34,15 @@ const UserSchema = new mongoose.Schema({
 // Veri tabanında "stats" gibi objeler üzerinde güncelleme yaparken 
 // değişikliğin algılanması için gerekli ayar (opsiyonel ama önerilir)
 UserSchema.set('minimize', false);
+// models/User.js (Güncellenecek Kısım)
+stats: { 
+    type: Map, 
+    of: new mongoose.Schema({
+        hp: { type: Number, default: 100 },
+        atk: { type: Number, default: 15 },
+        def: { type: Number, default: 10 }
+    }, { _id: false }),
+    default: {} 
+},
 
 module.exports = mongoose.model('User', UserSchema);
