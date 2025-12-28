@@ -12,7 +12,7 @@ const nodemailer = require('nodemailer');
 
 const connectDB = require('./db');
 const User = require('./models/User');
-const Log = require('./models/Log'); // MongoDB Log Modeli
+const Log = require('./models/Log');
 
 connectDB();
 
@@ -36,12 +36,12 @@ app.use(session({
 }));
 app.set('view engine', 'ejs');
 
-// --- YENİ MONGODB LOG FONKSİYONU ---
+// --- MONGODB LOG FONKSİYONU ---
 const dbLog = async (type, content) => {
     try {
         const newLog = new Log({ type, content });
         await newLog.save();
-        console.log(`[DB LOG SAVED] ${type}: ${content}`);
+        console.log(`[DB LOG] ${type}: ${content}`);
     } catch (err) {
         console.error("Log kaydı başarısız:", err.message);
     }
@@ -51,7 +51,7 @@ const checkAuth = (req, res, next) => {
     if (req.session.userId) next(); else res.redirect('/');
 };
 
-// --- ROTALAR ---
+// --- HTTP ROTALARI (GET) ---
 app.get('/', (req, res) => {
     const userIp = req.headers['x-forwarded-for'] || req.socket.remoteAddress;
     res.render('index', { articles: ["Arena Yayında!", "Market Güncellendi"], userIp, forceHelp: false });
@@ -105,22 +105,7 @@ app.get('/meeting', checkAuth, async (req, res) => {
     } catch (e) { res.redirect('/profil'); }
 });
 
-app.post('/create-meeting', checkAuth, async (req, res) => {
-    try {
-        const user = await User.findById(req.session.userId);
-        if (user && user.bpl >= 50) {
-            user.bpl -= 50;
-            await user.save();
-            const roomId = "Masa_" + Math.random().toString(36).substr(2, 5);
-            await dbLog('MEETING', `${user.nickname} elit masa kurdu: ${roomId}`); //
-            res.redirect(`/meeting?roomId=${roomId}&userId=${user._id}`);
-        } else {
-            res.send('<script>alert("Yetersiz Bakiye!"); window.location.href="/chat";</script>');
-        }
-    } catch (e) { res.redirect('/chat'); }
-});
-
-// --- AUTH VE OYUN İŞLEMLERİ ---
+// --- HTTP ROTALARI (POST) ---
 app.post('/login', authLimiter, async (req, res) => {
     const { email, password } = req.body;
     const user = await User.findOne({ email, password });
@@ -140,6 +125,21 @@ app.post('/register', authLimiter, async (req, res) => {
     } catch (e) { res.send("Kayıt Hatası."); }
 });
 
+app.post('/create-meeting', checkAuth, async (req, res) => {
+    try {
+        const user = await User.findById(req.session.userId);
+        if (user && user.bpl >= 50) {
+            user.bpl -= 50;
+            await user.save();
+            const roomId = "Masa_" + Math.random().toString(36).substr(2, 5);
+            await dbLog('MEETING', `${user.nickname} elit masa kurdu: ${roomId}`);
+            res.redirect(`/meeting?roomId=${roomId}&userId=${user._id}`);
+        } else {
+            res.send('<script>alert("Yetersiz Bakiye!"); window.location.href="/chat";</script>');
+        }
+    } catch (e) { res.redirect('/chat'); }
+});
+
 app.post('/buy-animal', checkAuth, async (req, res) => {
     const { animalName, price } = req.body;
     try {
@@ -151,7 +151,7 @@ app.post('/buy-animal', checkAuth, async (req, res) => {
             user.stats[animalName] = { hp: 100, atk: 15, def: 10 };
             user.markModified('stats'); 
             await user.save();
-            await dbLog('MARKET', `${user.nickname} ${animalName} satın aldı.`); //
+            await dbLog('MARKET', `${user.nickname} ${animalName} satın aldı.`);
             res.json({ status: 'success', newBalance: user.bpl });
         } else res.json({ status: 'error', msg: 'Yetersiz Bakiye!' });
     } catch (e) { res.json({ status: 'error' }); }
@@ -164,15 +164,40 @@ app.post('/withdraw', checkAuth, async (req, res) => {
         if (amount >= 7500 && user.bpl >= amount) {
             user.bpl -= amount;
             await user.save();
-            await dbLog('WALLET', `${user.nickname} ${amount} BPL çekim talebi oluşturdu.`); //
+            await dbLog('WALLET', `${user.nickname} ${amount} BPL çekim talebi oluşturdu.`);
             res.json({ status: 'success', msg: 'Talebiniz alındı.' });
         } else res.json({ status: 'error', msg: 'Yetersiz bakiye veya limit altı.' });
     } catch (e) { res.json({ status: 'error' }); }
 });
 
-// --- SOCKET.IO ---
+app.post('/contact-submit', async (req, res) => {
+    try {
+        const { email, message } = req.body;
+        if (!email || !message) return res.json({ status: 'error', msg: 'Lütfen alanları doldurun.' });
+        await dbLog('SUPPORT', `E-posta: ${email} | Mesaj: ${message}`);
+        res.json({ status: 'success', msg: 'Mesajınız kaydedildi.' });
+    } catch (e) { res.json({ status: 'error', msg: 'Hata oluştu.' }); }
+});
+
+app.post('/forgot-password', async (req, res) => {
+    const { email } = req.body;
+    try {
+        const user = await User.findOne({ email });
+        if (!user) return res.json({ status: 'error', msg: 'Kullanıcı bulunamadı.' });
+        await dbLog('FORGOT_PASS', `Sıfırlama isteği: ${email}`);
+        res.json({ status: 'success', msg: 'Talebiniz alındı.' });
+    } catch (e) { res.json({ status: 'error' }); }
+});
+
+// --- SOCKET.IO SİSTEMİ ---
+const broadcastActiveCount = () => {
+    const count = io.engine.clientsCount;
+    io.emit('update-active-count', count);
+};
+
 io.on('connection', (socket) => {
-    
+    broadcastActiveCount(); // Bağlantı sayısını güncelle
+
     socket.on('join-chat', (data) => {
         socket.join(data.room);
         socket.nickname = data.nickname;
@@ -181,41 +206,12 @@ io.on('connection', (socket) => {
         socket.emit('sync-meeting', { remaining: 90 * 60 * 1000 });
     });
 
-// Aktif kullanıcıları sayan fonksiyon
-const broadcastActiveCount = () => {
-    const count = io.engine.clientsCount; // Bağlı toplam cihaz sayısı
-    io.emit('update-active-count', count);
-    console.log(`[SOCKET] Canlı Aktif Sayısı: ${count}`);
-};
-
-io.on('connection', (socket) => {
-    // Yeni birisi girdiğinde herkese güncel sayıyı gönder
-    broadcastActiveCount();
-
-    socket.on('disconnect', () => {
-        // Birisi çıktığında herkese güncel sayıyı gönder
-        broadcastActiveCount();
-        if (socket.roomId) socket.to(socket.roomId).emit('user-left', socket.id);
-    });
-    
-    // Diğer mevcut kodların (join-chat vb.) burada kalmaya devam etsin...
-});
-
-
-
-
-    
-
     socket.on('chat-message', (data) => {
         io.to(data.room).emit('new-message', { sender: data.nickname, text: data.message });
     });
 
     socket.on('meeting-msg', (data) => {
         io.to(data.room).emit('new-meeting-msg', { sender: data.sender, text: data.text });
-    });
-
-    socket.on('send-private-invite', (data) => {
-        io.emit('receive-meeting-invite', data);
     });
 
     socket.on('send-gift', async (data) => {
@@ -227,14 +223,13 @@ io.on('connection', (socket) => {
                 receiver.bpl += data.amount;
                 await sender.save();
                 await receiver.save();
-                await dbLog('GIFT', `${sender.nickname} -> ${receiver.nickname} (${data.amount} BPL)`); //
+                await dbLog('GIFT', `${sender.nickname} -> ${receiver.nickname} (${data.amount} BPL)`);
                 socket.emit('gift-result', { success: true, message: "Hediye gönderildi!", newBalance: sender.bpl });
                 io.to(data.room).emit('new-message', { sender: "SİSTEM", text: `🎁 ${sender.nickname}, ${receiver.nickname}'e ${data.amount} BPL gönderdi!` });
             }
         } catch (err) {}
     });
 
-    // --- ARENA / BOT SİSTEMİ (15 SANİYE GECİKMELİ) ---
     socket.on('join-arena', async (data) => {
         socket.join("arena_lobby");
         const user = await User.findById(data.userId);
@@ -242,7 +237,7 @@ io.on('connection', (socket) => {
     });
 
     socket.on('start-search', () => {
-        // Botun gelme süresi buradaki 15000 ms (15 saniye) ile ayarlanır
+        // Botun gelme süresi: 15 saniye (15000ms)
         setTimeout(() => {
             const botData = { nickname: "Savaşçı_Bot", animal: "Snake", userId: "BOT123" };
             const winnerId = Math.random() > 0.4 ? (socket.userData ? socket.userData.userId : "BOT123") : "BOT123";
@@ -255,69 +250,17 @@ io.on('connection', (socket) => {
         if (user) { 
             user.bpl += 50; 
             await user.save(); 
-            await dbLog('ARENA', `${user.nickname} arena kazandı (+50 BPL)`); //
+            await dbLog('ARENA', `${user.nickname} arena kazandı (+50 BPL)`);
         }
     });
 
-
-// --- DESTEK FORMU (BİZE ULAŞIN) ---
-app.post('/contact-submit', async (req, res) => {
-    try {
-        const { email, message } = req.body;
-
-        if (!email || !message) {
-            return res.json({ status: 'error', msg: 'Lütfen tüm alanları doldurun.' });
-        }
-
-        // MongoDB'ye "SUPPORT" etiketiyle kaydediyoruz
-        await dbLog('SUPPORT', `E-posta: ${email} | Mesaj: ${message}`);
-
-        res.json({ 
-            status: 'success', 
-            msg: 'Mesajınız başarıyla MongoDB sistemine kaydedildi. En kısa sürede incelenecektir.' 
-        });
-    } catch (e) {
-        console.error("Destek formu hatası:", e.message);
-        res.status(500).json({ status: 'error', msg: 'Sistem hatası: Mesaj iletilemedi.' });
-    }
-});
-
-// --- ŞİFREMİ UNUTTUM (BAŞLANGIÇ) ---
-app.post('/forgot-password', async (req, res) => {
-    const { email } = req.body;
-    try {
-        const user = await User.findOne({ email });
-        if (!user) {
-            return res.json({ status: 'error', msg: 'Bu e-posta adresiyle kayıtlı bir kullanıcı bulunamadı.' });
-        }
-
-        // Şimdilik sadece MongoDB'ye log atıyoruz (Mail sistemin hazır olduğunda buraya kod eklenebilir)
-        await dbLog('FORGOT_PASS', `Şifre sıfırlama isteği: ${email}`);
-
-        res.json({ 
-            status: 'success', 
-            msg: 'Şifre sıfırlama talebiniz alındı. (Yönetici onayı bekleniyor)' 
-        });
-    } catch (e) {
-        res.json({ status: 'error', msg: 'İşlem sırasında bir hata oluştu.' });
-    }
-});
-
-
-    
-
-    // --- WebRTC ---
-    socket.on('webrtc-offer', (data) => {
-        socket.to(data.toSocket).emit('webrtc-offer', { offer: data.offer, fromSocket: socket.id, senderNick: data.senderNick });
-    });
-    socket.on('webrtc-answer', (data) => {
-        socket.to(data.toSocket).emit('webrtc-answer', { answer: data.answer, fromSocket: socket.id });
-    });
-    socket.on('webrtc-ice-candidate', (data) => {
-        socket.to(data.toSocket).emit('webrtc-ice-candidate', { candidate: data.candidate, fromSocket: socket.id });
-    });
+    // WebRTC ve diğer socket olayları...
+    socket.on('webrtc-offer', (data) => socket.to(data.toSocket).emit('webrtc-offer', data));
+    socket.on('webrtc-answer', (data) => socket.to(data.toSocket).emit('webrtc-answer', data));
+    socket.on('webrtc-ice-candidate', (data) => socket.to(data.toSocket).emit('webrtc-ice-candidate', data));
 
     socket.on('disconnect', () => {
+        broadcastActiveCount(); // Çıkış yapıldığında sayıyı güncelle
         if (socket.roomId) socket.to(socket.roomId).emit('user-left', socket.id);
     });
 });
@@ -325,7 +268,3 @@ app.post('/forgot-password', async (req, res) => {
 server.listen(PORT, "0.0.0.0", () => {
     console.log(`BPL SİSTEMİ AKTİF | PORT: ${PORT}`);
 });
-
-
-
-
