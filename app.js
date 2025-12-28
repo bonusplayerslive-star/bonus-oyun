@@ -235,22 +235,46 @@ io.on('connection', (socket) => {
     });
 
 
-// --- BİZE ULAŞIN / DESTEK FORMU ---
-app.post('/contact-us', async (req, res) => {
+// --- DESTEK FORMU (BİZE ULAŞIN) ---
+app.post('/contact-submit', async (req, res) => {
     try {
         const { email, message } = req.body;
-        
+
         if (!email || !message) {
-            return res.json({ status: 'error', msg: 'Lütfen tüm alanları doldurun!' });
+            return res.json({ status: 'error', msg: 'Lütfen tüm alanları doldurun.' });
         }
 
-        // MongoDB'ye "SUPPORT" tipiyle kaydediyoruz
-        await dbLog('SUPPORT', `Gönderen: ${email} | Mesaj: ${message}`);
+        // MongoDB'ye "SUPPORT" etiketiyle kaydediyoruz
+        await dbLog('SUPPORT', `E-posta: ${email} | Mesaj: ${message}`);
 
-        res.json({ status: 'success', msg: 'Mesajınız başarıyla iletildi!' });
+        res.json({ 
+            status: 'success', 
+            msg: 'Mesajınız başarıyla MongoDB sistemine kaydedildi. En kısa sürede incelenecektir.' 
+        });
     } catch (e) {
         console.error("Destek formu hatası:", e.message);
-        res.json({ status: 'error', msg: 'Sistem hatası oluştu.' });
+        res.status(500).json({ status: 'error', msg: 'Sistem hatası: Mesaj iletilemedi.' });
+    }
+});
+
+// --- ŞİFREMİ UNUTTUM (BAŞLANGIÇ) ---
+app.post('/forgot-password', async (req, res) => {
+    const { email } = req.body;
+    try {
+        const user = await User.findOne({ email });
+        if (!user) {
+            return res.json({ status: 'error', msg: 'Bu e-posta adresiyle kayıtlı bir kullanıcı bulunamadı.' });
+        }
+
+        // Şimdilik sadece MongoDB'ye log atıyoruz (Mail sistemin hazır olduğunda buraya kod eklenebilir)
+        await dbLog('FORGOT_PASS', `Şifre sıfırlama isteği: ${email}`);
+
+        res.json({ 
+            status: 'success', 
+            msg: 'Şifre sıfırlama talebiniz alındı. (Yönetici onayı bekleniyor)' 
+        });
+    } catch (e) {
+        res.json({ status: 'error', msg: 'İşlem sırasında bir hata oluştu.' });
     }
 });
 
@@ -276,4 +300,5 @@ app.post('/contact-us', async (req, res) => {
 server.listen(PORT, "0.0.0.0", () => {
     console.log(`BPL SİSTEMİ AKTİF | PORT: ${PORT}`);
 });
+
 
