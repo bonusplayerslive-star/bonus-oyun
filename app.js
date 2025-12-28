@@ -181,6 +181,34 @@ io.on('connection', (socket) => {
         socket.emit('sync-meeting', { remaining: 90 * 60 * 1000 });
     });
 
+
+// Aktif kullanıcı sayısını tutan değişken
+let activeUsers = 0;
+
+io.on('connection', (socket) => {
+    // Yeni biri bağlandığında sayıyı artır ve herkese gönder
+    activeUsers++;
+    io.emit('update-active-count', activeUsers);
+    console.log(`[SOCKET] Yeni bağlantı. Aktif: ${activeUsers}`);
+
+    // Mevcut join-chat vb. kodların burada kalmaya devam etsin...
+
+    socket.on('disconnect', () => {
+        // Biri ayrıldığında sayıyı azalt ve herkese gönder
+        activeUsers = Math.max(0, activeUsers - 1);
+        io.emit('update-active-count', activeUsers);
+        console.log(`[SOCKET] Bağlantı koptu. Aktif: ${activeUsers}`);
+        
+        if (socket.roomId) socket.to(socket.roomId).emit('user-left', socket.id);
+    });
+});
+
+
+
+
+
+    
+
     socket.on('chat-message', (data) => {
         io.to(data.room).emit('new-message', { sender: data.nickname, text: data.message });
     });
@@ -300,5 +328,6 @@ app.post('/forgot-password', async (req, res) => {
 server.listen(PORT, "0.0.0.0", () => {
     console.log(`BPL SİSTEMİ AKTİF | PORT: ${PORT}`);
 });
+
 
 
