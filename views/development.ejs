@@ -1,4 +1,3 @@
-
 <!DOCTYPE html>
 <html lang="tr">
 <head>
@@ -16,6 +15,7 @@
         .balance-box { text-align: center; font-size: 1.2em; margin-bottom: 20px; border-bottom: 1px solid #333; padding-bottom: 15px; color: #FFFF00; }
         .back-btn { display: block; text-align: center; margin-top: 20px; color: #ff4444; text-decoration: none; font-weight: bold; }
         .back-btn:hover { text-decoration: underline; }
+        .active-animal { color: #39FF14; font-weight: bold; text-transform: uppercase; }
     </style>
 </head>
 <body>
@@ -23,6 +23,8 @@
     <div class="dev-container">
         <h1 style="text-align: center; letter-spacing: 3px;">GELİŞTİRME MERKEZİ</h1>
         
+        <p style="text-align: center;">Şu an Geliştirilen: <span id="active-animal-name" class="active-animal">Yükleniyor...</span></p>
+
         <div class="balance-box">
             Mevcut Bakiye: <span id="current-bpl"><%= user.bpl %></span> BPL
         </div>
@@ -71,16 +73,21 @@
             </div>
         </div>
 
-        <a href="/profil?id=<%= user._id %>" class="back-btn">PROFİLE GERİ DÖN</a>
+        <a href="/profil" class="back-btn">PROFİLE GERİ DÖN</a>
     </div>
 
     <script>
         const userId = "<%= user._id %>";
-        // Envanter kontrolü
-        const animalName = "<%= user.inventory && user.inventory.length > 0 ? user.inventory[0] : 'Gökdoğan' %>";
+        
+        // 1. DÜZELTME: URL'den ?animal=Kartal gibi parametreyi alıyoruz
+        const urlParams = new URLSearchParams(window.location.search);
+        const animalName = urlParams.get('animal') || "<%= user.inventory && user.inventory.length > 0 ? user.inventory[0] : 'Varsayılan' %>";
+        
+        // Ekranda hangi hayvanın seçili olduğunu göster
+        document.getElementById('active-animal-name').innerText = animalName;
 
         async function upgrade(type, cost) {
-            if (!confirm(cost + " BPL karşılığında bu geliştirmeyi onaylıyor musunuz?")) return;
+            if (!confirm(`${animalName} karakteri için ${cost} BPL harcanacak. Onaylıyor musunuz?`)) return;
 
             try {
                 const response = await fetch('/upgrade-stat', {
@@ -90,39 +97,38 @@
                         userId: userId,
                         animalName: animalName,
                         statType: type,
-                        cost: cost // ARTIK COST BİLGİSİ GİDİYOR
+                        cost: cost
                     })
                 });
+
+                // 2. DÜZELTME: JSON hatasını (Unexpected token <) önlemek için response kontrolü
+                const contentType = response.headers.get("content-type");
+                if (!contentType || !contentType.includes("application/json")) {
+                    throw new TypeError("Sunucudan geçersiz yanıt (404/500) geldi. app.js rotasını kontrol edin!");
+                }
 
                 const result = await response.json();
 
                 if (result.status === 'success') {
-                    // Sayfayı yenilemeden bakiyeyi güncelle
                     document.getElementById('current-bpl').innerText = result.newBalance;
-                    alert("Geliştirme Başarılı! Yeni statlar bir sonraki savaşta aktif olacak.");
+                    alert("Geliştirme Başarılı! Değerler güncellendi.");
                 } else {
                     alert("İşlem Başarısız: " + result.msg);
                 }
             } catch (err) {
-                console.error(err);
-                alert("Bağlantı Hatası! Sunucu şu an yanıt vermiyor.");
+                console.error("Hata Detayı:", err);
+                alert("Bağlantı Hatası! Sunucu şu an bu işlemi (upgrade-stat) tanımıyor.");
             }
         }
     </script>
 
-<script src="/socket.io/socket.io.js"></script>
-<script>
-    const socket = io(); // Her sayfada bu bağlantıyı başlatır
-    
-    // Aktif sayısını her sayfada güncel tutmak için:
-    socket.on('update-active-count', (count) => {
-        const playerEl = document.getElementById('active-players');
-        if(playerEl) playerEl.innerText = count + " OYUNCU";
-    });
-</script>
-
-
+    <script src="/socket.io/socket.io.js"></script>
+    <script>
+        const socket = io(); 
+        socket.on('update-active-count', (count) => {
+            const playerEl = document.getElementById('active-players');
+            if(playerEl) playerEl.innerText = count + " OYUNCU";
+        });
+    </script>
 </body>
-
 </html>
-
