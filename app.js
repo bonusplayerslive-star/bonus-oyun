@@ -179,6 +179,55 @@ app.post('/contact-submit', async (req, res) => {
     } catch (e) { res.json({ status: 'error', msg: 'Hata oluştu.' }); }
 });
 
+// --- GELİŞTİRME MERKEZİ (STAT YÜKSELTME) ---
+app.post('/upgrade-stat', checkAuth, async (req, res) => {
+    const { animalName, statType, cost } = req.body;
+    try {
+        const user = await User.findById(req.session.userId);
+        
+        // 1. Kullanıcı ve Bakiye Kontrolü
+        if (!user || user.bpl < cost) {
+            return res.json({ status: 'error', msg: 'Yetersiz bakiye veya kullanıcı bulunamadı!' });
+        }
+
+        // 2. Hayvan Envanterde mi?
+        if (!user.inventory.includes(animalName)) {
+            return res.json({ status: 'error', msg: 'Bu hayvana sahip değilsiniz!' });
+        }
+
+        // 3. Stat Güncelleme
+        if (!user.stats) user.stats = {};
+        if (!user.stats[animalName]) {
+            user.stats[animalName] = { hp: 100, atk: 15, def: 10 };
+        }
+
+        if (statType === 'hp') user.stats[animalName].hp += 10;
+        else if (statType === 'atk') user.stats[animalName].atk += 5;
+        else if (statType === 'def') user.stats[animalName].def += 5;
+        else if (statType === 'battleMode') {
+            // Anlık güç için geçici bir flag veya stat artışı
+            user.stats[animalName].atk += 20; 
+        }
+
+        // Bakiye düş ve kaydet
+        user.bpl -= cost;
+        user.markModified('stats'); // Objelerdeki değişiklikleri MongoDB'ye bildirir
+        await user.save();
+
+        // MongoDB'ye log at
+        await dbLog('DEVELOPMENT', `${user.nickname}, ${animalName} için ${statType} yükseltti.`);
+
+        res.json({ status: 'success', newBalance: user.bpl });
+    } catch (e) {
+        console.error("Geliştirme hatası:", e.message);
+        res.json({ status: 'error', msg: 'Sunucu hatası oluştu.' });
+    }
+});
+
+
+
+
+
 app.post('/forgot-password', async (req, res) => {
     const { email } = req.body;
     try {
@@ -237,14 +286,21 @@ io.on('connection', (socket) => {
     });
 
     socket.on('start-search', () => {
-        // Botun gelme süresi: 15 saniye (15000ms)
+    
+        
+        
+        
+        // Botun gelme süresi: 15 saniye (18000ms)
         setTimeout(() => {
             const botData = { nickname: "Savaşçı_Bot", animal: "Snake", userId: "BOT123" };
             const winnerId = Math.random() > 0.4 ? (socket.userData ? socket.userData.userId : "BOT123") : "BOT123";
             socket.emit('match-found', { matchId: `match_${Date.now()}`, winnerId, opponent: botData });
-        }, 15000); 
+        }, 18000); 
     });
 
+
+
+    
     socket.on('claim-victory', async (data) => {
         const user = await User.findById(data.userId);
         if (user) { 
@@ -254,6 +310,9 @@ io.on('connection', (socket) => {
         }
     });
 
+
+    
+    
     // WebRTC ve diğer socket olayları...
     socket.on('webrtc-offer', (data) => socket.to(data.toSocket).emit('webrtc-offer', data));
     socket.on('webrtc-answer', (data) => socket.to(data.toSocket).emit('webrtc-answer', data));
@@ -265,6 +324,12 @@ io.on('connection', (socket) => {
     });
 });
 
+
+
+
+
+
 server.listen(PORT, "0.0.0.0", () => {
     console.log(`BPL SİSTEMİ AKTİF | PORT: ${PORT}`);
 });
+
