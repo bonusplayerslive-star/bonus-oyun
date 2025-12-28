@@ -186,5 +186,18 @@
             });
         });
     </script>
+<script src="/socket.io/socket.io.js"></script>
+<script>
+    const socket = io(); // Her sayfada bu bağlantıyı başlatır
+    
+    // Aktif sayısını her sayfada güncel tutmak için:
+    socket.on('update-active-count', (count) => {
+        const playerEl = document.getElementById('active-players');
+        if(playerEl) playerEl.innerText = count + " OYUNCU";
+    });
+</script>
+
+
 </body>
 </html>
+
