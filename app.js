@@ -234,6 +234,29 @@ io.on('connection', (socket) => {
         }
     });
 
+
+// --- BİZE ULAŞIN / DESTEK FORMU ---
+app.post('/contact-us', async (req, res) => {
+    try {
+        const { email, message } = req.body;
+        
+        if (!email || !message) {
+            return res.json({ status: 'error', msg: 'Lütfen tüm alanları doldurun!' });
+        }
+
+        // MongoDB'ye "SUPPORT" tipiyle kaydediyoruz
+        await dbLog('SUPPORT', `Gönderen: ${email} | Mesaj: ${message}`);
+
+        res.json({ status: 'success', msg: 'Mesajınız başarıyla iletildi!' });
+    } catch (e) {
+        console.error("Destek formu hatası:", e.message);
+        res.json({ status: 'error', msg: 'Sistem hatası oluştu.' });
+    }
+});
+
+
+    
+
     // --- WebRTC ---
     socket.on('webrtc-offer', (data) => {
         socket.to(data.toSocket).emit('webrtc-offer', { offer: data.offer, fromSocket: socket.id, senderNick: data.senderNick });
@@ -253,3 +276,4 @@ io.on('connection', (socket) => {
 server.listen(PORT, "0.0.0.0", () => {
     console.log(`BPL SİSTEMİ AKTİF | PORT: ${PORT}`);
 });
+
