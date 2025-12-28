@@ -181,28 +181,25 @@ io.on('connection', (socket) => {
         socket.emit('sync-meeting', { remaining: 90 * 60 * 1000 });
     });
 
-
-// Aktif kullanıcı sayısını tutan değişken
-let activeUsers = 0;
+// Aktif kullanıcıları sayan fonksiyon
+const broadcastActiveCount = () => {
+    const count = io.engine.clientsCount; // Bağlı toplam cihaz sayısı
+    io.emit('update-active-count', count);
+    console.log(`[SOCKET] Canlı Aktif Sayısı: ${count}`);
+};
 
 io.on('connection', (socket) => {
-    // Yeni biri bağlandığında sayıyı artır ve herkese gönder
-    activeUsers++;
-    io.emit('update-active-count', activeUsers);
-    console.log(`[SOCKET] Yeni bağlantı. Aktif: ${activeUsers}`);
-
-    // Mevcut join-chat vb. kodların burada kalmaya devam etsin...
+    // Yeni birisi girdiğinde herkese güncel sayıyı gönder
+    broadcastActiveCount();
 
     socket.on('disconnect', () => {
-        // Biri ayrıldığında sayıyı azalt ve herkese gönder
-        activeUsers = Math.max(0, activeUsers - 1);
-        io.emit('update-active-count', activeUsers);
-        console.log(`[SOCKET] Bağlantı koptu. Aktif: ${activeUsers}`);
-        
+        // Birisi çıktığında herkese güncel sayıyı gönder
+        broadcastActiveCount();
         if (socket.roomId) socket.to(socket.roomId).emit('user-left', socket.id);
     });
+    
+    // Diğer mevcut kodların (join-chat vb.) burada kalmaya devam etsin...
 });
-
 
 
 
@@ -328,6 +325,7 @@ app.post('/forgot-password', async (req, res) => {
 server.listen(PORT, "0.0.0.0", () => {
     console.log(`BPL SİSTEMİ AKTİF | PORT: ${PORT}`);
 });
+
 
 
 
