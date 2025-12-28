@@ -11,8 +11,7 @@ const UserSchema = new mongoose.Schema({
     bpl: { type: Number, default: 2500 }, // Yeni kayıtlara 2500 hediye
     inventory: { type: [String], default: [] }, // Sahip olunan hayvanlar
 
-
-user.markModified('stats'); // Mongoose'a "stats değişti, bunu kaydet" mesajı verir.
+user.markModified('stats'); // Mongoose stats update
 await user.save();
     
     // Gelişim ve Savaş İstatistikleri
@@ -50,4 +49,5 @@ stats: {
 },
 
 module.exports = mongoose.model('User', UserSchema);
+
 
