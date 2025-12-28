@@ -1,9 +1,9 @@
 <!DOCTYPE html>
-<html lang="tr">
+<html lang="en">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>BonusPlayersLive | Giriş</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>BonusPlayersLive | Elite Gaming & Vision</title>
     <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
     <script src="/socket.io/socket.io.js"></script>
     <style>
@@ -11,14 +11,14 @@
             --neon-green: #39FF14;
             --neon-blue: #00f3ff;
             --neon-red: #ff003c;
-            --dark-glass: rgba(0, 0, 0, 0.85);
+            --dark-glass: rgba(0, 0, 0, 0.88);
         }
 
         body {
-            background: url('/caracter/page/welcome.jpg') no-repeat center center fixed;
+            background: #050505 url('/caracter/page/welcome.jpg') no-repeat center center fixed;
             background-size: cover;
             color: white;
-            font-family: 'Segoe UI', sans-serif;
+            font-family: 'Segoe UI', Roboto, sans-serif;
             overflow-x: hidden;
             min-height: 100vh;
         }
@@ -29,40 +29,59 @@
             top: 20px;
             left: 20px;
             width: 50px;
-            height: auto;
+            height: 50px;
             border-radius: 50%;
             border: 2px solid var(--neon-green);
             box-shadow: 0 0 15px var(--neon-green);
             z-index: 1000;
+            object-fit: cover;
         }
 
-        /* Cyber Panel Tasarımı */
+        /* Glass Box Tasarımı */
+        .glass-box {
+            background: rgba(0, 0, 0, 0.75);
+            border: 1px solid rgba(255, 255, 255, 0.1);
+            backdrop-filter: blur(15px);
+            -webkit-backdrop-filter: blur(15px);
+            border-radius: 20px;
+            padding: 25px;
+            margin-bottom: 20px;
+            transition: 0.3s;
+        }
+
+        .glass-box:hover {
+            border-color: var(--neon-green);
+            background: rgba(0, 0, 0, 0.85);
+        }
+
+        /* Tokenomics Progress Bar */
+        .token-progress {
+            height: 30px;
+            display: flex;
+            border-radius: 8px;
+            overflow: hidden;
+            border: 1px solid rgba(255, 255, 255, 0.2);
+            margin: 15px 0;
+        }
+        .progress-part {
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 10px;
+            font-weight: bold;
+            color: #000;
+            text-shadow: none;
+        }
+
+        /* Form Elemanları */
         .auth-card {
             background: var(--dark-glass);
             border: 1px solid rgba(57, 255, 20, 0.3);
-            border-radius: 20px;
-            backdrop-filter: blur(15px);
-            padding: 40px;
+            border-radius: 24px;
+            padding: 35px;
             width: 100%;
             max-width: 450px;
-            box-shadow: 0 0 40px rgba(0, 0, 0, 0.9), inset 0 0 20px rgba(57, 255, 20, 0.05);
-            position: relative;
-            overflow: hidden;
-        }
-
-        .auth-card::before {
-            content: "";
-            position: absolute;
-            top: 0; left: 0; width: 100%; height: 4px;
-            background: linear-gradient(90deg, transparent, var(--neon-green), transparent);
-        }
-
-        /* Tab Menü */
-        .nav-pills {
-            background: rgba(255, 255, 255, 0.05);
-            border-radius: 50px;
-            padding: 5px;
-            margin-bottom: 30px;
+            box-shadow: 0 0 40px rgba(0, 0, 0, 0.9);
         }
 
         .nav-pills .nav-link {
@@ -70,8 +89,6 @@
             border-radius: 50px;
             font-weight: bold;
             transition: 0.4s;
-            text-transform: uppercase;
-            letter-spacing: 1px;
         }
 
         .nav-pills .nav-link.active {
@@ -80,32 +97,20 @@
             box-shadow: 0 0 20px var(--neon-green);
         }
 
-        /* Modern Inputlar */
-        .form-floating > .form-control {
-            background: rgba(255, 255, 255, 0.05);
-            border: 1px solid rgba(255, 255, 255, 0.1);
+        .form-control {
+            background: rgba(255, 255, 255, 0.05) !important;
+            border: 1px solid rgba(255, 255, 255, 0.1) !important;
             color: white !important;
             border-radius: 12px;
         }
 
-        .form-floating > .form-control:focus {
-            background: rgba(255, 255, 255, 0.1);
-            border-color: var(--neon-green);
-            box-shadow: 0 0 10px rgba(57, 255, 20, 0.2);
-        }
-
-        .form-floating > label {
-            color: #888;
-        }
-
-        /* Neon Buton */
         .btn-cyber {
             background: transparent;
             border: 2px solid var(--neon-green);
             color: var(--neon-green);
             font-weight: 800;
             text-transform: uppercase;
-            letter-spacing: 2px;
+            letter-spacing: 1px;
             padding: 12px;
             border-radius: 12px;
             transition: 0.5s;
@@ -114,81 +119,40 @@
         .btn-cyber:hover {
             background: var(--neon-green);
             color: black;
-            box-shadow: 0 0 30px var(--neon-green);
-            transform: translateY(-2px);
+            box-shadow: 0 0 25px var(--neon-green);
         }
 
-        /* Bilgi Kutuları */
-        .info-pill {
-            background: rgba(57, 255, 20, 0.1);
-            border-left: 4px solid var(--neon-green);
-            padding: 10px 15px;
-            border-radius: 4px;
-            margin-bottom: 15px;
-        }
-
-        /* Sol Alt Bize Ulaş Butonu */
-        .btn-contact-float {
-            position: fixed;
-            bottom: 30px;
-            left: 30px;
-            background: rgba(0, 0, 0, 0.8);
+        .wallet-box {
+            background: #000;
             color: var(--neon-blue);
-            border: 2px solid var(--neon-blue);
-            padding: 12px 20px;
-            border-radius: 50px;
-            font-weight: bold;
-            text-decoration: none;
-            box-shadow: 0 0 15px var(--neon-blue);
-            transition: 0.3s;
-            z-index: 9999;
+            padding: 8px;
+            border-radius: 8px;
+            font-family: monospace;
+            font-size: 0.8rem;
+            border: 1px solid var(--neon-blue);
+            word-break: break-all;
+            margin-top: 5px;
         }
 
-        .btn-contact-float:hover {
-            background: var(--neon-blue);
-            color: black;
-            transform: scale(1.05);
-        }
-
-        /* Alt IP ve Aktiflik Göstergesi */
+        /* Footer & Alt Bilgiler */
         .ip-footer {
             position: fixed;
-            bottom: 10px;
+            bottom: 0;
+            left: 0;
             width: 100%;
+            background: rgba(0, 0, 0, 0.8);
+            padding: 8px;
             text-align: center;
-            font-size: 0.75rem;
-            color: rgba(255, 255, 255, 0.4);
+            font-size: 11px;
             letter-spacing: 1px;
             z-index: 100;
-            line-height: 1.5;
+            border-top: 1px solid rgba(57, 255, 20, 0.2);
         }
 
-        .ip-footer span {
-            color: var(--neon-green);
-            font-weight: bold;
-            text-shadow: 0 0 5px var(--neon-green);
-        }
-
-        .online-dot {
-            height: 8px;
-            width: 8px;
-            background-color: var(--neon-green);
-            border-radius: 50%;
-            display: inline-block;
-            margin-right: 5px;
-            box-shadow: 0 0 8px var(--neon-green);
-            animation: pulse 2s infinite;
-        }
-
-        @keyframes pulse {
-            0% { transform: scale(0.95); opacity: 0.4; }
-            50% { transform: scale(1.1); opacity: 1; }
-            100% { transform: scale(0.95); opacity: 0.4; }
-        }
-
-        .neon-text {
-            color: var(--neon-green);
-            text-shadow: 0 0 10px var(--neon-green);
+        .neon-text { color: var(--neon-green); text-shadow: 0 0 10px var(--neon-green); }
+        
+        @media (max-width: 992px) {
+            .content-area { margin-top: 80px; }
         }
     </style>
 </head>
@@ -196,56 +160,70 @@
 
     <img src="/caracter/page/logo.jpeg" class="main-logo" alt="BPL">
 
-    <div class="container min-vh-100 d-flex align-items-center">
-        <div class="row w-100 align-items-center">
+    <div class="container-fluid min-vh-100 d-flex align-items-center py-5">
+        <div class="row w-100 g-4">
             
-            <div class="col-lg-7 d-none d-lg-block">
+            <div class="col-lg-7 content-area px-lg-5">
                 <div class="mb-4">
-                    <h1 class="display-3 fw-bold" style="color: var(--neon-green); text-shadow: 0 0 20px rgba(57, 255, 20, 0.5);">BPL ELITE</h1>
-                    <h2 class="h3 text-white-50 italic">Hayatta Kal, Kazan, Hükmet.</h2>
+                    <h1 class="display-3 fw-bold neon-text">BPL ELITE</h1>
+                    <p class="h4 text-white-50 italic">Live players always win.</p>
                 </div>
-                
-                <div class="mt-5">
-                    <div class="info-pill">
-                        <span class="text-white fw-bold">DÜNYA ARENASI:</span>
-                        <span class="text-white-50 small ml-2">Diğer oyuncularla gerçek zamanlı savaşlara katıl.</span>
+
+                <div class="glass-box">
+                    <h5 class="neon-text">PROJECT VISION</h5>
+                    <p class="small text-white-50">Starting with addictive mini-games, we aim to build a global ecosystem. By 2026, we introduce VR-integrated gaming (V3), and by 2028, we expand into the Biotech sector, supplying raw materials for advanced cancer research. Your support drives our reality.</p>
+                </div>
+
+                <div class="glass-box">
+                    <h5 class="neon-text">TOKENOMICS (DISTRIBUTION)</h5>
+                    <div class="token-progress shadow">
+                        <div class="progress-part" style="width: 75%; background: #39FF14;">75% CORP</div>
+                        <div class="progress-part" style="width: 15%; background: #00f3ff;">15% EXCH</div>
+                        <div class="progress-part" style="width: 5%; background: #ff003c;">5% REW</div>
+                        <div class="progress-part" style="width: 5%; background: #bc13fe;">5% MKT</div>
                     </div>
-                    <div class="info-pill" style="border-left-color: var(--neon-blue);">
-                        <span class="text-white fw-bold">EKONOMİ:</span>
-                        <span class="text-white-50 small ml-2">BPL Token biriktirerek karakterini efsanevi seviyeye çıkar.</span>
+                    <div class="d-flex justify-content-between small text-white-50" style="font-size: 10px;">
+                        <span>🟢 Company (75%)</span>
+                        <span>🔵 Exchange (15%)</span>
+                        <span>🔴 Rewards (5%)</span>
+                        <span>🟣 Marketing (5%)</span>
                     </div>
+                </div>
+
+                <div class="glass-box">
+                    <h5 class="text-info">ECOSYSTEM FEATURES</h5>
+                    <ul class="small text-white-50 ps-3">
+                        <li><strong>Sign-up Bonus:</strong> 2500 BPL instantly.</li>
+                        <li><strong>Battle Arena:</strong> Train animals and win BPL in duels.</li>
+                        <li><strong>Social:</strong> 5-player Voice/Video rooms & Global Gifting.</li>
+                    </ul>
+                    <div class="wallet-box">BEP20: 0xB47FD3EFAcDdB316685D14B89598D78B4ce25181</div>
                 </div>
             </div>
 
-            <div class="col-lg-5 d-flex justify-content-center">
+            <div class="col-lg-5 d-flex justify-content-center align-items-center">
                 
                 <% if (locals.isBlocked) { %>
                     <div class="auth-card border-danger text-center">
-                        <h3 class="text-danger mb-3">FORM KİLİTLENDİ</h3>
-                        <p class="text-white mb-2">Çok fazla hatalı giriş denemesi yaptınız.</p>
-                        <p class="text-white-50 mb-4 small">Güvenlik nedeniyle IP adresiniz geçici olarak engellendi.<br> 
-                        Kalan süre: <strong class="text-danger"><%= remainingTime %> dakika</strong></p>
-                        <button class="btn btn-outline-danger w-100 py-3 fw-bold" onclick="openContactModal()">
-                            DESTEK İLE İLETİŞİME GEÇ
-                        </button>
+                        <h3 class="text-danger mb-3">ACCESS DENIED</h3>
+                        <p class="text-white-50 mb-4">Your IP has been temporarily blocked for security reasons.<br>Remaining: <strong class="text-danger"><%= remainingTime %> min</strong></p>
+                        <button class="btn btn-outline-danger w-100" onclick="openContactModal()">CONTACT SUPPORT</button>
                     </div>
                 <% } else if (locals.forceHelp) { %>
                     <div class="auth-card border-danger text-center">
-                        <h3 class="text-danger mb-3">ERİŞİM KISITLANDI</h3>
-                        <p class="text-white-50 mb-4 small">Güvenlik protokolleri nedeniyle giriş yetkiniz askıya alındı. Devam etmek için destek ekibine mesaj gönderin.</p>
-                        <button class="btn btn-outline-danger w-100 py-3 fw-bold" onclick="openContactModal()">
-                            YARDIM TALEBİ OLUŞTUR
-                        </button>
+                        <h3 class="text-danger mb-3">RESTRICTED</h3>
+                        <p class="text-white-50 mb-4">Please contact the support team to verify your account credentials.</p>
+                        <button class="btn btn-outline-danger w-100" onclick="openContactModal()">OPEN SUPPORT TICKET</button>
                     </div>
                 <% } else { %>
-                    <div class="auth-card shadow-lg">
+                    <div class="auth-card">
                         <div id="authTabs">
-                            <ul class="nav nav-pills nav-justified mb-4" id="pills-tab" role="tablist">
+                            <ul class="nav nav-pills nav-justified mb-4" id="pills-tab">
                                 <li class="nav-item">
-                                    <button class="nav-link active" data-bs-toggle="pill" data-bs-target="#pills-login">GİRİŞ</button>
+                                    <button class="nav-link active" data-bs-toggle="pill" data-bs-target="#pills-login">LOGIN</button>
                                 </li>
                                 <li class="nav-item">
-                                    <button class="nav-link" data-bs-toggle="pill" data-bs-target="#pills-register">KAYIT</button>
+                                    <button class="nav-link" data-bs-toggle="pill" data-bs-target="#pills-register">JOIN</button>
                                 </li>
                             </ul>
                         </div>
@@ -255,16 +233,16 @@
                                 <form action="/login" method="POST">
                                     <div class="form-floating mb-3">
                                         <input type="email" name="email" class="form-control" id="fEmail" placeholder="Email" required>
-                                        <label for="fEmail">Email Adresi</label>
+                                        <label for="fEmail">Email Address</label>
                                     </div>
                                     <div class="form-floating mb-4">
-                                        <input type="password" name="password" class="form-control" id="fPass" placeholder="Şifre" required>
-                                        <label for="fPass">Şifre</label>
+                                        <input type="password" name="password" class="form-control" id="fPass" placeholder="Password" required>
+                                        <label for="fPass">Password</label>
                                     </div>
-                                    <button type="submit" class="btn btn-cyber w-100">Sisteme Bağlan</button>
+                                    <button type="submit" class="btn btn-cyber w-100">Connect System</button>
                                 </form>
                                 <div class="text-center mt-3">
-                                    <a href="javascript:void(0)" onclick="toggleForgot(true)" class="text-white-50 small text-decoration-none hover-white">Şifreni mi unuttun?</a>
+                                    <a href="javascript:void(0)" onclick="toggleForgot(true)" class="text-white-50 small text-decoration-none">Forgot password?</a>
                                 </div>
                             </div>
 
@@ -279,69 +257,59 @@
                                         <label for="rEmail">Email</label>
                                     </div>
                                     <div class="form-floating mb-2">
-                                        <input type="password" name="password" class="form-control" id="rPass" placeholder="Şifre" required>
-                                        <label for="rPass">Şifre</label>
+                                        <input type="password" name="password" class="form-control" id="rPass" placeholder="Password" required>
+                                        <label for="rPass">Password</label>
                                     </div>
                                     <div class="form-floating mb-3">
-                                        <input type="text" name="ref_code" class="form-control" id="rRef" placeholder="Referans">
-                                        <label for="rRef">Referans Kodu (Varsa)</label>
+                                        <input type="text" name="ref_code" class="form-control" id="rRef" placeholder="Referral">
+                                        <label for="rRef">Referral Code (Optional)</label>
                                     </div>
-                                    <button type="submit" class="btn btn-cyber w-100">Karakterini Oluştur</button>
+                                    <button type="submit" class="btn btn-cyber w-100">Generate Hero</button>
                                 </form>
                             </div>
 
                             <div id="forgotForm" style="display: none;">
-                                <h4 class="text-center mb-3 neon-text">ŞİFRE KURTARMA</h4>
-                                <p class="small text-white-50 text-center mb-4">E-posta adresini gir, sana bir sıfırlama bağlantısı gönderelim.</p>
+                                <h4 class="text-center mb-3 neon-text">RECOVERY</h4>
                                 <div class="form-floating mb-4">
                                     <input type="email" id="forgotEmail" class="form-control" placeholder="Email" required>
-                                    <label for="forgotEmail">Kayıtlı E-posta Adresiniz</label>
+                                    <label for="forgotEmail">Registered Email</label>
                                 </div>
-                                <button type="button" onclick="sendForgotMail()" class="btn btn-cyber w-100 mb-3">BAĞLANTI GÖNDER</button>
+                                <button type="button" onclick="sendForgotMail()" class="btn btn-cyber w-100 mb-3">SEND LINK</button>
                                 <div class="text-center">
-                                    <a href="javascript:void(0)" onclick="toggleForgot(false)" class="text-white-50 small text-decoration-none">Giriş Ekranına Dön</a>
+                                    <a href="javascript:void(0)" onclick="toggleForgot(false)" class="text-white-50 small text-decoration-none">Back to Login</a>
                                 </div>
                             </div>
                         </div>
                     </div>
                 <% } %>
-
             </div>
         </div>
     </div>
 
-    <a href="javascript:void(0)" class="btn-contact-float" onclick="openContactModal()">
-        📩 BİZE ULAŞIN
-    </a>
-
     <div class="ip-footer">
-        <div>IP ADRESİNİZ: <span><%= locals.userIp || '0.0.0.0' %></span></div>
-        <div class="mt-1">
-            <span class="online-dot"></span> 
-         ANLIK AKTİF: <span id="active-players" style="color: #00ff00;">YÜKLENİYOR...</span>
-        </div>
+        IP: <span class="text-success"><%= locals.userIp || '0.0.0.0' %></span> | 
+        LIVE: <span id="active-players" class="text-success">SYNCHRONIZING...</span>
     </div>
 
-    <div class="modal fade" id="contactModal" tabindex="-1" aria-hidden="true">
+    <div class="modal fade" id="contactModal" tabindex="-1">
         <div class="modal-dialog modal-dialog-centered">
-            <div class="modal-content bg-dark text-white border-info shadow-lg">
-                <div class="modal-header border-info">
-                    <h5 class="modal-title neon-text">DESTEK VE ŞİKAYET FORMU</h5>
-                    <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="Close"></button>
+            <div class="modal-content bg-dark text-white border-info">
+                <div class="modal-header border-secondary">
+                    <h5 class="modal-title neon-text">SUPPORT CENTER</h5>
+                    <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
                 </div>
                 <div class="modal-body">
                     <div class="mb-3">
-                        <label class="form-label small">İletişim E-postanız</label>
-                        <input type="email" id="contactEmail" class="form-control bg-black text-white border-secondary" placeholder="Örn: mail@adres.com">
+                        <label class="form-label small">Contact Email</label>
+                        <input type="email" id="contactEmail" class="form-control bg-black border-secondary">
                     </div>
                     <div class="mb-3">
-                        <label class="form-label small">Konu / Mesaj / Şikayet</label>
-                        <textarea id="contactMessage" class="form-control bg-black text-white border-secondary" rows="5" placeholder="Lütfen detaylıca açıklayınız..."></textarea>
+                        <label class="form-label small">Message / Complaint</label>
+                        <textarea id="contactMessage" class="form-control bg-black border-secondary" rows="4"></textarea>
                     </div>
                 </div>
-                <div class="modal-footer border-info">
-                    <button type="button" class="btn btn-outline-light btn-sm" data-bs-dismiss="modal">İptal</button>
-                    <button type="button" onclick="submitSupportForm()" class="btn btn-info btn-sm px-4 fw-bold">KAYDET VE GÖNDER</button>
+                <div class="modal-footer border-secondary">
+                    <button type="button" onclick="submitSupportForm()" class="btn btn-info btn-sm px-4 fw-bold">SEND FORM</button>
                 </div>
             </div>
         </div>
@@ -351,41 +319,17 @@
     <script>
         const socket = io();
 
-        // Aktif oyuncu sayısını socket üzerinden yakala
+        // Aktif Oyuncu Sayısı
         socket.on('update-active-count', (count) => {
             const playerEl = document.getElementById('active-players');
-            if(playerEl) playerEl.innerText = count + " OYUNCU";
+            if(playerEl) playerEl.innerText = count + " USERS ONLINE";
         });
 
+        // Modal Kontrolü
         const helpModal = new bootstrap.Modal(document.getElementById('contactModal'));
+        function openContactModal() { helpModal.show(); }
 
-        function openContactModal() {
-            helpModal.show();
-        }
-
-        function submitSupportForm() {
-            const email = document.getElementById('contactEmail').value;
-            const message = document.getElementById('contactMessage').value;
-
-            if (!email || !message) return alert("Lütfen tüm alanları doldurun.");
-
-            fetch('/contact-submit', {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ email, message })
-            })
-            .then(res => res.json())
-            .then(data => {
-                alert(data.msg);
-                if (data.status === 'success') {
-                    helpModal.hide();
-                    document.getElementById('contactEmail').value = "";
-                    document.getElementById('contactMessage').value = "";
-                }
-            })
-            .catch(err => alert("Sistem hatası: " + err));
-        }
-
+        // Şifre Kurtarma Görünümü
         function toggleForgot(show) {
             const authTabs = document.getElementById('authTabs');
             const loginPane = document.getElementById('pills-login');
@@ -404,13 +348,37 @@
             }
         }
 
+        // Destek Formu Gönderimi
+        function submitSupportForm() {
+            const email = document.getElementById('contactEmail').value;
+            const message = document.getElementById('contactMessage').value;
+
+            if (!email || !message) return alert("Please fill all fields.");
+
+            fetch('/contact-submit', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ email, message })
+            })
+            .then(res => res.json())
+            .then(data => {
+                alert(data.msg);
+                if (data.status === 'success') {
+                    helpModal.hide();
+                    document.getElementById('contactEmail').value = "";
+                    document.getElementById('contactMessage').value = "";
+                }
+            })
+            .catch(err => alert("System Error: " + err));
+        }
+
+        // Şifre Kurtarma Maili
         function sendForgotMail() {
             const email = document.getElementById('forgotEmail').value;
-            if (!email) return alert("Lütfen geçerli bir e-posta adresi girin.");
+            if (!email) return alert("Email is required.");
 
             const btn = document.querySelector("#forgotForm .btn-cyber");
-            const originalText = btn.innerText;
-            btn.innerText = "GÖNDERİLİYOR...";
+            btn.innerText = "SENDING...";
             btn.disabled = true;
 
             fetch('/forgot-password', {
@@ -423,16 +391,12 @@
                 alert(data.msg);
                 if (data.status === 'success') toggleForgot(false);
             })
-            .catch(err => {
-                console.error(err);
-                alert("Sistem hatası oluştu!");
-            })
+            .catch(err => alert("Error!"))
             .finally(() => {
-                btn.innerText = originalText;
+                btn.innerText = "SEND LINK";
                 btn.disabled = false;
             });
         }
     </script>
 </body>
 </html>
-
