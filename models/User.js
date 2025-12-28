@@ -10,6 +10,10 @@ const UserSchema = new mongoose.Schema({
     // Ekonomi Sistemi
     bpl: { type: Number, default: 2500 }, // Yeni kayıtlara 2500 hediye
     inventory: { type: [String], default: [] }, // Sahip olunan hayvanlar
+
+
+user.markModified('stats'); // Mongoose'a "stats değişti, bunu kaydet" mesajı verir.
+await user.save();
     
     // Gelişim ve Savaş İstatistikleri
     // Örnek yapı: { "Aslan": { hp: 120, atk: 15, def: 10 }, "Kaplan": { ... } }
@@ -46,3 +50,4 @@ stats: {
 },
 
 module.exports = mongoose.model('User', UserSchema);
+
