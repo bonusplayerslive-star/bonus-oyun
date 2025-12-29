@@ -85,6 +85,25 @@
                         <div class="log-item text-muted">Sistem kayıtları taranıyor...</div>
                     </div>
                 </div>
+<div id="battle-scene">
+    <video id="battleVideo" width="100%" style="display:none;" controls autoplay></video>
+    <div id="battle-status">
+        <h2 class="text-neon">SAVAŞ BAŞLIYOR!</h2>
+    </div>
+</div>
+
+<script>
+    function startBattle(animal) {
+        const video = document.getElementById('battleVideo');
+        video.src = `/caracter/move/${animal}/${animal}1.mp4`; // Saldırı videosu
+        video.style.display = 'block';
+        
+        video.onended = () => {
+            // Savaş sonucu kazanma ise zafer videosuna geç
+            video.src = `/caracter/move/${animal}/${animal}.mp4`; 
+        };
+    }
+</script>
 
                 <div class="text-center mt-4">
                     <a href="/profil" class="text-danger text-decoration-none small">← ARENADAN AYRIL</a>
@@ -171,3 +190,4 @@
     </script>
 </body>
 </html>
+
