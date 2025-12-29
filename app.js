@@ -208,38 +208,89 @@ io.on('connection', (socket) => {
         io.emit('update-online-players', Object.keys(onlineUsers));
     });
 
+// --- SOCKET SİSTEMİ (ARENA, CHAT, MEETING & GIFT) ---
+let onlineUsers = {}; 
+
+io.on('connection', (socket) => {
+    // 1. Kullanıcı Kaydı
+    socket.on('register-user', (data) => {
+        socket.nickname = data.nickname;
+        socket.userId = data.id;
+        onlineUsers[data.nickname] = socket.id;
+        io.emit('update-online-players', Object.keys(onlineUsers).length);
+    });
+
+    // 2. Global Chat Olayları
     socket.on('join-chat', (data) => { socket.join('Global'); });
 
     socket.on('chat-message', (data) => {
-        io.emit('new-message', { sender: data.nickname, text: data.message });
+        // Hem Global odaya hem genel emit (Undefined hatasını önlemek için veri yapısı sabitlendi)
+        io.emit('new-message', { 
+            sender: data.nickname, 
+            text: data.message 
+        });
     });
 
+    // 3. HEDİYE SİSTEMİ (CHART & MEETING İÇİN)
+    socket.on('send-gift', async (data) => {
+        try {
+            const sender = await User.findById(data.userId || socket.userId);
+            const receiver = await User.findOne({ nickname: data.to });
+
+            if (!sender || !receiver) return;
+
+            // ŞİRKET KURALI: 6000 BPL Altı Globalde hediye gönderemez
+            if (data.room === 'Global' && sender.bpl < 6000) {
+                return socket.emit('gift-result', { message: "Hediye için en az 6000 BPL bakiye gerekir!" });
+            }
+
+            const giftAmount = parseInt(data.amount);
+            if (giftAmount > 0 && sender.bpl >= giftAmount) {
+                sender.bpl -= giftAmount;
+                receiver.bpl += giftAmount;
+                await sender.save();
+                await receiver.save();
+
+                // Gönderene yeni bakiyesini bildir
+                socket.emit('gift-result', { 
+                    newBalance: sender.bpl, 
+                    message: `${data.to} kişisine ${giftAmount} BPL gönderildi!` 
+                });
+
+                // Odadakilere duyur
+                const announceMsg = `🎁 ${sender.nickname} -> ${receiver.nickname} kullanıcısına ${giftAmount} BPL hediye etti!`;
+                if(data.room) {
+                    io.to(data.room).emit('new-message', { sender: "SİSTEM", text: announceMsg });
+                    io.to(data.room).emit('gift-result', { message: announceMsg });
+                } else {
+                    io.emit('new-message', { sender: "SİSTEM", text: announceMsg });
+                }
+            }
+        } catch (e) { console.log("Hediye hatası:", e); }
+    });
+
+    // 4. BEŞGEN MASA (MEETING) ÖZEL SİNYALLERİ
     socket.on('join-room', (data) => {
         socket.join(data.roomId);
-        socket.to(data.roomId).emit('new-message', { sender: 'Sistem', text: `${data.nickname} masaya katıldı.` });
+        io.to(data.roomId).emit('new-message', { 
+            sender: 'Sistem', 
+            text: `🚀 ${data.nickname} masaya oturdu. Hoş geldin!` 
+        });
     });
 
-    socket.on('send-gift-room', async (data) => {
-        // Hediyeleşme mantığı (Backend bakiye güncelleme)
-        const sender = await User.findById(socket.userId);
-        const receiver = await User.findOne({ nickname: data.targetNickname });
-        if(sender && receiver && sender.bpl >= data.amount) {
-            sender.bpl -= data.amount;
-            receiver.bpl += data.amount;
-            await sender.save(); await receiver.save();
-            io.to(data.roomId).emit('gift-received', { from: sender.nickname, to: receiver.nickname, amount: data.amount, senderNewBalance: sender.bpl });
-        }
-    });
-
+    // 5. MEYDAN OKUMA (ARENA DAVETİ)
     socket.on('challenge-player', (data) => {
-        const targetId = onlineUsers[data.targetNickname];
-        if (targetId) io.to(targetId).emit('challenge-received', { challenger: socket.nickname });
+        const targetSocketId = onlineUsers[data.targetNickname];
+        if (targetSocketId) {
+            io.to(targetSocketId).emit('challenge-received', { challenger: socket.nickname });
+        }
     });
 
     socket.on('disconnect', () => {
         if (socket.nickname) delete onlineUsers[socket.nickname];
-        io.emit('update-online-players', Object.keys(onlineUsers));
+        io.emit('update-online-players', Object.keys(onlineUsers).length);
     });
 });
 
 server.listen(PORT, "0.0.0.0", () => console.log(`BPL SERVER RUNNING ON ${PORT}`));
+
