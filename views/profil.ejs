@@ -39,13 +39,15 @@
         .limit-alert { font-size: 0.8rem; color: #ff4444; border: 1px solid #ff4444; padding: 5px; border-radius: 5px; }
         
         .nav-btn { width: 100%; margin-bottom: 10px; text-transform: uppercase; font-weight: bold; }
+        .btn-meeting { border: 2px solid #ffc107; color: #ffc107; }
+        .btn-meeting:hover { background: #ffc107; color: #000; }
     </style>
 </head>
 <body>
 
     <div class="header-section">
         <div class="container d-flex justify-content-between align-items-center">
-            <img src="/caracter/logo/logo.jpeg" alt="BPL LOGO" class="logo-img">
+            <img src="/caracter/logo/logo.jpeg" alt="BPL LOGO" class="logo-img" onerror="this.src='/caracter/page/logo.jpeg'">
             <div class="text-end">
                 <h4 class="mb-0 text-neon"><%= user.nickname %></h4>
                 <span class="bpl-badge"><%= user.bpl.toLocaleString() %> BPL</span>
@@ -61,7 +63,13 @@
                     <a href="/market" class="btn btn-outline-success nav-btn"><i class="fas fa-shopping-cart"></i> MARKET</a>
                     <a href="/arena" class="btn btn-outline-danger nav-btn"><i class="fas fa-swords"></i> ARENA</a>
                     <a href="/chat" class="btn btn-outline-info nav-btn"><i class="fas fa-comments"></i> GLOBAL CHAT</a>
-                    <a href="/meeting" class="btn btn-outline-warning nav-btn"><i class="fas fa-video"></i> MEETING</a>
+                    
+                    <form action="/create-meeting" method="POST" style="width: 100%;">
+                        <button type="submit" class="btn btn-meeting nav-btn">
+                            <i class="fas fa-video"></i> BEŞGEN MASA (50 BPL)
+                        </button>
+                    </form>
+
                     <a href="/wallet" class="btn btn-light nav-btn"><i class="fas fa-wallet"></i> WALLET (CÜZDAN)</a>
                     <hr>
                     <a href="/" class="btn btn-dark nav-btn text-danger">ÇIKIŞ YAP</a>
@@ -104,17 +112,23 @@
     <script src="/socket.io/socket.io.js"></script>
     <script>
         const socket = io();
-        // Profil sayfası açıldığı anda socket'e "ben buradayım" der.
+        
+        // Kayıt ve Online Takibi
         socket.emit('register-user', { 
             id: "<%= user._id %>", 
             nickname: "<%= user.nickname %>" 
         });
 
-        // Savaş daveti gelirse her sayfada olduğu gibi burada da yakalıyoruz
+        // Arena Daveti Yakalama
         socket.on('challenge-received', (data) => {
             if(confirm(data.challenger + " seni Arena'ya davet ediyor! Kabul ediyor musun?")) {
                 window.location.href = '/arena';
             }
+        });
+
+        // Globalden gelen Beşgen Masa davetleri için
+        socket.on('receive-meeting-invite', (data) => {
+            console.log("Masa daveti geldi:", data);
         });
     </script>
 </body>
