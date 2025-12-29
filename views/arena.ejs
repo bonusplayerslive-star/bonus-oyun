@@ -130,24 +130,27 @@
         let timeLeft = 13;
         let isBattleActive = false;
 
-        // 1. Geri Sayım ve Bot Tetikleme
+        // --- UNUTULAN GERİ SAYIM DİNAMİĞİ ---
         const timerInterval = setInterval(() => {
             timeLeft--;
-            document.getElementById('timer').innerText = timeLeft;
+            const timerDiv = document.getElementById('timer');
+            if(timerDiv) timerDiv.innerText = timeLeft;
             
             if (timeLeft <= 0) {
                 clearInterval(timerInterval);
-                document.getElementById('matching-ui').style.display = 'none';
-                document.getElementById('bot-ui').style.display = 'block';
+                // 13 saniye dolunca UI değişir
+                document.getElementById('matching-ui').style.opacity = "0";
+                setTimeout(() => {
+                    document.getElementById('matching-ui').style.display = 'none';
+                    document.getElementById('bot-ui').style.display = 'block';
+                }, 500);
             }
         }, 1000);
 
-        // 2. Savaş Başlatma
         async function startBattle() {
             const animal = "<%= selectedAnimal %>";
             
             try {
-                // Backend'den savaş verilerini çek
                 const response = await fetch(`/attack-bot?animal=${animal}`, { method: 'POST' });
                 const data = await response.json();
 
@@ -155,14 +158,14 @@
                     isBattleActive = true;
                     overlay.style.display = 'flex';
                     
-                    // --- 1. AŞAMA: SALDIRI HAMLESİ (8 SN) ---
+                    // 1. AŞAMA: SALDIRI
                     videoPlayer.src = data.animation.actionVideo;
                     battleTopText.innerText = "SALDIRI HAMLESİ YAPILIYOR...";
                     videoPlayer.play();
 
                     videoPlayer.onended = () => {
                         if(data.animation.isWin) {
-                            // --- 2. AŞAMA: ZAFER VİDEOSU ---
+                            // 2. AŞAMA: ZAFER
                             winBanner.style.display = 'block';
                             battleTopText.innerText = "ZAFER SENİN!";
                             battleTopText.className = "status-top-text mb-3 h4 text-warning";
@@ -174,24 +177,22 @@
                                 setTimeout(() => { location.href = '/profil'; }, 2000);
                             };
                         } else {
-                            // Kaybetme Durumu
+                            // KAYBETME
                             battleTopText.innerText = "MAĞLUP OLDUN!";
                             battleTopText.className = "status-top-text mb-3 h4 text-danger";
                             setTimeout(() => { location.href = '/profil'; }, 3000);
                         }
                     };
                 } else {
-                    alert(data.msg || "Savaş başlatılamadı!");
+                    alert(data.msg || "Bakiye yetersiz veya hata!");
                 }
             } catch (err) {
-                console.error(err);
-                alert("Bağlantı hatası!");
+                alert("Arena bağlantısı kesildi!");
             }
         }
 
-        // Erken çıkış uyarısı (İsteğe bağlı)
         window.onbeforeunload = function() {
-            if(isBattleActive) return "Savaş devam ediyor, çıkarsan ceza alabilirsin!";
+            if(isBattleActive) return "Savaştan kaçarsan ceza alabilirsin!";
         };
     </script>
 </body>
