@@ -415,65 +415,79 @@ app.post('/sell-character', checkAuth, async (req, res) => {
         console.log('Bir kumandan ayrıldı.');
     });
 });
-app.post('/verify-payment', checkAuth, async (req, res) => {
+
+
+const Payment = require('./models/Payment'); // Ödeme kayıtları için model
+
+app.post('/verify-payment', async (req, res) => {
     const { userId, txid, usd, bpl } = req.body;
-    const BSCSCAN_API_KEY = "YOUR_BSCSCAN_API_KEY"; // Buraya BSCScan API Key gelecek
-    const COMPANY_WALLET = "0x9f63e92E8B316b7119b4586998966dF4446Dc754".toLowerCase();
-    const USDT_CONTRACT = "0x55d398326f99059ff775485246999027b3197955".toLowerCase(); // BSC USDT
+    
+    // Render Environment'dan gelen veriler
+    const apiKey = process.env.BSCSCAN_API_KEY;
+    const companyWallet = process.env.WALLET_ADDRESS.toLowerCase();
+    const usdtContract = process.env.CONTRACT_ADDRESS.toLowerCase();
 
     try {
-        // 1. Daha önce kullanılmış mı kontrol et (Mongoose Payment Modeli varsayıyoruz)
-        const existingTx = await Payment.findOne({ txid: txid });
-        if (existingTx) return res.json({ status: 'error', msg: 'Bu TxID zaten kullanılmış!' });
+        // 1. TxID daha önce kullanılmış mı? (Mükerrer ödeme kontrolü)
+        const checkDuplicate = await Payment.findOne({ txid: txid });
+        if (checkDuplicate) return res.json({ status: 'error', msg: 'Bu işlem daha önce onaylanmış!' });
 
-        // 2. BSCScan üzerinden sorgula
-        const response = await axios.get(`https://api.bscscan.com/api?module=proxy&action=eth_getTransactionReceipt&txhash=${txid}&apikey=${BSCSCAN_API_KEY}`);
-        const txData = response.data.result;
+        // 2. BSCScan API sorgusu
+        const url = `https://api.bscscan.com/api?module=proxy&action=eth_getTransactionReceipt&txhash=${txid}&apikey=${apiKey}`;
+        const response = await axios.get(url);
+        const receipt = response.data.result;
 
-        if (!txData || txData.status !== "0x1") {
-            return res.json({ status: 'error', msg: 'Geçersiz veya başarısız işlem!' });
+        if (!receipt || receipt.status !== "0x1") {
+            return res.json({ status: 'error', msg: 'İşlem henüz onaylanmamış veya geçersiz.' });
         }
 
-        // 3. Logları Tara (USDT Transferi mi?)
-        const logs = txData.logs;
-        let isPaymentValid = false;
-        let transferAmount = 0;
-
-        logs.forEach(log => {
-            // Transfer event'i ve USDT kontratı kontrolü
-            if (log.address.toLowerCase() === USDT_CONTRACT) {
-                // Topic[2] alıcı adresini tutar (paddingli 0x... formatında)
-                if (log.topics[2].toLowerCase().includes(COMPANY_WALLET.replace('0x', ''))) {
-                    // Data kısmındaki hex değeri sayıya çevir (USDT 18 decimal ise dikkat)
-                    transferAmount = parseInt(log.data, 16) / Math.pow(10, 18); // USDT BEP20 genelde 18 decimaldir
-                    if (transferAmount >= parseFloat(usd)) {
-                        isPaymentValid = true;
-                    }
+        // 3. Log analizi (Doğru adrese, doğru tutarda USDT gitti mi?)
+        let validTransfer = false;
+        receipt.logs.forEach(log => {
+            const isUSDT = log.address.toLowerCase() === usdtContract;
+            const toCompany = log.topics[2] && log.topics[2].toLowerCase().includes(companyWallet.replace('0x', ''));
+            
+            if (isUSDT && toCompany) {
+                const amountHex = log.data;
+                const actualAmount = parseInt(amountHex, 16) / Math.pow(10, 18); // 18 decimal kontrolü
+                
+                if (actualAmount >= parseFloat(usd)) {
+                    validTransfer = true;
                 }
             }
         });
 
-        if (isPaymentValid) {
-            // 4. Onayla ve BPL Yükle
+        if (validTransfer) {
+            // 4. Kullanıcıya BPL ekle
             const user = await User.findById(userId);
             user.bpl += parseInt(bpl);
             await user.save();
 
-            // Kayıt altına al
+            // 5. MongoDB'ye Kalıcı Kayıt At (Nirvana Kaydı)
             await new Payment({
-                userId, txid, amountUSD: usd, amountBPL: bpl, status: 'completed'
+                userId: userId,
+                txid: txid,
+                amountUSD: usd,
+                amountBPL: bpl,
+                walletUsed: companyWallet,
+                date: new Date(),
+                status: 'COMPLETED'
             }).save();
 
-            res.json({ status: 'success', msg: 'Ödeme doğrulandı! BPL yüklendi.' });
+            return res.json({ status: 'success', msg: 'Ödeme doğrulandı, BPL yüklendi!' });
         } else {
-            res.json({ status: 'error', msg: 'Tutar veya Alıcı adresi eşleşmiyor!' });
+            return res.json({ status: 'error', msg: 'Transfer verileri paketle uyuşmuyor!' });
         }
 
-    } catch (error) {
-        console.error("Payment Error:", error);
-        res.status(500).json({ status: 'error', msg: 'Sistem hatası!' });
+    } catch (err) {
+        console.error("Doğrulama Hatası:", err);
+        res.json({ status: 'error', msg: 'Sistem şu an doğrulamayı yapamıyor.' });
     }
 });
+
+
+
+
 
 
 
@@ -487,6 +501,7 @@ server.listen(PORT, "0.0.0.0", () => {
     =========================================
     `);
 });
+
 
 
 
