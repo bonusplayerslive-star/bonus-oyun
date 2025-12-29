@@ -1,327 +1,152 @@
 <!DOCTYPE html>
-<html lang="tr">
+<html lang="en">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>BPL | Elite Beşgen Masa</title>
+    <title>BPL MEETING | Virtual Hub</title>
     <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css">
     <script src="/socket.io/socket.io.js"></script>
     <style>
-        :root { --neon-green: #39FF14; --neon-yellow: #FFFF00; --dark-bg: #0d0d0d; }
-        body { background: var(--dark-bg); color: var(--neon-green); font-family: 'Segoe UI', sans-serif; margin: 0; min-height: 100vh; overflow: hidden; }
+        :root { --neon-green: #39FF14; --dark-bg: #0a0a0a; }
+        body { background: var(--dark-bg); color: white; font-family: 'Segoe UI', sans-serif; height: 100vh; overflow: hidden; }
+
+        /* Navbar & Logo */
+        .meeting-nav {
+            background: rgba(0,0,0,0.8); border-bottom: 1px solid rgba(57, 255, 20, 0.2);
+            padding: 10px 20px; display: flex; justify-content: space-between; align-items: center;
+        }
+        .meeting-nav img { height: 40px; filter: drop-shadow(0 0 5px var(--neon-green)); }
+
+        /* Ana Ekran Düzeni */
+        .meeting-container { display: flex; height: calc(100vh - 65px); }
         
-        /* Ana Düzen */
-        .layout { display: flex; flex-direction: row; height: 100vh; width: 100vw; }
-        .arena { flex: 1; position: relative; display: flex; justify-content: center; align-items: center; background: radial-gradient(circle, #1a1a1a 0%, #000 100%); }
+        /* Video Alanı */
+        .video-grid { flex: 3; background: #000; padding: 20px; display: grid; grid-template-columns: repeat(auto-fit, minmax(300px, 1fr)); gap: 15px; overflow-y: auto; }
+        .video-box { background: #1a1a1a; border: 1px solid #333; border-radius: 15px; position: relative; overflow: hidden; aspect-ratio: 16/9; }
+        .video-box video { width: 100%; height: 100%; object-fit: cover; }
+        .user-label { position: absolute; bottom: 10px; left: 10px; background: rgba(0,0,0,0.6); padding: 2px 10px; border-radius: 5px; font-size: 0.8rem; border-left: 3px solid var(--neon-green); }
+
+        /* Sağ Panel (Chat & Gift) */
+        .side-panel { flex: 1; border-left: 1px solid #222; background: #0f0f0f; display: flex; flex-direction: column; }
+        .panel-header { padding: 15px; border-bottom: 1px solid #222; color: var(--neon-green); font-weight: bold; text-align: center; }
         
-        /* Beşgen Masa Düzeni */
-        .pentagon-container { position: relative; width: 550px; height: 550px; transition: 0.5s cubic-bezier(0.4, 0, 0.2, 1); }
-        
-        .table-center {
-            position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%);
-            width: 220px; height: 220px; background: #000; border: 3px solid var(--neon-green);
-            clip-path: polygon(50% 0%, 100% 38%, 82% 100%, 18% 100%, 0% 38%);
-            display: flex; justify-content: center; align-items: center; box-shadow: 0 0 25px rgba(57, 255, 20, 0.2);
-            z-index: 5;
-        }
+        .chat-area { flex: 1; overflow-y: auto; padding: 15px; font-size: 0.9rem; }
+        .msg { margin-bottom: 10px; background: rgba(255,255,255,0.05); padding: 8px; border-radius: 8px; }
+        .msg b { color: var(--neon-green); }
 
-        /* Kamera Slotları */
-        .cam-slot {
-            position: absolute; width: 140px; height: 100px;
-            background: #111; border: 2px solid var(--neon-green); border-radius: 8px; overflow: hidden;
-            display: flex; flex-direction: column; align-items: center; justify-content: center;
-            cursor: pointer; transition: 0.4s ease; z-index: 10;
-        }
-        .cam-slot:hover { border-color: var(--neon-yellow); transform: scale(1.05); }
-        .cam-slot video { width: 100%; height: 100%; object-fit: cover; background: #000; pointer-events: none; }
-        .tag { width: 100%; background: rgba(57, 255, 20, 0.2); color: var(--neon-green); font-size: 0.7rem; text-align: center; padding: 2px 0; border-top: 1px solid var(--neon-green); }
+        .gift-section { padding: 15px; border-top: 1px solid #222; background: #141414; }
+        .gift-btn { width: 48%; margin-bottom: 5px; font-size: 0.8rem; }
 
-        /* Köşe Koordinatları */
-        #slot-1 { top: 0%; left: 50%; transform: translate(-50%, -50%); border-color: var(--neon-yellow); }
-        #slot-2 { top: 35%; right: 0%; transform: translate(15%, -50%); }
-        #slot-3 { bottom: 5%; right: 10%; }
-        #slot-4 { bottom: 5%; left: 10%; }
-        #slot-5 { top: 35%; left: 0%; transform: translate(-15%, -50%); }
-
-        /* ODAK MODU (FOCUS MODE) - %85 KAPSAMA */
-        .focus-active .pentagon-container { transform: scale(0.3) translateX(-150%); opacity: 0.5; pointer-events: none; }
-        
-        #focus-overlay {
-            position: absolute; top: 0; left: 0; width: 100%; height: 100%;
-            background: rgba(0,0,0,0.9); display: none; justify-content: center; align-items: center; z-index: 100;
-        }
-        #focused-video-container {
-            width: 85%; height: 85%; border: 3px solid var(--neon-green); border-radius: 15px; 
-            overflow: hidden; position: relative; box-shadow: 0 0 50px var(--neon-green);
-        }
-        #focused-video-container video { width: 100%; height: 100%; object-fit: contain; }
-        #focus-tag { position: absolute; bottom: 0; left: 0; width: 100%; background: rgba(0,0,0,0.7); color: white; padding: 10px; text-align: center; font-size: 1.2rem; }
-
-        /* Normal Görünüm Butonu */
-        #btn-normal {
-            position: absolute; top: 20px; right: 20px; z-index: 101; 
-            display: none; box-shadow: 0 0 15px var(--neon-yellow);
-        }
-
-        /* Sağ Panel */
-        .side { width: 340px; background: #050505; border-left: 2px solid var(--neon-green); padding: 20px; display: flex; flex-direction: column; z-index: 110; }
-        .panel-header { border-bottom: 1px solid var(--neon-yellow); padding-bottom: 10px; margin-bottom: 15px; text-align: center; color: var(--neon-yellow); font-weight: bold; }
-        #msgs { flex: 1; overflow-y: auto; border: 1px solid #222; margin-bottom: 15px; padding: 10px; font-size: 0.85rem; background: rgba(255,255,255,0.02); }
-        
-        .chat-msg { margin-bottom: 5px; border-bottom: 1px solid #111; padding-bottom: 2px; }
-
-        @media (max-width: 992px) {
-            .layout { flex-direction: column; overflow-y: auto; }
-            .arena { height: 70vh; min-height: 500px; }
-            .side { width: 100%; height: 400px; }
-            #focused-video-container { width: 95%; height: 70%; }
-        }
+        /* Kontrol Butonları */
+        .controls { position: fixed; bottom: 20px; left: 50%; transform: translateX(-50%); display: flex; gap: 15px; z-index: 100; }
+        .control-btn { width: 50px; height: 50px; border-radius: 50%; border: none; background: #222; color: white; transition: 0.3s; }
+        .control-btn:hover { background: var(--neon-green); color: black; }
+        .btn-end { background: #ff4444; }
     </style>
 </head>
 <body>
 
-<div class="layout" id="mainLayout">
-    <div class="arena">
-        <div id="focus-overlay">
-            <button id="btn-normal" onclick="closeFocus()" class="btn btn-warning fw-bold">NORMAL GÖRÜNÜM</button>
-            <div id="focused-video-container">
-                <video id="focusVideo" autoplay playsinline></video>
-                <div id="focus-tag">KULLANICI ADI</div>
+    <nav class="meeting-nav">
+        <a href="/profil"><img src="/caracter/logo/logo.png" alt="BPL LOGO"></a>
+        <div class="text-secondary small">Room ID: <span class="text-info"><%= roomId %></span></div>
+        <div class="text-success fw-bold">BPL: <span id="user-bpl"><%= user.bpl %></span></div>
+    </nav>
+
+    <div class="meeting-container">
+        <div class="video-grid" id="video-grid">
+            <div class="video-box">
+                <video id="my-video" muted autoplay playsinline></video>
+                <div class="user-label">You (<%= user.nickname %>)</div>
             </div>
         </div>
 
-        <div class="pentagon-container" id="pContainer">
-            <div class="table-center">
-                <div id="clock" style="font-size: 2.2rem; color: var(--neon-yellow); font-family: 'Courier New'; font-weight: bold;">90:00</div>
+        <div class="side-panel">
+            <div class="panel-header"><i class="fas fa-comments"></i> LIVE CHAT & GIFTS</div>
+            
+            <div class="chat-area" id="chat-messages">
+                <div class="msg"><b>System:</b> Welcome to the room! Be respectful.</div>
             </div>
 
-            <div class="cam-slot" id="slot-1" onclick="focusCam('myCam', 'TAG: SİZ')">
-                <video id="myCam" autoplay muted playsinline></video>
-                <div class="tag" id="tag-1">MASA SAHİBİ</div>
-            </div>
-
-            <div class="cam-slot" id="slot-2" onclick="focusCam('v2', document.getElementById('tag-2').innerText)">
-                <video id="v2" autoplay playsinline></video>
-                <div class="tag" id="tag-2">BOŞ</div>
-            </div>
-            <div class="cam-slot" id="slot-3" onclick="focusCam('v3', document.getElementById('tag-3').innerText)">
-                <video id="v3" autoplay playsinline></video>
-                <div class="tag" id="tag-3">BOŞ</div>
-            </div>
-            <div class="cam-slot" id="slot-4" onclick="focusCam('v4', document.getElementById('tag-4').innerText)">
-                <video id="v4" autoplay playsinline></video>
-                <div class="tag" id="tag-4">BOŞ</div>
-            </div>
-            <div class="cam-slot" id="slot-5" onclick="focusCam('v5', document.getElementById('tag-5').innerText)">
-                <video id="v5" autoplay playsinline></video>
-                <div class="tag" id="tag-5">BOŞ</div>
+            <div class="gift-section text-center">
+                <p class="small text-secondary mb-2">Send a Gift to Selected User</p>
+                <button class="btn btn-outline-warning gift-btn" onclick="sendGift(50)"><i class="fas fa-coffee"></i> 50 BPL</button>
+                <button class="btn btn-outline-info gift-btn" onclick="sendGift(200)"><i class="fas fa-gem"></i> 200 BPL</button>
+                <button class="btn btn-outline-danger gift-btn" onclick="sendGift(500)"><i class="fas fa-crown"></i> 500 BPL</button>
+                <button class="btn btn-outline-success gift-btn" onclick="challengeUser()"><i class="fas fa-swords"></i> CHALLENGE</button>
+                
+                <div class="input-group mt-2">
+                    <input type="text" id="chat-input" class="form-control bg-dark text-white border-secondary" placeholder="Type message...">
+                    <button class="btn btn-success" onclick="sendMessage()"><i class="fas fa-paper-plane"></i></button>
+                </div>
             </div>
         </div>
     </div>
 
-    <div class="side">
-        <div class="panel-header">Elite Masa Paneli</div>
-        <div id="msgs"></div>
-
-        <div class="input-group mb-3">
-            <input type="text" id="chatInp" class="form-control bg-dark text-white border-success" placeholder="Mesaj gönder...">
-            <button onclick="msg()" class="btn btn-success fw-bold">></button>
-        </div>
-
-        <div class="card bg-dark border-warning p-2 mb-3">
-            <small class="text-warning mb-2 d-block text-center fw-bold">ÜYE DAVET ET</small>
-            <div class="input-group input-group-sm">
-                <input type="text" id="target" class="form-control bg-black text-white border-warning" placeholder="Kullanıcı Nickname">
-                <button onclick="sendInv()" class="btn btn-warning text-black fw-bold">GÖNDER</button>
-            </div>
-        </div>
-
-        <div class="d-grid gap-2 mt-auto">
-            <a href="/profil" class="btn btn-outline-danger btn-sm">MASADAN AYRIL</a>
-        </div>
+    <div class="controls">
+        <button class="control-btn" onclick="toggleMic()"><i class="fas fa-microphone" id="mic-icon"></i></button>
+        <button class="control-btn" onclick="toggleCam()"><i class="fas fa-video" id="cam-icon"></i></button>
+        <button class="control-btn btn-end" onclick="location.href='/profil'"><i class="fas fa-phone-slash"></i></button>
     </div>
-</div>
 
-<script>
-    const socket = io();
-    const room = "<%= roomId %>";
-    const myNick = "<%= user.nickname %>";
-    let myStream;
-    const peers = {};
+    <script>
+        const socket = io();
+        const nickname = "<%= user.nickname %>";
+        const roomId = "<%= roomId %>";
+        let myStream;
 
-    const slotMap = {
-        "slot-2": { busy: false, sid: null },
-        "slot-3": { busy: false, sid: null },
-        "slot-4": { busy: false, sid: null },
-        "slot-5": { busy: false, sid: null }
-    };
+        // Kamerayı Başlat
+        navigator.mediaDevices.getUserMedia({ video: true, audio: true }).then(stream => {
+            myStream = stream;
+            document.getElementById('my-video').srcObject = stream;
+        }).catch(err => alert("Camera access denied!"));
 
-    // --- ODAKLANMA (FOCUS) MANTIĞI ---
-    function focusCam(videoId, nickname) {
-        const sourceVideo = document.getElementById(videoId);
-        if (!sourceVideo || !sourceVideo.srcObject) return; // Boş slotu büyütme
+        // Oda Katılımı
+        socket.emit('register-user', { id: "<%= user._id %>", nickname: nickname });
+        socket.emit('join-room', { roomId, nickname });
 
-        const focusOverlay = document.getElementById('focus-overlay');
-        const focusVideo = document.getElementById('focusVideo');
-        const focusBtn = document.getElementById('btn-normal');
-        const mainLayout = document.getElementById('mainLayout');
+        // Mesaj Gönderme
+        function sendMessage() {
+            const input = document.getElementById('chat-input');
+            if(input.value) {
+                socket.emit('chat-message', { nickname, message: input.value, roomId });
+                input.value = '';
+            }
+        }
 
-        focusVideo.srcObject = sourceVideo.srcObject;
-        document.getElementById('focus-tag').innerText = nickname;
-        
-        focusOverlay.style.display = 'flex';
-        focusBtn.style.display = 'block';
-        mainLayout.classList.add('focus-active');
-    }
-
-
-function sendInv() {
-    const targetNick = document.getElementById('target').value;
-    if (targetNick) {
-        // Tüm sunucuya (Global Chat) sinyal gönderir
-        socket.emit('send-private-invite', { 
-            from: myNick, 
-            toNick: targetNick, 
-            room: room 
+        socket.on('new-message', (data) => {
+            const chat = document.getElementById('chat-messages');
+            chat.innerHTML += `<div class="msg"><b>${data.sender}:</b> ${data.text}</div>`;
+            chat.scrollTop = chat.scrollHeight;
         });
-        alert(targetNick + " kullanıcısına sinyal gönderildi!");
-        document.getElementById('target').value = "";
-    }
-}
 
-
-socket.on('sync-meeting', (data) => {
-    let timeLeft = data.remaining / 1000;
-    const timerInterval = setInterval(() => {
-        const minutes = Math.floor(timeLeft / 60);
-        const seconds = Math.floor(timeLeft % 60);
-        document.getElementById('clock').innerText = 
-            `${minutes}:${seconds < 10 ? '0' : ''}${seconds}`;
-        if (timeLeft <= 0) {
-            clearInterval(timerInterval);
-            window.location.href = "/profil"; // Süre bitince odadan at
+        // Hediye Gönderme Fonksiyonu (Simüle)
+        function sendGift(amount) {
+            alert(amount + " BPL değerinde hediye gönderildi!");
+            // Backend'e socket üzerinden bakiye güncelleme isteği atılmalı
         }
-        timeLeft--;
-    }, 1000);
-});
-    function closeFocus() {
-        const focusOverlay = document.getElementById('focus-overlay');
-        const mainLayout = document.getElementById('mainLayout');
-        const focusVideo = document.getElementById('focusVideo');
 
-        focusOverlay.style.display = 'none';
-        document.getElementById('btn-normal').style.display = 'none';
-        mainLayout.classList.remove('focus-active');
-        focusVideo.srcObject = null;
-    }
-
-    // --- WEBRTC & DİĞER FONKSİYONLAR ---
-    async function init() {
-        try {
-            myStream = await navigator.mediaDevices.getUserMedia({ video: true, audio: true });
-            document.getElementById('myCam').srcObject = myStream;
-        } catch (e) { console.log("Kamera izni yok."); }
-        socket.emit('join-chat', { room, nickname: myNick, userId: "<%= user.id %>" });
-    }
-
-    init();
-
-    socket.on('user-joined', (data) => {
-        assignSlot(data.socketId, data.nickname);
-        if(myStream) {
-            const pc = createPeer(data.socketId, data.nickname);
-            pc.createOffer().then(offer => {
-                pc.setLocalDescription(offer);
-                socket.emit('webrtc-offer', { toSocket: data.socketId, offer, senderNick: myNick });
-            });
-        }
-    });
-
-    function assignSlot(sid, nickname) {
-        for (let key in slotMap) {
-            if (!slotMap[key].busy) {
-                slotMap[key].busy = true;
-                slotMap[key].sid = sid;
-                const num = key.split('-')[1];
-                document.getElementById("tag-"+num).innerText = nickname;
-                document.getElementById("tag-"+num).style.background = "rgba(57, 255, 20, 0.6)";
-                break;
+        // Meydan Okuma
+        function challengeUser() {
+            const target = prompt("Kime meydan okumak istersin? (Nickname yazın)");
+            if(target) {
+                socket.emit('challenge-player', { targetNickname: target });
+                alert("Meydan okuma gönderildi!");
             }
         }
-    }
 
-    socket.on('webrtc-offer', async (data) => {
-        assignSlot(data.fromSocket, data.senderNick);
-        const pc = createPeer(data.fromSocket, data.senderNick);
-        await pc.setRemoteDescription(new RTCSessionDescription(data.offer));
-        const answer = await pc.createAnswer();
-        await pc.setLocalDescription(answer);
-        socket.emit('webrtc-answer', { toSocket: data.fromSocket, answer });
-    });
-
-    socket.on('webrtc-answer', async (data) => {
-        if (peers[data.fromSocket]) await peers[data.fromSocket].setRemoteDescription(new RTCSessionDescription(data.answer));
-    });
-
-    socket.on('webrtc-ice-candidate', (data) => {
-        if (peers[data.fromSocket]) peers[data.fromSocket].addIceCandidate(new RTCIceCandidate(data.candidate)).catch(e=>{});
-    });
-
-    function createPeer(sid, nick) {
-        if (peers[sid]) return peers[sid];
-        const pc = new RTCPeerConnection({ iceServers: [{ urls: 'stun:stun.l.google.com:19302' }] });
-        peers[sid] = pc;
-        if(myStream) myStream.getTracks().forEach(t => pc.addTrack(t, myStream));
-        pc.onicecandidate = (e) => { if (e.candidate) socket.emit('webrtc-ice-candidate', { toSocket: sid, candidate: e.candidate }); };
-        pc.ontrack = (e) => {
-            for (let key in slotMap) {
-                if (slotMap[key].sid === sid) {
-                    document.getElementById("v" + key.split('-')[1]).srcObject = e.streams[0];
-                }
-            }
-        };
-        return pc;
-    }
-
-    socket.on('user-left', (sid) => {
-        if (peers[sid]) { peers[sid].close(); delete peers[sid]; }
-        for (let key in slotMap) {
-            if (slotMap[key].sid === sid) {
-                slotMap[key].busy = false;
-                const num = key.split('-')[1];
-                document.getElementById("tag-"+num).innerText = "BOŞ";
-                document.getElementById("v"+num).srcObject = null;
-            }
+        // Mikrofon/Kamera Kapatma
+        function toggleMic() {
+            const audioTrack = myStream.getAudioTracks()[0];
+            audioTrack.enabled = !audioTrack.enabled;
+            document.getElementById('mic-icon').className = audioTrack.enabled ? 'fas fa-microphone' : 'fas fa-microphone-slash';
         }
-    });
 
-    function msg() {
-        const t = document.getElementById('chatInp').value;
-        if(t) socket.emit('meeting-msg', { room, sender: myNick, text: t });
-        document.getElementById('chatInp').value = "";
-    }
-
-    socket.on('new-meeting-msg', (d) => {
-        const div = document.createElement('div');
-        div.className = "chat-msg";
-        div.innerHTML = `<b class="text-warning">${d.sender}:</b> ${d.text}`;
-        const m = document.getElementById('msgs'); m.appendChild(div); m.scrollTop = m.scrollHeight;
-    });
-</script>
-
-<script src="/socket.io/socket.io.js"></script>
-<script>
-    const socket = io(); // Her sayfada bu bağlantıyı başlatır
-    
-    // Aktif sayısını her sayfada güncel tutmak için:
-    socket.on('update-active-count', (count) => {
-        const playerEl = document.getElementById('active-players');
-        if(playerEl) playerEl.innerText = count + " OYUNCU";
-    });
-</script>
-
-
+        function toggleCam() {
+            const videoTrack = myStream.getVideoTracks()[0];
+            videoTrack.enabled = !videoTrack.enabled;
+            document.getElementById('cam-icon').className = videoTrack.enabled ? 'fas fa-video' : 'fas fa-video-slash';
+        }
+    </script>
 </body>
 </html>
-
-
