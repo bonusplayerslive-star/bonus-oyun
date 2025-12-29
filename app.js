@@ -54,10 +54,11 @@ const transporter = nodemailer.createTransport({
         pass: process.env.EMAIL_PASS
     }
 });
+// ==========================================
+// 1. MARKET VE ENVANTER SİSTEMİ (Inventory & Market Logic)
+// ==========================================
 
-// ==========================================
-// 1. MARKET VE ENVANTER MANTIĞI
-// ==========================================
+// Marketimizde satılan tüm karakterlerin listesi ve özellikleri
 const MARKET_ANIMALS = [
     { id: 1, name: 'Bear', price: 1000, img: '/caracter/profile/Bear.jpg' },
     { id: 2, name: 'Crocodile', price: 1000, img: '/caracter/profile/Crocodile.jpg' },
@@ -71,44 +72,82 @@ const MARKET_ANIMALS = [
     { id: 10, name: 'Tiger', price: 5000, img: '/caracter/profile/Tiger.jpg' }
 ];
 
+/**
+ * @route   POST /buy-animal
+ * @desc    Kullanıcının marketten yeni bir karakter satın almasını sağlar.
+ * @access  Private (Sadece giriş yapmış kullanıcılar)
+ */
 app.post('/buy-animal', checkAuth, async (req, res) => {
     try {
+        // 1. ADIM: İstemciden gelen verileri al (Market.ejs'den gelen animalId)
         const { animalId } = req.body;
+
+        // 2. ADIM: Veritabanından güncel kullanıcı verisini çek
         const user = await User.findById(req.session.userId);
+
+        // 3. ADIM: Satın alınmak istenen hayvan market listesinde var mı kontrol et
         const animal = MARKET_ANIMALS.find(a => a.id == animalId);
+        if (!animal) {
+            return res.json({ status: 'error', msg: 'Hata: Seçilen karakter market kataloğunda bulunamadı!' });
+        }
 
-        if (!animal) return res.json({ status: 'error', msg: 'Karakter bulunamadı!' });
-
-        // Çanta sınırı: En fazla 3 hayvan
+        // 4. ADIM: Envanter kapasite kontrolü (Maksimum 3 karakter kuralı)
+        // Kullanıcının envanter dizisi yoksa veya uzunluğu 3'e eşit/büyükse işlemi durdur.
         if (user.inventory && user.inventory.length >= 3) {
-            return res.json({ status: 'error', msg: 'Çantan dolu! Maksimum 3 karakter alabilirsin.' });
+            return res.json({ status: 'error', msg: 'Envanter dolu! Daha fazla karakter almak için birini bırakmalısın.' });
         }
 
-        // Bakiye kontrolü
+        // 5. ADIM: Bakiye (BPL) kontrolü
+        // Kullanıcının parası hayvanın fiyatından az ise reddet.
         if (user.bpl < animal.price) {
-            return res.json({ status: 'error', msg: 'Yetersiz BPL bakiyesi!' });
+            return res.json({ status: 'error', msg: `Yetersiz bakiye! ${animal.name} için ${animal.price} BPL gerekiyor.` });
         }
 
-        // Satın Alma İşlemi
+        // 6. ADIM: Ödeme işlemini gerçekleştir
+        // Kullanıcının bakiyesinden fiyatı düş.
         user.bpl -= animal.price;
+
+        // 7. ADIM: Yeni karakteri kullanıcının envanterine ekle
+        // Karakterin başlangıç istatistiklerini (Level 1, HP 100 vb.) burada tanımlıyoruz.
         user.inventory.push({ 
             name: animal.name, 
             level: 1, 
             xp: 0, 
             img: animal.img,
-            stats: { hp: 100, atk: 20, def: 10 } 
+            stats: { 
+                hp: 100,  // Sağlık Puanı
+                atk: 20,  // Saldırı Gücü
+                def: 10   // Savunma Gücü
+            } 
         });
         
+        // 8. ADIM: Değişiklikleri Veritabanına Kaydet
         await user.save();
-        await new Income({ userId: user._id, type: 'SPEND', amount: animal.price, details: `Marketten ${animal.name} alındı.` }).save();
+
+        // 9. ADIM: Finansal kayıt (Log) oluştur
+        // Harcama geçmişine bu işlemi kaydet ki kullanıcı parasının nereye gittiğini görsün.
+        await new Income({ 
+            userId: user._id, 
+            type: 'SPEND', 
+            amount: animal.price, 
+            details: `Market Alışverişi: ${animal.name} karakteri satın alındı.` 
+        }).save();
         
-        res.json({ status: 'success', msg: `${animal.name} orduya katıldı!` });
-    } catch (e) { 
-        console.error(e);
-        res.status(500).json({ status: 'error', msg: 'Sistem hatası!' }); 
+        // 10. ADIM: Başarılı yanıtını gönder
+        return res.json({ 
+            status: 'success', 
+            msg: `Tebrikler Kumandan! ${animal.name} artık orduna dahil oldu.` 
+        });
+
+    } catch (error) { 
+        // Herhangi bir beklenmedik hata oluşursa (Veritabanı bağlantısı kesilmesi vb.) burası çalışır.
+        console.error("SATIN ALMA HATASI:", error);
+        return res.status(500).json({ 
+            status: 'error', 
+            msg: 'Sunucu tarafında bir hata oluştu. Lütfen teknik ekiple iletişime geçin.' 
+        }); 
     }
 });
-
 // ==========================================
 // 2. GELİŞTİRME MERKEZİ
 // ==========================================
@@ -320,3 +359,4 @@ io.on('connection', (socket) => {
 server.listen(PORT, "0.0.0.0", () => {
     console.log(`BPL ECOSYSTEM OPERATIONAL ON ${PORT}`);
 });
+
