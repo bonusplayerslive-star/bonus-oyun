@@ -1,58 +1,90 @@
-// --- NODEMAILER AYARI (En üste require'ların yanına ekle) ---
-const nodemailer = require('nodemailer');
-
-const transporter = nodemailer.createTransport({
-    service: 'gmail', // veya .env içindeki bilgiler
-    auth: {
-        user: process.env.EMAIL_USER,
-        pass: process.env.EMAIL_PASS
+<style>
+    /* 4. RESİM DÜZELTMESİ: BARLARIN SIKINTISIZ GÖRÜNMESİ */
+    .token-bar-container { 
+        height: 200px; 
+        display: flex; 
+        align-items: flex-end; 
+        justify-content: space-around; 
+        margin-top: 40px; 
+        padding-bottom: 20px;
+        border-bottom: 1px solid rgba(57, 255, 20, 0.2);
     }
-});
-
-// --- 1. COMMAND CENTER (CONTACT) ROTASI ---
-app.post('/contact', async (req, res) => {
-    try {
-        const { email, note } = req.body;
-        // 1. Mongo'ya Kaydet (Log modelini kullanabilirsin veya yeni Contact modeli)
-        const newLog = new Log({
-            userId: req.session.userId || null,
-            action: 'CONTACT_FORM',
-            details: `Email: ${email}, Message: ${note}`
-        });
-        await newLog.save();
-
-        // 2. Mail Gönder (Opsiyonel)
-        console.log(`📩 Yeni Destek Mesajı: ${email} -> ${note}`);
-        
-        res.send('<script>alert("Transmission Received! We will contact you."); window.location.href="/";</script>');
-    } catch (e) {
-        console.error("Contact Error:", e);
-        res.status(500).send("Command Center Offline!");
+    .token-bar { 
+        width: 18%; /* Daha geniş ve okunaklı */
+        border-radius: 5px 5px 0 0; 
+        position: relative; 
+        transition: 1s; 
+        min-width: 45px;
     }
-});
-
-// --- 2. FORGOT PASSWORD ROTASI ---
-app.post('/forgot-password', async (req, res) => {
-    try {
-        const { email } = req.body;
-        const user = await User.findOne({ email });
-
-        if (!user) {
-            return res.send('<script>alert("User not found!"); window.location.href="/";</script>');
-        }
-
-        // Şifreyi mail atıyoruz (Güvenlik için normalde link gönderilir ama senin isteğin üzerine şifreyi atıyoruz)
-        const mailOptions = {
-            from: process.env.EMAIL_USER,
-            to: email,
-            subject: 'BPL Ecosystem - Password Recovery',
-            text: `Your current password is: ${user.password} \n\nPlease change it after login.`
-        };
-
-        await transporter.sendMail(mailOptions);
-        res.send('<script>alert("Password sent to your email!"); window.location.href="/";</script>');
-    } catch (e) {
-        console.error("Forgot Pass Error:", e);
-        res.send('<script>alert("Mail System Error!"); window.location.href="/";</script>');
+    .bar-label { 
+        position: absolute; 
+        top: -25px; 
+        width: 100%; 
+        text-align: center; 
+        font-weight: bold; 
+        color: white;
+        font-size: 0.9rem;
     }
-});
+    .bar-name { 
+        position: absolute; 
+        bottom: -30px; 
+        width: 100%; 
+        text-align: center; 
+        font-size: 0.8rem; 
+        color: var(--neon-green);
+        white-space: nowrap;
+    }
+
+    /* 5. RESİM LOGO PARLAMA EFEKTİ */
+    .navbar-brand img {
+        height: 60px; /* Biraz büyüttüm */
+        filter: drop-shadow(0 0 8px var(--neon-green));
+        transition: 0.3s;
+    }
+    .navbar-brand img:hover {
+        filter: drop-shadow(0 0 15px var(--neon-green));
+    }
+</style>
+
+<nav class="navbar navbar-expand-lg fixed-top">
+    <div class="container">
+        <a class="navbar-brand" href="/">
+            <img src="/caracter/page/logo.jpeg" alt="BPL LOGO" onerror="this.src='https://via.placeholder.com/50?text=BPL'">
+        </a>
+        </div>
+</nav>
+
+<div class="row mt-5">
+    <div class="col-md-6">
+        <div class="glass-card text-start">
+            <h4 class="neon-text text-center"><i class="fas fa-chart-pie"></i> TOKEN ALLOCATION</h4>
+            <div class="token-bar-container">
+                <div class="token-bar bg-success" style="height: 75%;" title="Company"><span class="bar-label">75%</span><span class="bar-name">Company</span></div>
+                <div class="token-bar bg-info" style="height: 15%;" title="Exchange"><span class="bar-label">15%</span><span class="bar-name">Market</span></div>
+                <div class="token-bar bg-warning" style="height: 5%;" title="Gaming"><span class="bar-label">5%</span><span class="bar-name">Gaming</span></div>
+                <div class="token-bar bg-danger" style="height: 5%;" title="Marketing"><span class="bar-label">5%</span><span class="bar-name">Ads</span></div>
+            </div>
+        </div>
+    </div>
+    </div>
+
+<div class="row mt-5 justify-content-center">
+    <div class="col-md-10">
+        <div class="glass-card border-info">
+            <h3 class="text-info text-center mb-4"><i class="fas fa-headset"></i> COMMAND CENTER</h3>
+            <form action="/contact" method="POST">
+                <div class="row g-3">
+                    <div class="col-md-4">
+                        <input type="email" name="email" class="form-control custom-input" placeholder="Your Email..." required>
+                    </div>
+                    <div class="col-md-6">
+                        <input type="text" name="note" maxlength="180" class="form-control custom-input" placeholder="Transmission Note (Max 180)..." required>
+                    </div>
+                    <div class="col-md-2">
+                        <button type="submit" class="btn btn-info w-100 py-2 shadow-sm">SEND</button>
+                    </div>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
