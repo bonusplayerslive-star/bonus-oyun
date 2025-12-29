@@ -75,16 +75,28 @@ app.post('/buy-animal', checkAuth, async (req, res) => {
     try {
         const { animalId } = req.body;
         const user = await User.findById(req.session.userId);
-        const animal = MARKET_ANIMALS.find(a => a.id == animalId);
+        
+        // animalId'yi sayıya zorla ve listede ara
+        const animal = MARKET_ANIMALS.find(a => Number(a.id) === Number(animalId));
 
-        if (user.inventory.length >= 3) {
-            return res.json({ status: 'error', msg: 'Bag full! Sell in Wallet to buy more.' });
+        if (!animal) {
+            return res.json({ status: 'error', msg: 'Karakter sistemde bulunamadı!' });
         }
+
+        // Çanta sınırı: En fazla 3
+        if (user.inventory && user.inventory.length >= 3) {
+            return res.json({ status: 'error', msg: 'Çantan dolu! Maksimum 3 karakter alabilirsin.' });
+        }
+
+        // Bakiye kontrolü
         if (user.bpl < animal.price) {
-            return res.json({ status: 'error', msg: 'Insufficient BPL!' });
+            return res.json({ status: 'error', msg: 'Yetersiz BPL bakiyesi!' });
         }
 
+        // Satın alma işlemi
         user.bpl -= animal.price;
+        
+        // Envantere ekle
         user.inventory.push({ 
             name: animal.name, 
             level: 1, 
@@ -93,12 +105,23 @@ app.post('/buy-animal', checkAuth, async (req, res) => {
             stats: { hp: 100, atk: 20, def: 10 } 
         });
         
+        // Veritabanına kaydet
         await user.save();
-        await new Income({ userId: user._id, type: 'SPEND', amount: animal.price, details: `Bought ${animal.name}` }).save();
-        res.json({ status: 'success', msg: `${animal.name} initialized!` });
-    } catch (e) { res.status(500).json({ status: 'error' }); }
-});
+        
+        // Gelir/Gider tablosuna işle
+        await new Income({ 
+            userId: user._id, 
+            type: 'SPEND', 
+            amount: animal.price, 
+            details: `Marketten ${animal.name} alındı.` 
+        }).save();
 
+        res.json({ status: 'success', msg: `${animal.name} başarıyla alındı!` });
+    } catch (e) { 
+        console.error("Market Hatası:", e);
+        res.status(500).json({ status: 'error', msg: 'Sunucu hatası oluştu!' }); 
+    }
+});
 // ==========================================
 // 2. GELİŞTİRME MERKEZİ (UPGRADE STATS)
 // ==========================================
@@ -304,5 +327,6 @@ io.on('connection', (socket) => {
 server.listen(PORT, "0.0.0.0", () => {
     console.log(`BPL ECOSYSTEM OPERATIONAL ON ${PORT}`);
 });
+
 
 
