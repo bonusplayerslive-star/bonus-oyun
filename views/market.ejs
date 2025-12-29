@@ -70,11 +70,15 @@
     <div class="row">
         <% animals.forEach(animal => { %>
             <div class="col-md-3 col-sm-6">
-                <div class="animal-card">
-                    <img src="<%= animal.img %>" class="animal-img" alt="<%= animal.name %>">
-                    
-                    <h4><%= animal.name.toUpperCase() %></h4>
-                    <p class="price-tag"><%= animal.price %> BPL</p>
+              <div class="animal-card">
+    <div class="animal-img-container">
+        <img src="/caracter/profile/<%= animal.name %>.jpg" 
+             alt="<%= animal.name %>" 
+             class="animal-img"
+             onerror="this.src='/caracter/page/logo.jpeg'"> </div>
+    <h3 class="animal-name"><%= animal.name %></h3>
+    <p class="animal-price"><%= animal.price %> BPL</p>
+    </div>
 
                     <% 
                         // Kullanıcının bu hayvana zaten sahip olup olmadığını kontrol et
@@ -118,3 +122,4 @@
 
 </body>
 </html>
+
