@@ -1,13 +1,13 @@
-// Path: models/Payment.js
 const mongoose = require('mongoose');
 
-const paymentSchema = new mongoose.Schema({
-    email: { type: String, required: true },
-    requestedBpl: { type: Number, required: true }, // Kullanıcının çekmek istediği miktar
-    fee: { type: Number, required: true },          // %30 Kesinti miktarı
-    netAmount: { type: Number, required: true },    // Kesintiden sonra yatan miktar
-    status: { type: String, default: 'Beklemede' }, // Beklemede, Onaylandı, Reddedildi
+const PaymentSchema = new mongoose.Schema({
+    userId: mongoose.Schema.Types.ObjectId,
+    nickname: String,
+    txid: { type: String, unique: true, required: true },
+    amountUSD: Number,
+    amountBPL: Number,
+    status: { type: String, default: 'pending' },
     date: { type: Date, default: Date.now }
 });
 
-module.exports = mongoose.model('Payment', paymentSchema);
+module.exports = mongoose.model('Payment', PaymentSchema);
