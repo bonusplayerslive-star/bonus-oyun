@@ -11,7 +11,7 @@
             --neon-green: #39FF14;
             --neon-blue: #00f3ff;
             --neon-red: #ff003c;
-            --dark-glass: rgba(0, 0, 0, 0.88);
+            --dark-glass: rgba(0, 0, 0, 0.7); /* Zemin görünmesi için düşürüldü */
         }
 
         body {
@@ -23,380 +23,240 @@
             min-height: 100vh;
         }
 
-        /* Sol Üst Logo */
+        /* Sağ Üst Yanar Döner Butonlar */
+        .auth-nav {
+            position: fixed;
+            top: 20px;
+            right: 20px;
+            z-index: 1050;
+            display: flex;
+            gap: 15px;
+        }
+
+        .btn-glow {
+            padding: 10px 25px;
+            border: none;
+            border-radius: 50px;
+            font-weight: 800;
+            text-transform: uppercase;
+            cursor: pointer;
+            transition: 0.5s;
+            background-size: 200% auto;
+            color: white;
+            box-shadow: 0 0 15px rgba(0,0,0,0.5);
+        }
+
+        .btn-login-glow { background-image: linear-gradient(to right, #00d2ff 0%, #3a7bd5 51%, #00d2ff 100%); }
+        .btn-register-glow { background-image: linear-gradient(to right, #39FF14 0%, #008000 51%, #39FF14 100%); }
+
+        .btn-glow:hover {
+            background-position: right center;
+            transform: scale(1.05);
+            box-shadow: 0 0 30px var(--neon-green);
+        }
+
         .main-logo {
             position: absolute;
             top: 20px;
             left: 20px;
-            width: 50px;
-            height: 50px;
+            width: 55px;
+            height: 55px;
             border-radius: 50%;
             border: 2px solid var(--neon-green);
             box-shadow: 0 0 15px var(--neon-green);
             z-index: 1000;
-            object-fit: cover;
         }
 
-        /* Glass Box Tasarımı */
         .glass-box {
-            background: rgba(0, 0, 0, 0.75);
+            background: rgba(0, 0, 0, 0.65);
             border: 1px solid rgba(255, 255, 255, 0.1);
-            backdrop-filter: blur(15px);
-            -webkit-backdrop-filter: blur(15px);
+            backdrop-filter: blur(10px);
             border-radius: 20px;
-            padding: 25px;
+            padding: 20px;
             margin-bottom: 20px;
-            transition: 0.3s;
+            height: 100%;
         }
 
-        .glass-box:hover {
-            border-color: var(--neon-green);
-            background: rgba(0, 0, 0, 0.85);
-        }
-
-        /* Tokenomics Progress Bar */
         .token-progress {
-            height: 30px;
+            height: 25px;
             display: flex;
-            border-radius: 8px;
+            border-radius: 12px;
             overflow: hidden;
-            border: 1px solid rgba(255, 255, 255, 0.2);
-            margin: 15px 0;
+            margin: 10px 0;
+            border: 1px solid rgba(255,255,255,0.2);
         }
-        .progress-part {
-            display: flex;
-            align-items: center;
+
+        /* Form Overlay */
+        .form-overlay {
+            display: none;
+            position: fixed;
+            top: 0; left: 0; width: 100%; height: 100%;
+            background: rgba(0,0,0,0.75);
+            backdrop-filter: blur(12px);
+            z-index: 2000;
             justify-content: center;
-            font-size: 10px;
-            font-weight: bold;
-            color: #000;
-            text-shadow: none;
+            align-items: center;
         }
 
-        /* Form Elemanları */
         .auth-card {
-            background: var(--dark-glass);
-            border: 1px solid rgba(57, 255, 20, 0.3);
+            background: rgba(0, 0, 0, 0.6); /* Şeffaf form kartı */
+            border: 1px solid var(--neon-green);
             border-radius: 24px;
-            padding: 35px;
-            width: 100%;
-            max-width: 450px;
-            box-shadow: 0 0 40px rgba(0, 0, 0, 0.9);
-        }
-
-        .nav-pills .nav-link {
-            color: #aaa;
-            border-radius: 50px;
-            font-weight: bold;
-            transition: 0.4s;
-        }
-
-        .nav-pills .nav-link.active {
-            background: var(--neon-green) !important;
-            color: black !important;
-            box-shadow: 0 0 20px var(--neon-green);
+            padding: 30px;
+            width: 90%;
+            max-width: 400px;
+            box-shadow: 0 0 40px rgba(0, 255, 0, 0.15);
         }
 
         .form-control {
-            background: rgba(255, 255, 255, 0.05) !important;
-            border: 1px solid rgba(255, 255, 255, 0.1) !important;
+            background: rgba(255, 255, 255, 0.1) !important;
+            border: 1px solid rgba(255, 255, 255, 0.2) !important;
             color: white !important;
-            border-radius: 12px;
         }
 
-        .btn-cyber {
-            background: transparent;
-            border: 2px solid var(--neon-green);
-            color: var(--neon-green);
-            font-weight: 800;
-            text-transform: uppercase;
-            letter-spacing: 1px;
-            padding: 12px;
-            border-radius: 12px;
-            transition: 0.5s;
-        }
-
-        .btn-cyber:hover {
-            background: var(--neon-green);
-            color: black;
-            box-shadow: 0 0 25px var(--neon-green);
-        }
-
-        .wallet-box {
-            background: #000;
-            color: var(--neon-blue);
-            padding: 8px;
-            border-radius: 8px;
-            font-family: monospace;
-            font-size: 0.8rem;
-            border: 1px solid var(--neon-blue);
-            word-break: break-all;
-            margin-top: 5px;
-        }
-
-        /* Footer & Alt Bilgiler */
         .ip-footer {
             position: fixed;
-            bottom: 0;
-            left: 0;
-            width: 100%;
+            bottom: 0; left: 0; width: 100%;
             background: rgba(0, 0, 0, 0.8);
-            padding: 8px;
+            padding: 6px;
             text-align: center;
-            font-size: 11px;
-            letter-spacing: 1px;
+            font-size: 10px;
             z-index: 100;
-            border-top: 1px solid rgba(57, 255, 20, 0.2);
         }
 
         .neon-text { color: var(--neon-green); text-shadow: 0 0 10px var(--neon-green); }
-        
-        @media (max-width: 992px) {
-            .content-area { margin-top: 80px; }
-        }
+        .text-justify { text-align: justify; }
     </style>
 </head>
 <body>
 
     <img src="/caracter/page/logo.jpeg" class="main-logo" alt="BPL">
 
-    <div class="container-fluid min-vh-100 d-flex align-items-center py-5">
-        <div class="row w-100 g-4">
-            
-            <div class="col-lg-7 content-area px-lg-5">
-                <div class="mb-4">
-                    <h1 class="display-3 fw-bold neon-text">BPL ELITE</h1>
-                    <p class="h4 text-white-50 italic">Live players always win.</p>
-                </div>
+    <div class="auth-nav">
+        <button class="btn-glow btn-login-glow" onclick="showAuth('login')">LOGIN</button>
+        <button class="btn-glow btn-register-glow" onclick="showAuth('register')">REGISTER</button>
+    </div>
 
-                <div class="glass-box">
-                    <h5 class="neon-text">PROJECT VISION</h5>
-                    <p class="small text-white-50">Starting with addictive mini-games, we aim to build a global ecosystem. By 2026, we introduce VR-integrated gaming (V3), and by 2028, we expand into the Biotech sector, supplying raw materials for advanced cancer research. Your support drives our reality.</p>
-                </div>
+    <div class="container py-5" style="margin-top: 60px;">
+        <div class="row mb-4">
+            <div class="col-12 text-center">
+                <h1 class="display-4 fw-bold neon-text">BonusPlayersLive</h1>
+                <p class="h5">Canlı oyuncular her zaman kazanır.</p>
+            </div>
+        </div>
 
+        <div class="row g-4">
+            <div class="col-lg-4">
                 <div class="glass-box">
-                    <h5 class="neon-text">TOKENOMICS (DISTRIBUTION)</h5>
-                    <div class="token-progress shadow">
-                        <div class="progress-part" style="width: 75%; background: #39FF14;">75% CORP</div>
-                        <div class="progress-part" style="width: 15%; background: #00f3ff;">15% EXCH</div>
-                        <div class="progress-part" style="width: 5%; background: #ff003c;">5% REW</div>
-                        <div class="progress-part" style="width: 5%; background: #bc13fe;">5% MKT</div>
-                    </div>
-                    <div class="d-flex justify-content-between small text-white-50" style="font-size: 10px;">
-                        <span>🟢 Company (75%)</span>
-                        <span>🔵 Exchange (15%)</span>
-                        <span>🔴 Rewards (5%)</span>
-                        <span>🟣 Marketing (5%)</span>
-                    </div>
-                </div>
-
-                <div class="glass-box">
-                    <h5 class="text-info">ECOSYSTEM FEATURES</h5>
-                    <ul class="small text-white-50 ps-3">
-                        <li><strong>Sign-up Bonus:</strong> 2500 BPL instantly.</li>
-                        <li><strong>Battle Arena:</strong> Train animals and win BPL in duels.</li>
-                        <li><strong>Social:</strong> 5-player Voice/Video rooms & Global Gifting.</li>
-                    </ul>
-                    <div class="wallet-box">BEP20: 0xB47FD3EFAcDdB316685D14B89598D78B4ce25181</div>
+                    <h5 class="neon-text">***** HEDEFİMİZ *****</h5>
+                    <p class="small text-justify">Bu küçük ve basit oyunlar ile dolaşımı sağlayıp ismimizden söz ettireceğiz. Siz değerli kullanıcılar ile beraber tokenimiz en iyi yerlerde ve en iyi ücretlerle talep görecektir. İstenilen kullanıcı sayısına ulaşılırsa mutlaka V2 ve farklı karakterlerle karşınıza çıkacağız.</p>
+                    <p class="small text-justify">Beklediğimiz talep olursa <b>V3</b> ve can alıcı mükemmel oyunumuzla karşınıza çıkacağız. <b>VR gözlükle</b> oynanabilen, gerçekçi ve hayal gücünü zorlayan oyunumuzun bilinen bir token ile oynanması çok kolay olacak. 2026 yılında oyun hedeflerimize ulaşacağımıza inancımız tam.</p>
                 </div>
             </div>
 
-            <div class="col-lg-5 d-flex justify-content-center align-items-center">
-                
-                <% if (locals.isBlocked) { %>
-                    <div class="auth-card border-danger text-center">
-                        <h3 class="text-danger mb-3">ACCESS DENIED</h3>
-                        <p class="text-white-50 mb-4">Your IP has been temporarily blocked for security reasons.<br>Remaining: <strong class="text-danger"><%= remainingTime %> min</strong></p>
-                        <button class="btn btn-outline-danger w-100" onclick="openContactModal()">CONTACT SUPPORT</button>
+            <div class="col-lg-4">
+                <div class="glass-box text-center">
+                    <h5 class="neon-text">TOKEN & KAZANÇ SİSTEMİ</h5>
+                    <div class="token-progress">
+                        <div style="width: 75%; background: #39FF14; color: black; font-size: 10px; font-weight:bold; display:flex; align-items:center; justify-content:center;">%75 ŞİRKET</div>
+                        <div style="width: 15%; background: #00f3ff; color: black; font-size: 10px; display:flex; align-items:center; justify-content:center;">%15 BORSA</div>
+                        <div style="width: 5%; background: #ff003c; font-size: 8px;">%5 OYN</div>
+                        <div style="width: 5%; background: #bc13fe; font-size: 8px;">%5 REK</div>
                     </div>
-                <% } else if (locals.forceHelp) { %>
-                    <div class="auth-card border-danger text-center">
-                        <h3 class="text-danger mb-3">RESTRICTED</h3>
-                        <p class="text-white-50 mb-4">Please contact the support team to verify your account credentials.</p>
-                        <button class="btn btn-outline-danger w-100" onclick="openContactModal()">OPEN SUPPORT TICKET</button>
+                    <p class="small text-justify mt-3">Kayıt olduğunuzda <b>2500 BPL</b> hesabınıza direkt geçer. Profil sayfanızdan markete girip 6 adet hayvandan birini seçerek geliştirip, diğer oyuncularla veya botlarla oynayarak BPL kazanabilirsiniz. Kazandığınız BPL'leri <b>BEP20</b> tabanlı cüzdanınıza aktarabilirsiniz.</p>
+                    <div class="p-2 bg-black rounded border border-info small" style="word-break: break-all; font-family: monospace;">
+                        0xB47FD3EFAcDdB316685D14B89598D78B4ce25181
                     </div>
-                <% } else { %>
-                    <div class="auth-card">
-                        <div id="authTabs">
-                            <ul class="nav nav-pills nav-justified mb-4" id="pills-tab">
-                                <li class="nav-item">
-                                    <button class="nav-link active" data-bs-toggle="pill" data-bs-target="#pills-login">LOGIN</button>
-                                </li>
-                                <li class="nav-item">
-                                    <button class="nav-link" data-bs-toggle="pill" data-bs-target="#pills-register">JOIN</button>
-                                </li>
-                            </ul>
-                        </div>
+                </div>
+            </div>
 
-                        <div class="tab-content">
-                            <div class="tab-pane fade show active" id="pills-login">
-                                <form action="/login" method="POST">
-                                    <div class="form-floating mb-3">
-                                        <input type="email" name="email" class="form-control" id="fEmail" placeholder="Email" required>
-                                        <label for="fEmail">Email Address</label>
-                                    </div>
-                                    <div class="form-floating mb-4">
-                                        <input type="password" name="password" class="form-control" id="fPass" placeholder="Password" required>
-                                        <label for="fPass">Password</label>
-                                    </div>
-                                    <button type="submit" class="btn btn-cyber w-100">Connect System</button>
-                                </form>
-                                <div class="text-center mt-3">
-                                    <a href="javascript:void(0)" onclick="toggleForgot(true)" class="text-white-50 small text-decoration-none">Forgot password?</a>
-                                </div>
-                            </div>
+            <div class="col-lg-4">
+                <div class="glass-box">
+                    <h5 class="neon-text">2028 SAĞLIK VİZYONU</h5>
+                    <p class="small text-justify">2028'in ilk çeyreğinde sağlık sektöründe büyük bir hammadde tedarikçisi olacağız. Ağrı kesici kullanımında %100 başarılı ve piyasada az bulunan, <b>göğüs kanseri</b> tedavisinde ciddi başarı sağlamış bir hammadde üzerinde çalışıyoruz.</p>
+                    <p class="small text-justify">Bu hammadde yüksek protein içerdiği için <b>akciğer kanseri</b> araştırmalarında Avrupa'da başarı sağlamıştır. Üniversiteler ile protokol imzalayıp AR-GE çalışmalarında hammadde ve ilaç tedariğinde bulunacağız. Oyunla başlayan eğlence, sağlıklı insanlarla devam edecek.</p>
+                </div>
+            </div>
+        </div>
 
-                            <div class="tab-pane fade" id="pills-register">
-                                <form action="/register" method="POST">
-                                    <div class="form-floating mb-2">
-                                        <input type="text" name="nickname" class="form-control" id="rNick" placeholder="Nickname" required>
-                                        <label for="rNick">Nickname</label>
-                                    </div>
-                                    <div class="form-floating mb-2">
-                                        <input type="email" name="email" class="form-control" id="rEmail" placeholder="Email" required>
-                                        <label for="rEmail">Email</label>
-                                    </div>
-                                    <div class="form-floating mb-2">
-                                        <input type="password" name="password" class="form-control" id="rPass" placeholder="Password" required>
-                                        <label for="rPass">Password</label>
-                                    </div>
-                                    <div class="form-floating mb-3">
-                                        <input type="text" name="ref_code" class="form-control" id="rRef" placeholder="Referral">
-                                        <label for="rRef">Referral Code (Optional)</label>
-                                    </div>
-                                    <button type="submit" class="btn btn-cyber w-100">Generate Hero</button>
-                                </form>
-                            </div>
+        <div class="row mt-4">
+            <div class="col-12 text-center">
+                <p class="small text-white-50">Tahaahhütümüzden daha fazlasını yapacak potansiyelimiz, bilgimiz ve ekibimiz var. Sadece desteğinizi istiyoruz.</p>
+            </div>
+        </div>
+    </div>
 
-                            <div id="forgotForm" style="display: none;">
-                                <h4 class="text-center mb-3 neon-text">RECOVERY</h4>
-                                <div class="form-floating mb-4">
-                                    <input type="email" id="forgotEmail" class="form-control" placeholder="Email" required>
-                                    <label for="forgotEmail">Registered Email</label>
-                                </div>
-                                <button type="button" onclick="sendForgotMail()" class="btn btn-cyber w-100 mb-3">SEND LINK</button>
-                                <div class="text-center">
-                                    <a href="javascript:void(0)" onclick="toggleForgot(false)" class="text-white-50 small text-decoration-none">Back to Login</a>
-                                </div>
-                            </div>
-                        </div>
-                    </div>
-                <% } %>
+    <div class="form-overlay" id="authOverlay" onclick="closeAuth(event)">
+        <div class="auth-card" onclick="event.stopPropagation()">
+            <ul class="nav nav-pills nav-justified mb-4" id="pills-tab">
+                <li class="nav-item">
+                    <button class="nav-link active" id="tab-login" data-bs-toggle="pill" data-bs-target="#pills-login">LOGIN</button>
+                </li>
+                <li class="nav-item">
+                    <button class="nav-link" id="tab-register" data-bs-toggle="pill" data-bs-target="#pills-register">JOIN</button>
+                </li>
+            </ul>
+            <div class="tab-content">
+                <div class="tab-pane fade show active" id="pills-login">
+                    <form action="/login" method="POST">
+                        <input type="email" name="email" class="form-control mb-3" placeholder="Email" required>
+                        <input type="password" name="password" class="form-control mb-4" placeholder="Password" required>
+                        <button type="submit" class="btn btn-cyber w-100">CONNECT SYSTEM</button>
+                    </form>
+                    <div class="text-center mt-3"><a href="#" onclick="toggleForgot(true)" class="text-white-50 small">Forgot Password?</a></div>
+                </div>
+                <div class="tab-pane fade" id="pills-register">
+                    <form action="/register" method="POST">
+                        <input type="text" name="nickname" class="form-control mb-2" placeholder="Nickname" required>
+                        <input type="email" name="email" class="form-control mb-2" placeholder="Email" required>
+                        <input type="password" name="password" class="form-control mb-3" placeholder="Password" required>
+                        <button type="submit" class="btn btn-cyber w-100">GENERATE HERO</button>
+                    </form>
+                </div>
+                <div id="forgotForm" style="display: none;">
+                    <h5 class="text-center mb-3">RECOVERY</h5>
+                    <input type="email" id="forgotEmail" class="form-control mb-3" placeholder="Email">
+                    <button type="button" onclick="sendForgotMail()" class="btn btn-cyber w-100 mb-2">SEND LINK</button>
+                    <div class="text-center"><a href="#" onclick="toggleForgot(false)" class="text-white-50 small">Back</a></div>
+                </div>
             </div>
         </div>
     </div>
 
     <div class="ip-footer">
-        IP: <span class="text-success"><%= locals.userIp || '0.0.0.0' %></span> | 
-        LIVE: <span id="active-players" class="text-success">SYNCHRONIZING...</span>
+        IP: <%= locals.userIp || '0.0.0.0' %> | LIVE: <span id="active-players">CONNECTING...</span>
     </div>
 
-    <div class="modal fade" id="contactModal" tabindex="-1">
-        <div class="modal-dialog modal-dialog-centered">
-            <div class="modal-content bg-dark text-white border-info">
-                <div class="modal-header border-secondary">
-                    <h5 class="modal-title neon-text">SUPPORT CENTER</h5>
-                    <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
-                </div>
-                <div class="modal-body">
-                    <div class="mb-3">
-                        <label class="form-label small">Contact Email</label>
-                        <input type="email" id="contactEmail" class="form-control bg-black border-secondary">
-                    </div>
-                    <div class="mb-3">
-                        <label class="form-label small">Message / Complaint</label>
-                        <textarea id="contactMessage" class="form-control bg-black border-secondary" rows="4"></textarea>
-                    </div>
-                </div>
-                <div class="modal-footer border-secondary">
-                    <button type="button" onclick="submitSupportForm()" class="btn btn-info btn-sm px-4 fw-bold">SEND FORM</button>
-                </div>
-            </div>
-        </div>
-    </div>
-
-    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
     <script>
         const socket = io();
+        const authOverlay = document.getElementById('authOverlay');
 
-        // Aktif Oyuncu Sayısı
+        function showAuth(type) {
+            authOverlay.style.display = 'flex';
+            type === 'login' ? document.getElementById('tab-login').click() : document.getElementById('tab-register').click();
+        }
+
+        function closeAuth(e) { if(e.target.id === 'authOverlay') authOverlay.style.display = 'none'; }
+
         socket.on('update-active-count', (count) => {
-            const playerEl = document.getElementById('active-players');
-            if(playerEl) playerEl.innerText = count + " USERS ONLINE";
+            document.getElementById('active-players').innerText = count + " USERS ONLINE";
         });
 
-        // Modal Kontrolü
-        const helpModal = new bootstrap.Modal(document.getElementById('contactModal'));
-        function openContactModal() { helpModal.show(); }
-
-        // Şifre Kurtarma Görünümü
         function toggleForgot(show) {
-            const authTabs = document.getElementById('authTabs');
-            const loginPane = document.getElementById('pills-login');
-            const registerPane = document.getElementById('pills-register');
-            const forgotForm = document.getElementById('forgotForm');
-
-            if (show) {
-                if(authTabs) authTabs.style.display = 'none';
-                if(loginPane) loginPane.classList.remove('active', 'show');
-                if(registerPane) registerPane.classList.remove('active', 'show');
-                forgotForm.style.display = 'block';
-            } else {
-                if(authTabs) authTabs.style.display = 'block';
-                if(loginPane) loginPane.classList.add('active', 'show');
-                forgotForm.style.display = 'none';
-            }
+            document.getElementById('pills-tab').style.display = show ? 'none' : 'flex';
+            document.getElementById('pills-login').style.display = show ? 'none' : 'block';
+            document.getElementById('forgotForm').style.display = show ? 'block' : 'none';
         }
 
-        // Destek Formu Gönderimi
-        function submitSupportForm() {
-            const email = document.getElementById('contactEmail').value;
-            const message = document.getElementById('contactMessage').value;
-
-            if (!email || !message) return alert("Please fill all fields.");
-
-            fetch('/contact-submit', {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ email, message })
-            })
-            .then(res => res.json())
-            .then(data => {
-                alert(data.msg);
-                if (data.status === 'success') {
-                    helpModal.hide();
-                    document.getElementById('contactEmail').value = "";
-                    document.getElementById('contactMessage').value = "";
-                }
-            })
-            .catch(err => alert("System Error: " + err));
-        }
-
-        // Şifre Kurtarma Maili
         function sendForgotMail() {
             const email = document.getElementById('forgotEmail').value;
-            if (!email) return alert("Email is required.");
-
-            const btn = document.querySelector("#forgotForm .btn-cyber");
-            btn.innerText = "SENDING...";
-            btn.disabled = true;
-
             fetch('/forgot-password', {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ email: email })
-            })
-            .then(res => res.json())
-            .then(data => {
-                alert(data.msg);
-                if (data.status === 'success') toggleForgot(false);
-            })
-            .catch(err => alert("Error!"))
-            .finally(() => {
-                btn.innerText = "SEND LINK";
-                btn.disabled = false;
-            });
+                body: JSON.stringify({ email })
+            }).then(res => res.json()).then(data => alert(data.msg));
         }
     </script>
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
 </body>
 </html>
