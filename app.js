@@ -236,13 +236,34 @@ app.post('/verify-payment', checkAuth, async (req, res) => {
 // --- SOCKET SİSTEMİ (ARENA, CHAT, MEETING & GIFT) ---
 let onlineUsers = {}; 
 
-io.on('connection', (socket) => {
-    // 1. Kullanıcı Kaydı
-    socket.on('register-user', (data) => {
-        socket.nickname = data.nickname;
-        socket.userId = data.id;
-        onlineUsers[data.nickname] = socket.id;
-        io.emit('update-online-players', Object.keys(onlineUsers).length);
+// 2. Arena Eşleşme (Burası Online Rakip Bulmanı Sağlar)
+    socket.on('join-arena', async (data) => {
+        // Boşta bekleyen bir rakip var mı kontrol et
+        const opponentNickname = Object.keys(onlineUsers).find(nick => 
+            nick !== socket.nickname && !busyUsers.has(nick)
+        );
+
+        if (opponentNickname) {
+            const opponentSocketId = onlineUsers[opponentNickname];
+            const roomId = `arena_${socket.nickname}_${opponentNickname}`;
+
+            // İki oyuncuyu da aynı odaya (room) sok
+            socket.join(roomId);
+            io.to(opponentSocketId).emit('invite-to-room', { roomId, opponent: socket.nickname });
+
+            // Kullanıcıları meşgul olarak işaretle (Başka maça girmesinler)
+            busyUsers.add(socket.nickname);
+            busyUsers.add(opponentNickname);
+
+            io.to(roomId).emit('match-found', { 
+                player1: socket.nickname, 
+                player2: opponentNickname,
+                roomId: roomId 
+            });
+        } else {
+            // Rakip yoksa bekleme moduna al (Elite Bot uyarısı burada devreye girer)
+            socket.emit('waiting-for-opponent');
+        }
     });
 
     // 2. Global Chat Olayları
@@ -315,5 +336,6 @@ io.on('connection', (socket) => {
 server.listen(PORT, "0.0.0.0", () => {
     console.log(`BPL SERVER RUNNING ON PORT ${PORT}`);
 });
+
 
 
