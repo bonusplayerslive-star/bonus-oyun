@@ -68,7 +68,7 @@ const MARKET_ANIMALS = [
     { id: 7, name: 'Peregrinefalcon', price: 1000, img: '/caracter/profile/Peregrinefalcon.jpg' },
     { id: 8, name: 'Rhino', price: 5000, img: '/caracter/profile/Rhino.jpg' },
     { id: 9, name: 'Snake', price: 1000, img: '/caracter/profile/Snake.jpg' },
-    { id: 10, name: 'Tiger', price: 1000, img: '/caracter/profile/Tiger.jpg' }
+    { id: 10, name: 'Tiger', price: 5000, img: '/caracter/profile/Tiger.jpg' }
 ];
 
 app.post('/buy-animal', checkAuth, async (req, res) => {
@@ -304,4 +304,5 @@ io.on('connection', (socket) => {
 server.listen(PORT, "0.0.0.0", () => {
     console.log(`BPL ECOSYSTEM OPERATIONAL ON ${PORT}`);
 });
+
 
