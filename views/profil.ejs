@@ -15,7 +15,7 @@
         body::before {
             content: ""; position: fixed; top: 0; left: 0; width: 100%; height: 100%;
             background: url('/caracter/page/welcome.jpg') no-repeat center center fixed;
-            background-size: cover; opacity: 0.2; z-index: -1;
+            background-size: cover; opacity: 0.15; z-index: -1;
         }
 
         .header-section { 
@@ -33,23 +33,19 @@
             background: rgba(255,255,255,0.03); border: 1px solid rgba(255,255,255,0.1);
             border-radius: 12px; padding: 15px; transition: 0.3s; margin-bottom: 20px;
         }
-        .stat-card:hover { border-color: var(--neon-green); transform: translateY(-3px); }
+        .stat-card:hover { border-color: var(--neon-green); transform: translateY(-5px); box-shadow: 0 0 20px rgba(57, 255, 20, 0.1); }
         
         .inventory-img { 
             width: 100%; aspect-ratio: 1/1; object-fit: cover; 
-            border-radius: 10px; border: 2px solid #333; margin-bottom: 10px;
+            border-radius: 10px; border: 1px solid var(--neon-green); margin-bottom: 10px;
         }
         
         .bpl-badge { color: var(--neon-green); font-family: 'Orbitron'; font-weight: bold; font-size: 1.3rem; }
-        .limit-alert { font-size: 0.75rem; color: #ff4444; border: 1px solid #ff4444; padding: 3px 8px; border-radius: 4px; font-family: 'Orbitron'; }
+        .nav-btn { width: 100%; margin-bottom: 12px; font-weight: bold; font-family: 'Orbitron'; font-size: 0.8rem; letter-spacing: 1px; transition: 0.3s; }
+        .nav-btn:hover { box-shadow: 0 0 10px currentColor; transform: scale(1.02); }
         
-        .nav-btn { width: 100%; margin-bottom: 12px; font-weight: bold; font-family: 'Orbitron'; font-size: 0.8rem; letter-spacing: 1px; }
-        .btn-meeting { border: 2px solid #ffc107; color: #ffc107; }
-        .btn-meeting:hover { background: #ffc107; color: #000; box-shadow: 0 0 10px #ffc107; }
-
-        .animal-stats { font-size: 0.8rem; color: #aaa; text-align: left; background: rgba(0,0,0,0.3); padding: 8px; border-radius: 5px; }
-        .stat-line { display: flex; justify-content: space-between; margin-bottom: 2px; }
-        .stat-val { color: var(--neon-green); font-weight: bold; }
+        .progress { background: #1a1a1a; border-radius: 10px; border: 1px solid #333; }
+        .stat-label { font-size: 0.75rem; color: #aaa; font-family: 'Orbitron'; }
     </style>
 </head>
 <body>
@@ -65,104 +61,92 @@
     </div>
 
     <div class="container">
- <div class="row">
-    <% if(!user.inventory || user.inventory.length === 0) { %>
-        <div class="col-12 text-center p-5 border border-secondary border-dashed rounded text-muted">
-            <i class="fas fa-ghost fa-3x mb-3"></i><br>
-            Envanterin boş kumandan! Ordunu kurmak için markete uğra.
-        </div>
-    <% } else { %>
-        <% user.inventory.forEach((item, index) => { %>
-            <div class="col-md-4 mb-4">
-                <div class="stat-card text-center" style="position: relative; overflow: hidden; background: rgba(0,0,0,0.6); border: 1px solid rgba(57, 255, 20, 0.3);">
+        <div class="row">
+            <div class="col-md-3 mb-4">
+                <div class="glass-panel text-center">
+                    <h6 class="text-muted border-bottom border-secondary pb-2 mb-3 font-orbitron">COMMAND CENTER</h6>
+                    <a href="/market" class="btn btn-outline-success nav-btn"><i class="fas fa-shopping-cart me-2"></i>MARKET</a>
+                    <a href="/development" class="btn btn-outline-warning nav-btn"><i class="fas fa-tools me-2"></i>GELİŞTİRME</a>
+                    <a href="/arena" class="btn btn-outline-danger nav-btn"><i class="fas fa-crosshairs me-2"></i>ARENA (BATTLE)</a>
+                    <a href="/chat" class="btn btn-outline-info nav-btn"><i class="fas fa-comments me-2"></i>GLOBAL CHAT</a>
                     
-                    <div style="position: relative;">
-                        <img src="<%= item.img %>" onerror="this.src='/caracter/page/logo.jpeg'" class="inventory-img" style="border: 1px solid var(--neon-green); box-shadow: 0 0 15px rgba(57, 255, 20, 0.2);">
-                        <span style="position: absolute; top: 10px; right: 10px; background: var(--neon-green); color: black; padding: 2px 8px; border-radius: 5px; font-weight: bold; font-family: 'Orbitron'; font-size: 0.7rem;">
-                            LVL <%= item.level %>
-                        </span>
-                    </div>
+                    <form action="/create-meeting" method="POST">
+                        <button type="submit" class="btn btn-outline-primary nav-btn" style="border-color: #ffc107; color: #ffc107;">
+                            <i class="fas fa-video me-2"></i>BEŞGEN MASA (50 BPL)
+                        </button>
+                    </form>
 
-                    <h5 class="text-uppercase my-3 font-orbitron" style="color: var(--neon-green); letter-spacing: 2px;"><%= item.name %></h5>
-                    
-                    <div class="p-2" style="background: rgba(0,0,0,0.4); border-radius: 10px;">
-                        
-                        <div class="mb-2 text-start">
-                            <div class="d-flex justify-content-between small mb-1">
-                                <span><i class="fas fa-heart text-danger"></i> SAĞLIK</span>
-                                <span class="stat-val text-white"><%= item.stats.hp %> / 100</span>
-                            </div>
-                            <div class="progress" style="height: 6px; background: #222;">
-                                <div class="progress-bar" style="width: <%= (item.stats.hp / 100) * 100 %>%; background: linear-gradient(90deg, #ff416c, #ff4b2b); box-shadow: 0 0 10px #ff416c;"></div>
-                            </div>
-                        </div>
-
-                        <div class="mb-2 text-start">
-                            <div class="d-flex justify-content-between small mb-1">
-                                <span><i class="fas fa-swords text-warning"></i> SALDIRI</span>
-                                <span class="stat-val text-white"><%= item.stats.atk %></span>
-                            </div>
-                            <div class="progress" style="height: 6px; background: #222;">
-                                <div class="progress-bar" style="width: <%= (item.stats.atk / 50) * 100 %>%; background: linear-gradient(90deg, #f7971e, #ffd200); box-shadow: 0 0 10px #f7971e;"></div>
-                            </div>
-                        </div>
-
-                        <div class="mb-3 text-start">
-                            <div class="d-flex justify-content-between small mb-1">
-                                <span><i class="fas fa-shield-alt text-info"></i> SAVUNMA</span>
-                                <span class="stat-val text-white">15</span>
-                            </div>
-                            <div class="progress" style="height: 6px; background: #222;">
-                                <div class="progress-bar" style="width: 30%; background: linear-gradient(90deg, #00c6ff, #0072ff); box-shadow: 0 0 10px #00c6ff;"></div>
-                            </div>
-                        </div>
-
-                    </div>
-
-                    <a href="/arena?animalIndex=<%= index %>" class="btn btn-sm w-100 font-orbitron mt-3" 
-                       style="background: transparent; border: 1px solid #ff4444; color: #ff4444; transition: 0.3s;"
-                       onmouseover="this.style.background='#ff4444'; this.style.color='white'"
-                       onmouseout="this.style.background='transparent'; this.style.color='#ff4444'">
-                        SAVAŞA GÖNDER
-                    </a>
+                    <a href="/wallet" class="btn btn-outline-light nav-btn"><i class="fas fa-wallet me-2"></i>WALLET (CÜZDAN)</a>
+                    <hr class="border-secondary">
+                    <a href="/logout" class="btn btn-dark nav-btn text-danger border-danger"><i class="fas fa-power-off me-2"></i>SİSTEMDEN ÇIK</a>
                 </div>
-            </div>
-        <% }) %>
-    <% } %>
-</div>
             </div>
 
             <div class="col-md-9">
                 <div class="glass-panel">
                     <div class="d-flex justify-content-between align-items-center mb-4">
                         <h4 class="font-orbitron mb-0"><i class="fas fa-boxes me-2"></i>ENVANTER (ASSETS)</h4>
-                        <% if(user.inventory.length >= 3) { %>
-                            <span class="limit-alert animate__animated animate__flash animate__infinite">KAPASİTE DOLU (3/3)</span>
-                        <% } else { %>
-                            <span class="text-muted small">Slot: <%= user.inventory.length %> / 3</span>
-                        <% } %>
+                        <span class="badge rounded-pill bg-dark border border-secondary">Slot: <%= user.inventory.length %> / 3</span>
                     </div>
 
                     <div class="row">
                         <% if(!user.inventory || user.inventory.length === 0) { %>
                             <div class="col-12 text-center p-5 border border-secondary border-dashed rounded text-muted">
-                                <i class="fas fa-ghost fa-3x mb-3"></i><br>
+                                <i class="fas fa-box-open fa-3x mb-3" style="opacity: 0.3;"></i><br>
                                 Envanterin boş kumandan! Ordunu kurmak için markete uğra.
                             </div>
                         <% } else { %>
                             <% user.inventory.forEach((item, index) => { %>
-                                <div class="col-md-4">
-                                    <div class="stat-card text-center">
-                                        <img src="<%= item.img %>" onerror="this.src='/caracter/page/logo.jpeg'" class="inventory-img">
-                                        <h6 class="text-uppercase mb-2 font-orbitron text-info"><%= item.name %></h6>
+                                <div class="col-md-4 mb-4">
+                                    <div class="stat-card text-center" style="position: relative; overflow: hidden; background: rgba(0,0,0,0.6); border: 1px solid rgba(57, 255, 20, 0.3);">
                                         
-                                        <div class="animal-stats mb-3">
-                                            <div class="stat-line"><span>LEVEL:</span> <span class="stat-val"><%= item.level %></span></div>
-                                            <div class="stat-line"><span>SAĞLIK (HP):</span> <span class="stat-val"><%= item.stats.hp %></span></div>
-                                            <div class="stat-line"><span>SALDIRI (ATK):</span> <span class="stat-val"><%= item.stats.atk %></span></div>
+                                        <div style="position: relative;">
+                                            <img src="<%= item.img %>" onerror="this.src='/caracter/page/logo.jpeg'" class="inventory-img" style="box-shadow: 0 0 15px rgba(57, 255, 20, 0.2);">
+                                            <span style="position: absolute; top: 10px; right: 10px; background: var(--neon-green); color: black; padding: 2px 8px; border-radius: 5px; font-weight: bold; font-family: 'Orbitron'; font-size: 0.7rem;">
+                                                LVL <%= item.level %>
+                                            </span>
                                         </div>
 
-                                        <a href="/arena?animalIndex=<%= index %>" class="btn btn-sm btn-danger w-100 font-orbitron">SAVAŞA GÖNDER</a>
+                                        <h5 class="text-uppercase my-3 font-orbitron" style="color: var(--neon-green); letter-spacing: 2px;"><%= item.name %></h5>
+                                        
+                                        <div class="p-2" style="background: rgba(0,0,0,0.4); border-radius: 10px;">
+                                            <div class="mb-2 text-start">
+                                                <div class="d-flex justify-content-between stat-label mb-1">
+                                                    <span><i class="fas fa-heart text-danger"></i> SAĞLIK</span>
+                                                    <span class="text-white"><%= item.stats.hp %> / 100</span>
+                                                </div>
+                                                <div class="progress" style="height: 6px;">
+                                                    <div class="progress-bar" style="width: <%= (item.stats.hp / 100) * 100 %>%; background: linear-gradient(90deg, #ff416c, #ff4b2b); box-shadow: 0 0 10px #ff416c;"></div>
+                                                </div>
+                                            </div>
+
+                                            <div class="mb-2 text-start">
+                                                <div class="d-flex justify-content-between stat-label mb-1">
+                                                    <span><i class="fas fa-swords text-warning"></i> SALDIRI</span>
+                                                    <span class="text-white"><%= item.stats.atk %></span>
+                                                </div>
+                                                <div class="progress" style="height: 6px;">
+                                                    <div class="progress-bar" style="width: <%= (item.stats.atk / 50) * 100 %>%; background: linear-gradient(90deg, #f7971e, #ffd200); box-shadow: 0 0 10px #f7971e;"></div>
+                                                </div>
+                                            </div>
+
+                                            <div class="mb-1 text-start">
+                                                <div class="d-flex justify-content-between stat-label mb-1">
+                                                    <span><i class="fas fa-shield-alt text-info"></i> SAVUNMA</span>
+                                                    <span class="text-white">15</span>
+                                                </div>
+                                                <div class="progress" style="height: 6px;">
+                                                    <div class="progress-bar" style="width: 30%; background: linear-gradient(90deg, #00c6ff, #0072ff); box-shadow: 0 0 10px #00c6ff;"></div>
+                                                </div>
+                                            </div>
+                                        </div>
+
+                                        <a href="/arena?animalIndex=<%= index %>" class="btn btn-sm w-100 font-orbitron mt-3" 
+                                           style="background: transparent; border: 1px solid #ff4444; color: #ff4444; transition: 0.3s;"
+                                           onmouseover="this.style.background='#ff4444'; this.style.color='white'"
+                                           onmouseout="this.style.background='transparent'; this.style.color='#ff4444'">
+                                            SAVAŞA GÖNDER
+                                        </a>
                                     </div>
                                 </div>
                             <% }) %>
@@ -186,4 +170,3 @@
     </script>
 </body>
 </html>
-
