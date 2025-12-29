@@ -6,6 +6,8 @@ const socketIo = require('socket.io');
 const session = require('express-session');
 const mongoose = require('mongoose');
 const axios = require('axios');
+const nodemailer = require('nodemailer');
+
 
 const connectDB = require('./db');
 const User = require('./models/User');
@@ -41,6 +43,66 @@ const busyUsers = new Set();
 const checkAuth = (req, res, next) => {
     if (req.session.userId) next(); else res.redirect('/');
 };
+
+
+// --- NODEMAILER AYARI (En üste require'ların yanına ekle) ---
+
+
+const transporter = nodemailer.createTransport({
+    service: 'gmail', // veya .env içindeki bilgiler
+    auth: {
+        user: process.env.EMAIL_USER,
+        pass: process.env.EMAIL_PASS
+    }
+});
+
+// --- 1. COMMAND CENTER (CONTACT) ROTASI ---
+app.post('/contact', async (req, res) => {
+    try {
+        const { email, note } = req.body;
+        // 1. Mongo'ya Kaydet (Log modelini kullanabilirsin veya yeni Contact modeli)
+        const newLog = new Log({
+            userId: req.session.userId || null,
+            action: 'CONTACT_FORM',
+            details: `Email: ${email}, Message: ${note}`
+        });
+        await newLog.save();
+
+        // 2. Mail Gönder (Opsiyonel)
+        console.log(`📩 Yeni Destek Mesajı: ${email} -> ${note}`);
+        
+        res.send('<script>alert("Transmission Received! We will contact you."); window.location.href="/";</script>');
+    } catch (e) {
+        console.error("Contact Error:", e);
+        res.status(500).send("Command Center Offline!");
+    }
+});
+
+// --- 2. FORGOT PASSWORD ROTASI ---
+app.post('/forgot-password', async (req, res) => {
+    try {
+        const { email } = req.body;
+        const user = await User.findOne({ email });
+
+        if (!user) {
+            return res.send('<script>alert("User not found!"); window.location.href="/";</script>');
+        }
+
+        // Şifreyi mail atıyoruz (Güvenlik için normalde link gönderilir ama senin isteğin üzerine şifreyi atıyoruz)
+        const mailOptions = {
+            from: process.env.EMAIL_USER,
+            to: email,
+            subject: 'BPL Ecosystem - Password Recovery',
+            text: `Your current password is: ${user.password} \n\nPlease change it after login.`
+        };
+
+        await transporter.sendMail(mailOptions);
+        res.send('<script>alert("Password sent to your email!"); window.location.href="/";</script>');
+    } catch (e) {
+        console.error("Forgot Pass Error:", e);
+        res.send('<script>alert("Mail System Error!"); window.location.href="/";</script>');
+    }
+});
 
 // --- ROTALAR ---
 app.get('/', (req, res) => res.render('index', { userIp: req.ip }));
@@ -153,3 +215,4 @@ io.on('connection', (socket) => {
 server.listen(PORT, "0.0.0.0", () => {
     console.log(`BPL SERVER RUNNING ON PORT ${PORT}`);
 });
+
