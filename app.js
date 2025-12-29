@@ -85,30 +85,37 @@ app.get('/development', checkAuth, async (req, res) => {
     const user = await User.findById(req.session.userId);
     res.render('development', { user }); // views/development.ejs dosyasını açar
 });
-
 app.post('/upgrade-stat', checkAuth, async (req, res) => {
     try {
         const { animalName, statType, cost } = req.body;
         const user = await User.findById(req.session.userId);
 
         if (user.bpl < cost) {
-            return res.json({ status: 'error', msg: 'Yetersiz BPL bakiyesi!' });
+            return res.json({ status: 'error', msg: 'Yetersiz BPL!' });
         }
 
         // BPL Düşür
         user.bpl -= cost;
 
-        // İstatistik Güncelleme Mantığı (Kalıcı olması için User modelinde stats alanı olmalı)
-        // Eğer User modelinde bu alan yoksa, basitçe bakiye düşüp onay veriyoruz
-        // Gelişmiş versiyonda: user.animalStats[animalName][statType] += 10; şeklinde tutulur.
+        // Stats alanı boşsa başlat (Senin eklediğin stats objesi burada devreye giriyor)
+        if (!user.stats[animalName]) {
+            user.stats[animalName] = { hp: 100, atk: 20, def: 10 };
+        }
 
+        // İstatistiği artır
+        if (statType === 'hp') user.stats[animalName].hp += 10;
+        else if (statType === 'atk') user.stats[animalName].atk += 5;
+        else if (statType === 'def') user.stats[animalName].def += 5;
+
+        // Mongoose'a objenin değiştiğini haber ver (Object tipi için şarttır)
+        user.markModified('stats'); 
+        
         await user.save();
         res.json({ status: 'success', newBalance: user.bpl });
     } catch (e) {
-        res.json({ status: 'error', msg: 'Sunucu hatası oluştu.' });
+        res.json({ status: 'error', msg: 'Sunucu hatası!' });
     }
 });
-
 // --- POST ROTALARI (GİRİŞ & KAYIT) ---
 app.post('/login', async (req, res) => {
     const { email, password } = req.body;
@@ -308,4 +315,5 @@ io.on('connection', (socket) => {
 server.listen(PORT, "0.0.0.0", () => {
     console.log(`BPL SERVER RUNNING ON PORT ${PORT}`);
 });
+
 
