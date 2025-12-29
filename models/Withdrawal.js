@@ -1,4 +1,3 @@
-
 const mongoose = require('mongoose');
 
 const WithdrawalSchema = new mongoose.Schema({
@@ -14,6 +13,16 @@ const WithdrawalSchema = new mongoose.Schema({
     walletAddress: {
         type: String,
         required: true
+    },
+    // Çekim yapılan ağ (BEP20 varsayılan)
+    network: {
+        type: String,
+        default: 'BEP20'
+    },
+    // Onaylandığında buraya TXID girilecek
+    transactionHash: {
+        type: String,
+        default: null
     },
     status: {
         type: String,
