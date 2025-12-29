@@ -129,19 +129,37 @@
             }
         }, 1000);
 
-        socket.on('arena-list-update', (players) => {
-            const list = document.getElementById('player-list');
-            list.innerHTML = '';
-            players.forEach(p => {
-                if(p.id !== userId) {
-                    list.innerHTML += `
-                        <div class="opponent-card">
-                            <span><b>${p.nickname}</b></span>
-                            <button class="btn btn-success btn-sm btn-battle">MEYDAN OKU</button>
-                        </div>`;
+  socket.on('arena-list-update', (players) => {
+    const list = document.getElementById('player-list');
+    list.innerHTML = '';
+    players.forEach(p => {
+        if(p.id !== userId) {
+            list.innerHTML += `
+                <div class="opponent-card">
+                    <span><b>${p.nickname}</b></span>
+                    <button class="btn btn-success btn-sm" onclick="sendChallenge('${p.nickname}')">MEYDAN OKU</button>
+                </div>`;
+        }
+    });
+});
+
+// Meydan okuma gönder
+function sendChallenge(targetName) {
+    socket.emit('challenge-player', { targetNickname: targetName });
+    alert(targetName + " kullanıcısına meydan okundu. Bekleniyor...");
+}
+
+// Meydan okuma al
+socket.on('challenge-received', (data) => {
+    if(confirm(data.challenger + " sana meydan okudu! Kabul ediyor musun?")) {
+        // Burada savaşı başlatabilirsin
+        alert("Savaş kabul edildi! Hazırlan...");
+    }
+});
                 }
             });
         });
     </script>
 </body>
 </html>
+
