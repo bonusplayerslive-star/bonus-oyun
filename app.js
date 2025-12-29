@@ -364,6 +364,49 @@ io.on('connection', (socket) => {
             target: data.target
         });
     });
+// --- KARAKTER SATIŞ & YAKIM ROTASI ---
+app.post('/sell-character', checkAuth, async (req, res) => {
+    try {
+        const { userId, animalIndex, fiyat } = req.body;
+        const user = await User.findById(userId);
+
+        if (user.inventory.length <= 1) {
+            return res.json({ status: 'error', msg: 'Son karakterini satamazsın!' });
+        }
+
+        const originalPrice = parseInt(fiyat);
+        const burnTax = Math.floor(originalPrice * 0.30); // %30 Yakım
+        const refundAmount = originalPrice - burnTax;
+
+        // Karakteri envanterden çıkar
+        const removedItem = user.inventory.splice(animalIndex, 1);
+        user.bpl += refundAmount;
+
+        user.markModified('inventory');
+        await user.save();
+
+        // YAKIM KAYDI (Log)
+        await new Log({
+            type: 'BPL_BURN',
+            content: `Karakter Satışı (%30 Yakım): ${removedItem[0].name || removedItem[0]} tasfiye edildi. ${burnTax} BPL yakıldı.`,
+            userEmail: user.email
+        }).save();
+
+        res.json({ 
+            status: 'success', 
+            msg: `Varlık satıldı! ${refundAmount} BPL hesabına eklendi, ${burnTax} BPL sistemden yakıldı.`,
+            newBpl: user.bpl 
+        });
+
+    } catch (err) {
+        console.error("Satış Hatası:", err);
+        res.status(500).json({ status: 'error', msg: 'İşlem başarısız oldu.' });
+    }
+});
+
+
+
+    
 
     socket.on('disconnect', () => {
         console.log('Bir kumandan ayrıldı.');
@@ -382,6 +425,7 @@ server.listen(PORT, "0.0.0.0", () => {
     =========================================
     `);
 });
+
 
 
 
