@@ -9,20 +9,42 @@
     <style>
         :root { --neon-green: #39FF14; --neon-blue: #00d4ff; --dark-bg: #050505; }
         body { background-color: var(--dark-bg); color: #fff; font-family: 'Orbitron', sans-serif; }
+        
+        /* Navbar */
         .navbar-bpl { background: rgba(0,0,0,0.95); border-bottom: 2px solid var(--neon-green); padding: 15px; }
         .balance-box { background: rgba(57, 255, 20, 0.1); border: 1px solid var(--neon-green); padding: 5px 15px; border-radius: 50px; }
-        .animal-card { background: #111; border-radius: 20px; overflow: hidden; position: relative; border: 1px solid #222; transition: all 0.4s; height: 100%; }
-        .animal-card:hover { border-color: var(--neon-green); transform: translateY(-10px); box-shadow: 0 10px 30px rgba(57, 255, 20, 0.2); }
-        .card-img-wrapper { position: relative; overflow: hidden; height: 200px; }
-        .animal-img { width: 100%; height: 100%; object-fit: cover; }
-        .rarity-tag { position: absolute; top: 10px; left: 10px; padding: 4px 12px; border-radius: 5px; font-size: 0.7rem; font-weight: bold; z-index: 10; }
+
+        /* Market Cards */
+        .animal-card { 
+            background: #111; border-radius: 20px; overflow: hidden; position: relative; 
+            border: 1px solid #222; transition: all 0.4s ease; height: 100%;
+        }
+        .animal-card:hover { 
+            border-color: var(--neon-green); transform: translateY(-10px);
+            box-shadow: 0 10px 30px rgba(57, 255, 20, 0.2);
+        }
+        
+        .card-img-wrapper { position: relative; overflow: hidden; height: 220px; background: #000; }
+        .animal-img { width: 100%; height: 100%; object-fit: cover; transition: 0.5s; }
+        .animal-card:hover .animal-img { transform: scale(1.1); }
+
+        .rarity-tag {
+            position: absolute; top: 10px; left: 10px; padding: 4px 12px; 
+            border-radius: 5px; font-size: 0.7rem; font-weight: bold; text-transform: uppercase;
+            z-index: 10;
+        }
         .legendary { background: linear-gradient(to right, #ff8c00, #ff0000); color: white; }
         .wild { background: linear-gradient(to right, #00d4ff, #0055ff); color: white; }
-        .stat-label { font-size: 0.7rem; color: #888; display: flex; justify-content: space-between; }
-        .progress { height: 6px; background: #222; margin-bottom: 10px; }
-        .btn-buy-action { background: transparent; border: 2px solid var(--neon-green); color: var(--neon-green); font-weight: bold; border-radius: 10px; padding: 10px; width: 100%; transition: 0.3s; }
+
+        /* Button Custom */
+        .btn-buy-action {
+            background: transparent; border: 2px solid var(--neon-green); color: var(--neon-green);
+            font-weight: bold; border-radius: 10px; padding: 10px; width: 100%; transition: 0.3s;
+        }
         .btn-buy-action:hover:not(:disabled) { background: var(--neon-green); color: #000; box-shadow: 0 0 20px var(--neon-green); }
-        .btn-buy-action:disabled { border-color: #444; color: #444; }
+        .btn-buy-action:disabled { border-color: #444; color: #444; cursor: not-allowed; opacity: 0.6; }
+
+        .inventory-status { font-size: 0.9rem; color: #aaa; text-align: center; margin-top: 10px; }
     </style>
 </head>
 <body>
@@ -30,61 +52,75 @@
 <nav class="navbar navbar-bpl sticky-top">
     <div class="container d-flex justify-content-between align-items-center">
         <a class="navbar-brand d-flex align-items-center" href="/profil">
-            <img src="/caracter/logo/logo.jpeg" alt="BPL" style="width: 45px; border-radius: 8px; margin-right: 12px;">
-            <span style="color: var(--neon-green); font-weight: 800;">BPL MARKET</span>
+            <img src="/caracter/logo/logo.jpeg" alt="BPL" style="width: 45px; border-radius: 8px; margin-right: 12px;" onerror="this.src='/caracter/page/welcome.jpg'">
+            <span style="color: var(--neon-green); font-weight: 800; letter-spacing: 2px;">BPL MARKET</span>
         </a>
         <div class="d-flex align-items-center">
             <div class="balance-box me-3">
                 <i class="fas fa-coins text-warning"></i> 
-                <span class="ms-1 fw-bold"><%= user.bpl.toLocaleString() %> BPL</span>
+                <span class="ms-1 fw-bold" id="balanceDisplay"><%= user.bpl.toLocaleString() %> BPL</span>
             </div>
-            <a href="/profil" class="btn btn-outline-light btn-sm">Profil</a>
+            <a href="/profil" class="btn btn-outline-light btn-sm"><i class="fas fa-user"></i> Profile</a>
         </div>
     </div>
 </nav>
 
 <div class="container py-5">
     <div class="text-center mb-5">
-        <h2 class="text-uppercase fw-bold">Karakter Mağazası</h2>
-        <p class="text-muted">Envanter: <span class="<%= user.inventory.length >= 3 ? 'text-danger' : 'text-success' %>"><%= user.inventory.length %> / 3</span></p>
+        <h2 class="text-uppercase fw-bold" style="letter-spacing: 5px;">ORDUNU KUR</h2>
+        <div class="inventory-status">
+            Çanta Kapasitesi: 
+            <span class="fw-bold <%= user.inventory.length >= 3 ? 'text-danger' : 'text-success' %>">
+                <%= user.inventory.length %> / 3
+            </span>
+            <br>
+            <small class="text-muted">(En az 1, en fazla 3 karakter sahibi olabilirsiniz)</small>
+        </div>
     </div>
 
-<div class="row g-4">
-    <% animals.forEach(animal => { %>
-        <div class="col-md-3">
-            <div class="animal-card">
-                <div class="rarity-tag <%= animal.price === 5000 ? 'legendary' : 'wild' %>">
-                    <%= animal.price === 5000 ? 'PREMIUM' : 'NORMAL' %>
-                </div>
-                
-                <div class="card-img-wrapper">
-                    <img src="<%= animal.img %>" class="animal-img" onerror="this.src='/caracter/profile/Bear.jpg'">
-                </div>
+    <div class="row g-4">
+        <% animals.forEach(animal => { %>
+            <div class="col-md-3 col-sm-6">
+                <div class="animal-card">
+                    <div class="rarity-tag <%= animal.price >= 5000 ? 'legendary' : 'wild' %>">
+                        <%= animal.price >= 5000 ? 'EFSANEVİ' : 'VAHŞİ' %>
+                    </div>
+                    
+                    <div class="card-img-wrapper">
+                        <img src="<%= animal.img %>" class="animal-img" onerror="this.src='/caracter/profile/Bear.jpg'">
+                    </div>
 
-                <div class="p-3">
-                    <h5 class="text-center fw-bold"><%= animal.name %></h5>
-                    <p class="text-center text-warning fw-bold mb-3"><%= animal.price %> BPL</p>
+                    <div class="p-3">
+                        <h5 class="text-center text-uppercase fw-bold mb-1"><%= animal.name %></h5>
+                        <p class="text-center text-warning fw-bold mb-3"><%= animal.price.toLocaleString() %> BPL</p>
 
-                    <% 
-                        // Kullanıcıda bu hayvan var mı kontrol et
-                        const hasAnimal = user.inventory.some(i => i.name === animal.name);
-                    %>
+                        <% 
+                            // Kullanıcının bu hayvana sahip olup olmadığını kontrol et
+                            const isOwned = user.inventory.some(item => item.name === animal.name);
+                            const isFull = user.inventory.length >= 3;
+                        %>
 
-                    <button onclick="buyAnimal('<%= animal.id %>', '<%= animal.name %>')" 
-                            class="btn-buy-action" 
-                            <%= (user.inventory.length >= 3 || hasAnimal) ? 'disabled' : '' %>>
-                        <%= hasAnimal ? 'SAHİPSİN' : (user.inventory.length >= 3 ? 'KONTENJAN DOLU' : 'SATIN AL') %>
-                    </button>
+                        <button onclick="buyAnimal('<%= animal.id %>', '<%= animal.name %>')" 
+                                class="btn-buy-action" 
+                                <%= (isFull || isOwned) ? 'disabled' : '' %>>
+                            <% if(isOwned) { %>
+                                SAHİPSİN
+                            <% } else if(isFull) { %>
+                                ÇANTA DOLU
+                            <% } else { %>
+                                SATIN AL
+                            <% } %>
+                        </button>
+                    </div>
                 </div>
             </div>
-        </div>
-    <% }) %>
-</div>
+        <% }) %>
+    </div>
 </div>
 
 <script>
     function buyAnimal(animalId, animalName) {
-        if(!confirm(animalName + ' satın alınsın mı?')) return;
+        if(!confirm(animalName + ' karakterini orduya katmak istiyor musun?')) return;
 
         fetch('/buy-animal', {
             method: 'POST',
@@ -94,13 +130,16 @@
         .then(r => r.json())
         .then(data => {
             if(data.status === 'success') {
-                alert('Başarılı: ' + data.msg);
+                alert('İşlem Başarılı! ' + animalName + ' envantere eklendi.');
                 location.reload();
             } else {
                 alert('Hata: ' + data.msg);
             }
         })
-        .catch(err => alert('Sunucu hatası!'));
+        .catch(err => {
+            console.error(err);
+            alert('Sunucuyla bağlantı kurulamadı!');
+        });
     }
 </script>
 
@@ -112,4 +151,3 @@
 
 </body>
 </html>
-
