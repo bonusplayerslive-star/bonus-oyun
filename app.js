@@ -173,26 +173,57 @@ app.post('/sell-animal', checkAuth, async (req, res) => {
     } catch (e) { res.json({ status: 'error' }); }
 });
 
-// --- ARENA SAVAŞ MANTIĞI ---
+// --- SAVAŞ VE ANİMASYON MANTIĞI (DÜZELTİLMİŞ) ---
 app.post('/attack-bot', checkAuth, async (req, res) => {
-    const user = await User.findById(req.session.userId);
-    const animal = req.body.animal || user.inventory[0];
-    if(!animal) return res.json({status:'error', msg:'Hayvan seçilmedi!'});
+    try {
+        const user = await User.findById(req.session.userId);
+        // Kullanıcının envanterindeki ilk hayvanı veya seçili olanı alıyoruz
+        const animalName = req.query.animal || user.inventory[0]; 
 
-    const pStats = user.stats[animal] || { hp: 100, atk: 15, def: 10 };
-    const botStats = { hp: 140, atk: 18, def: 12 };
+        if(!animalName) {
+            return res.json({ status: 'error', msg: 'Savaşacak bir hayvanınız yok!' });
+        }
 
-    let pHP = pStats.hp; let bHP = botStats.hp;
-    while (pHP > 0 && bHP > 0) {
-        bHP -= Math.max(5, pStats.atk - botStats.def);
-        if (bHP <= 0) break;
-        pHP -= Math.max(5, botStats.atk - pStats.def);
+        const pStats = user.stats[animalName] || { hp: 100, atk: 15, def: 10 };
+        const botStats = { hp: 130, atk: 18, def: 12 };
+
+        let pHP = pStats.hp;
+        let bHP = botStats.hp;
+
+        // Simülasyon
+        while (pHP > 0 && bHP > 0) {
+            bHP -= Math.max(5, pStats.atk - botStats.def);
+            if (bHP <= 0) break;
+            pHP -= Math.max(5, botStats.atk - pStats.def);
+        }
+
+        const win = pHP > 0;
+        const reward = win ? 150 : 0;
+
+        if (win) {
+            user.bpl += reward;
+            await user.save();
+        }
+
+        // Klasör yapına göre video yollarını gönderiyoruz
+        res.json({
+            status: 'success',
+            winner: win ? user.nickname : 'Elite_Bot',
+            reward: reward,
+            newBalance: user.bpl,
+            animation: {
+                actionVideo: `/caracter/move/${animalName}/${animalName}1.mp4`, // Hamle/Saldırı
+                winVideo: `/caracter/move/${animalName}/${animalName}.mp4`,    // Kazandı/Kükreme
+                isWin: win
+            }
+        });
+    } catch (e) {
+        console.error("Savaş Hatası:", e);
+        res.status(500).json({ status: 'error', msg: 'Sunucu hatası' });
     }
-    const win = pHP > 0;
-    let reward = win ? 150 : 0;
-    if(win) { user.bpl += reward; await user.save(); }
-    res.json({ status: 'success', winner: win ? user.nickname : 'Elite_Bot', reward, newBalance: user.bpl });
 });
+
+// ... (Geri kalan socket ve server.listen kodların aynı kalabilir)
 
 app.post('/attack-player', checkAuth, async (req, res) => {
     try {
@@ -279,3 +310,4 @@ io.on('connection', (socket) => {
 });
 
 server.listen(PORT, "0.0.0.0", () => console.log(`BPL ONLINE | PORT: ${PORT}`));
+
