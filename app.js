@@ -266,6 +266,38 @@ app.get('/logout', (req, res) => {
     res.redirect('/');
 });
 
+
+// Hediye ve Vergi Mantığı
+socket.on('transfer-bpl', async (data) => {
+    const sender = await User.findById(socket.userId);
+    const receiver = await User.findOne({ nickname: data.to });
+    
+    const amount = Math.min(data.amount, 1000);
+    const tax = Math.floor(amount * 0.25); // %25 Vergi
+    const netAmount = amount - tax;
+
+    if(sender.bpl >= 6000 && sender.bpl >= amount) {
+        sender.bpl -= amount;
+        receiver.bpl += netAmount;
+
+        await sender.save();
+        await receiver.save();
+
+        // YAKIM KAYDI (Mongo'ya Log)
+        await new Log({
+            type: 'BPL_BURN',
+            content: `Transfer Vergisi Yakıldı: ${tax} BPL`,
+            userEmail: sender.email
+        }).save();
+
+        io.to(receiver.socketId).emit('gift-result', { message: `${sender.nickname} size ${netAmount} BPL yolladı!` });
+    }
+});
+
+
+
+
+
 // --- 7. SUNUCU BAŞLATMA ---
 server.listen(PORT, "0.0.0.0", () => {
     console.log(`
@@ -276,6 +308,7 @@ server.listen(PORT, "0.0.0.0", () => {
     =========================================
     `);
 });
+
 
 
 
