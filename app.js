@@ -38,6 +38,21 @@ app.use(session({
 }));
 app.set('view engine', 'ejs');
 
+
+app.get('/', (req, res) => {
+    res.render('index'); // veya senin ana sayfa dosyanın adı neyse
+});
+
+
+
+
+
+
+
+
+
+
+
 // --- GLOBAL DEĞİŞKENLER & AUTH ---
 const onlineUsers = {}; 
 const busyUsers = new Set();
@@ -180,3 +195,4 @@ server.listen(PORT, "0.0.0.0", () => {
     =========================================
     `);
 });
+
