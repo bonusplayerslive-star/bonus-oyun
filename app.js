@@ -54,6 +54,49 @@ const transporter = nodemailer.createTransport({
     }
 });
 
+// --- KULLANICI KAYIT (REGISTER) ---
+app.post('/register', async (req, res) => {
+    const { nickname, email, password } = req.body;
+    try {
+        // 1. E-posta zaten kullanılıyor mu kontrol et
+        const existingUser = await User.findOne({ email });
+        if (existingUser) {
+            return res.send('<script>alert("Bu e-posta zaten kayıtlı!"); window.location.href="/";</script>');
+        }
+
+        // 2. Yeni kullanıcıyı oluştur (Başlangıç parası: 1000 BPL)
+        const newUser = new User({
+            nickname,
+            email,
+            password,
+            bpl: 1000, // Yeni gelen kumandana hoş geldin hediyesi
+            inventory: []
+        });
+
+        // 3. Veritabanına kaydet
+        await newUser.save();
+
+        // 4. Log kaydı oluştur
+        await new Log({ 
+            type: 'REGISTER', 
+            content: `Yeni kullanıcı katıldı: ${nickname}`, 
+            userEmail: email 
+        }).save();
+
+        res.send('<script>alert("Kayıt başarılı! Şimdi giriş yapabilirsin."); window.location.href="/";</script>');
+    } catch (err) {
+        console.error("Kayıt Hatası:", err);
+        res.status(500).send("Kayıt sırasında bir sunucu hatası oluştu.");
+    }
+});
+
+
+
+
+
+
+
+
 const MARKET_ANIMALS = [
     { id: 1, name: 'Bear', price: 1000, img: '/caracter/profile/bear.jpg' },
     { id: 2, name: 'Crocodile', price: 1000, img: '/caracter/profile/crocodile.jpg' },
@@ -154,3 +197,4 @@ server.listen(PORT, "0.0.0.0", () => {
     =========================================
     `);
 });
+
