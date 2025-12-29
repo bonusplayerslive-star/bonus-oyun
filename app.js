@@ -175,6 +175,51 @@ app.post('/login', async (req, res) => {
     }
 });
 
+// --- STAT GELİŞTİRME MERKEZİ ---
+app.post('/upgrade-stat', checkAuth, async (req, res) => {
+    const { animalName, statType, cost } = req.body;
+
+    try {
+        const user = await User.findById(req.session.userId);
+        
+        // Envanterde doğru hayvanı bul
+        const animalIndex = user.inventory.findIndex(a => a.name === animalName);
+        
+        if (animalIndex === -1) return res.json({ status: 'error', msg: 'Hayvan bulunamadı!' });
+        if (user.bpl < cost) return res.json({ status: 'error', msg: 'Bakiye yetersiz!' });
+
+        const animal = user.inventory[animalIndex];
+
+        // Geliştirme Mantığı
+        switch(statType) {
+            case 'hp': animal.stats.hp += 10; break;
+            case 'atk': animal.stats.atk += 5; break;
+            case 'def': animal.stats.def = (animal.stats.def || 0) + 5; break;
+            case 'crit': animal.stats.crit = (animal.stats.crit || 0) + 5; break; // Yeni Özellik!
+            case 'battleMode': 
+                // Geçici güçlendirme mantığı buraya
+                animal.stats.atk += 20; 
+                break;
+        }
+
+        user.bpl -= cost;
+        user.markModified('inventory'); // MongoDB'ye dizinin değiştiğini fısılda
+        await user.save();
+
+        res.json({ 
+            status: 'success', 
+            newBalance: user.bpl.toLocaleString(),
+            msg: 'Gelişim tamamlandı!' 
+        });
+
+    } catch (err) {
+        res.status(500).json({ status: 'error', msg: 'Sunucu hatası!' });
+    }
+});
+
+
+
+
 app.post('/buy-animal', checkAuth, async (req, res) => {
     try {
         const { animalId } = req.body;
@@ -231,6 +276,7 @@ server.listen(PORT, "0.0.0.0", () => {
     =========================================
     `);
 });
+
 
 
 
