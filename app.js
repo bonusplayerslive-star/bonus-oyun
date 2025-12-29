@@ -18,24 +18,23 @@ const app = express();
 const server = http.createServer(app);
 const io = socketIo(server);
 
-const PORT = process.env.PORT || 10000; 
+const PORT = process.env.PORT || 10000;
 app.set('trust proxy', 1);
 
-// Güvenlik: Giriş denemelerini sınırla
 const authLimiter = rateLimit({ windowMs: 15 * 60 * 1000, max: 100 });
 
-app.use(bodyParser.json()); 
+app.use(bodyParser.json());
 app.use(bodyParser.urlencoded({ extended: true }));
 app.use(express.static('public'));
 app.use(session({
-    secret: 'bpl_ozel_anahtar', 
+    secret: 'bpl_ozel_anahtar',
     resave: false,
     saveUninitialized: false,
     cookie: { secure: false, maxAge: 24 * 60 * 60 * 1000 }
 }));
 app.set('view engine', 'ejs');
 
-// --- E-POSTA YAPILANDIRMASI (.env'den çeker) ---
+// --- E-POSTA YAPILANDIRMASI ---
 const transporter = nodemailer.createTransport({
     service: 'gmail',
     auth: {
@@ -44,7 +43,6 @@ const transporter = nodemailer.createTransport({
     }
 });
 
-// --- LOG FONKSİYONU ---
 const dbLog = async (type, content) => {
     try {
         const newLog = new Log({ type, content });
@@ -87,7 +85,7 @@ app.get('/meeting', checkAuth, async (req, res) => {
     res.render('meeting', { user, roomId: req.query.roomId || 'GlobalMasa' });
 });
 
-// --- POST ROTALARI (GİRİŞ & İLETİŞİM) ---
+// --- POST ROTALARI ---
 app.post('/login', authLimiter, async (req, res) => {
     const { email, password } = req.body;
     const user = await User.findOne({ email, password });
@@ -114,7 +112,6 @@ app.post('/forgot-password', async (req, res) => {
     const { email } = req.body;
     const user = await User.findOne({ email });
     if (!user) return res.send('<script>alert("E-posta bulunamadı!"); window.location.href="/";</script>');
-    
     const mailOptions = {
         from: process.env.EMAIL_USER,
         to: email,
@@ -157,23 +154,17 @@ app.post('/upgrade-stat', checkAuth, async (req, res) => {
     } else res.json({ status: 'error' });
 });
 
-// HAYVAN SATMA (REFUND) - %75 İade
 app.post('/sell-animal', checkAuth, async (req, res) => {
     const { animalName } = req.body;
     try {
         const user = await User.findById(req.session.userId);
         if (user.inventory.includes(animalName)) {
-            const refundAmount = 1875; // 2500'ün %75'i (veya statlara göre hesaplatabilirsin)
-            
-            // Envanterden sil
+            const refundAmount = 1875;
             user.inventory = user.inventory.filter(a => a !== animalName);
-            // Statları temizle
             if (user.stats[animalName]) delete user.stats[animalName];
-            
             user.bpl += refundAmount;
             user.markModified('stats');
             await user.save();
-            
             await dbLog('MARKET', `${user.nickname}, ${animalName} sattı. +${refundAmount} BPL`);
             res.json({ status: 'success', newBalance: user.bpl });
         } else {
@@ -182,109 +173,54 @@ app.post('/sell-animal', checkAuth, async (req, res) => {
     } catch (e) { res.json({ status: 'error' }); }
 });
 
+// --- ARENA SAVAŞ MANTIĞI ---
+app.post('/attack-bot', checkAuth, async (req, res) => {
+    const user = await User.findById(req.session.userId);
+    const animal = req.body.animal || user.inventory[0];
+    if(!animal) return res.json({status:'error', msg:'Hayvan seçilmedi!'});
 
+    const pStats = user.stats[animal] || { hp: 100, atk: 15, def: 10 };
+    const botStats = { hp: 140, atk: 18, def: 12 };
 
-// --- GELİŞMİŞ SOCKET SİSTEMİ ---
-let onlinePlayers = {}; // Nickname -> SocketId eşleşmesi
-
-io.on('connection', (socket) => {
-    // Kullanıcı bağlandığında kimliğini kaydet
-    socket.on('register-user', (data) => {
-        socket.userId = data.id;
-        socket.nickname = data.nickname;
-        onlinePlayers[data.nickname] = socket.id;
-    });
-
-    // Arena Listesi
-    socket.on('join-arena', (data) => {
-        socket.userId = data.id;
-        socket.nickname = data.nickname;
-        if(!onlineArena.find(u => u.id === data.id)) onlineArena.push(data);
-        io.emit('arena-list-update', onlineArena);
-    });
-
-
-// OYUNCU VS OYUNCU SAVAŞI
-app.post('/attack-player', checkAuth, async (req, res) => {
-    try {
-        const { defenderNickname } = req.body;
-        const attacker = await User.findById(req.session.userId);
-        const defender = await User.findOne({ nickname: defenderNickname });
-
-        if (!attacker || !defender) return res.json({ status: 'error', msg: 'Rakip bulunamadı' });
-
-        const aAnimal = attacker.inventory[0];
-        const dAnimal = defender.inventory[0];
-
-        const aStats = attacker.stats[aAnimal] || { hp: 100, atk: 15, def: 10 };
-        const dStats = defender.stats[dAnimal] || { hp: 100, atk: 15, def: 10 };
-
-        // Hızlı Simülasyon
-        const aWin = (aStats.atk + aStats.hp) > (dStats.atk + dStats.hp);
-        
-        let reward = 250; // Oyuncu yenme ödülü daha yüksek
-        if(aWin) {
-            attacker.bpl += reward;
-            await attacker.save();
-        }
-
-        res.json({ 
-            status: 'success', 
-            winner: aWin ? attacker.nickname : defender.nickname, 
-            reward: aWin ? reward : 0,
-            newBalance: attacker.bpl
-        });
-    } catch (e) { res.json({ status: 'error' }); }
-});
-
-
-
-
-    
-    // SAVAŞ DAVETİ (Meydan Oku / Kavuşma)
-    socket.on('challenge-player', (data) => {
-        const targetSocketId = onlinePlayers[data.targetNickname];
-        if (targetSocketId) {
-            io.to(targetSocketId).emit('challenge-received', {
-                challenger: socket.nickname,
-                challengerId: socket.userId
-            });
-        }
-    });
-
-    // DAVETİ KABUL ET
-    socket.on('accept-challenge', (data) => {
-        const challengerSocketId = onlinePlayers[data.challengerNickname];
-        if (challengerSocketId) {
-            // Her iki tarafa da savaşı başlat komutu gönder
-            const battleId = Math.random().toString(36).substring(7);
-            io.to(challengerSocketId).emit('start-battle', { opponent: socket.nickname, battleId });
-            socket.emit('start-battle', { opponent: data.challengerNickname, battleId });
-        }
-    });
-
-    socket.on('chat-message', (data) => io.emit('new-message', { sender: data.nickname, text: data.message }));
-
-    socket.on('disconnect', () => {
-        onlineArena = onlineArena.filter(u => u.id !== socket.userId);
-        delete onlinePlayers[socket.nickname];
-        io.emit('arena-list-update', onlineArena);
-    });
-});
-
+    let pHP = pStats.hp; let bHP = botStats.hp;
+    while (pHP > 0 && bHP > 0) {
+        bHP -= Math.max(5, pStats.atk - botStats.def);
+        if (bHP <= 0) break;
+        pHP -= Math.max(5, botStats.atk - pStats.def);
+    }
     const win = pHP > 0;
     let reward = win ? 150 : 0;
     if(win) { user.bpl += reward; await user.save(); }
     res.json({ status: 'success', winner: win ? user.nickname : 'Elite_Bot', reward, newBalance: user.bpl });
 });
 
-// --- MEETING (ODA KURMA) ---
+app.post('/attack-player', checkAuth, async (req, res) => {
+    try {
+        const { defenderNickname } = req.body;
+        const attacker = await User.findById(req.session.userId);
+        const defender = await User.findOne({ nickname: defenderNickname });
+        if (!attacker || !defender) return res.json({ status: 'error', msg: 'Rakip bulunamadı' });
+
+        const aAnimal = attacker.inventory[0];
+        const dAnimal = defender.inventory[0];
+        const aStats = attacker.stats[aAnimal] || { hp: 100, atk: 15, def: 10 };
+        const dStats = defender.stats[dAnimal] || { hp: 100, atk: 15, def: 10 };
+
+        const aWin = (aStats.atk + aStats.hp) > (dStats.atk + dStats.hp);
+        let reward = 250;
+        if(aWin) {
+            attacker.bpl += reward;
+            await attacker.save();
+        }
+        res.json({ status: 'success', winner: aWin ? attacker.nickname : defender.nickname, reward: aWin ? reward : 0, newBalance: attacker.bpl });
+    } catch (e) { res.json({ status: 'error' }); }
+});
+
 app.post('/create-meeting', checkAuth, (req, res) => {
     const roomId = Math.random().toString(36).substring(2, 8).toUpperCase();
     res.redirect(`/meeting?roomId=${roomId}`);
 });
 
-// --- CÜZDAN ---
 app.post('/withdraw', checkAuth, async (req, res) => {
     const { amount } = req.body;
     const user = await User.findById(req.session.userId);
@@ -297,20 +233,49 @@ app.post('/withdraw', checkAuth, async (req, res) => {
     } else res.json({ status: 'error' });
 });
 
-// --- SOCKET SİSTEMİ ---
+// --- SOCKET & ARENA SİSTEMİ ---
 let onlineArena = [];
+let onlinePlayers = {};
+
 io.on('connection', (socket) => {
+    socket.on('register-user', (data) => {
+        socket.userId = data.id;
+        socket.nickname = data.nickname;
+        onlinePlayers[data.nickname] = socket.id;
+    });
+
     socket.on('join-arena', (data) => {
         socket.userId = data.id;
+        socket.nickname = data.nickname;
         if(!onlineArena.find(u => u.id === data.id)) onlineArena.push(data);
         io.emit('arena-list-update', onlineArena);
     });
-    socket.on('chat-message', (data) => io.emit('new-message', { sender: data.nickname, text: data.message }));
+
+    socket.on('challenge-player', (data) => {
+        const targetSocketId = onlinePlayers[data.targetNickname];
+        if (targetSocketId) {
+            io.to(targetSocketId).emit('challenge-received', { challenger: socket.nickname });
+        }
+    });
+
+    socket.on('accept-challenge', (data) => {
+        const challengerSocketId = onlinePlayers[data.challengerNickname];
+        if (challengerSocketId) {
+            const battleId = Math.random().toString(36).substring(7);
+            io.to(challengerSocketId).emit('start-battle', { opponent: socket.nickname, battleId });
+            socket.emit('start-battle', { opponent: data.challengerNickname, battleId });
+        }
+    });
+
+    socket.on('chat-message', (data) => {
+        io.emit('new-message', { sender: data.nickname, text: data.message });
+    });
+
     socket.on('disconnect', () => {
         onlineArena = onlineArena.filter(u => u.id !== socket.userId);
+        if (socket.nickname) delete onlinePlayers[socket.nickname];
         io.emit('arena-list-update', onlineArena);
     });
 });
 
 server.listen(PORT, "0.0.0.0", () => console.log(`BPL ONLINE | PORT: ${PORT}`));
-
