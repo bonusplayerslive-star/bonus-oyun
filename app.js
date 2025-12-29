@@ -69,7 +69,7 @@ app.post('/register', async (req, res) => {
             nickname,
             email,
             password,
-            bpl: 1000, // Yeni gelen kumandana hoş geldin hediyesi
+            bpl: 2500, // Yeni gelen kumandana hoş geldin hediyesi
             inventory: []
         });
 
@@ -197,4 +197,5 @@ server.listen(PORT, "0.0.0.0", () => {
     =========================================
     `);
 });
+
 
