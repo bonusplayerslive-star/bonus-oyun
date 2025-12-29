@@ -5,52 +5,61 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>BPL PROFİL | <%= user.nickname %></title>
     <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+    <link href="https://fonts.googleapis.com/css2?family=Orbitron:wght@400;700&family=Rajdhani:wght@300;500;700&display=swap" rel="stylesheet">
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css">
     <style>
-        :root { --neon-green: #39FF14; --dark-bg: #0a0a0a; }
-        body { background: var(--dark-bg); color: white; font-family: 'Rajdhani', sans-serif; }
+        :root { --neon-green: #39FF14; --dark-bg: #050505; --glass: rgba(0, 0, 0, 0.85); }
+        body { background: var(--dark-bg); color: white; font-family: 'Rajdhani', sans-serif; overflow-x: hidden; }
         
-        .header-section { 
-            background: linear-gradient(45deg, #000, #111); 
-            border-bottom: 2px solid var(--neon-green);
-            padding: 20px 0; 
-            margin-bottom: 30px;
+        /* Arkaplan Süsü */
+        body::before {
+            content: ""; position: fixed; top: 0; left: 0; width: 100%; height: 100%;
+            background: url('/caracter/page/welcome.jpg') no-repeat center center fixed;
+            background-size: cover; opacity: 0.2; z-index: -1;
         }
-        .logo-img { height: 60px; filter: drop-shadow(0 0 5px var(--neon-green)); }
+
+        .header-section { 
+            background: rgba(0,0,0,0.9); border-bottom: 2px solid var(--neon-green);
+            padding: 15px 0; margin-bottom: 30px; backdrop-filter: blur(10px);
+        }
+        .logo-img { height: 50px; filter: drop-shadow(0 0 5px var(--neon-green)); }
+        
+        .glass-panel {
+            background: var(--glass); border: 1px solid rgba(57, 255, 20, 0.2);
+            border-radius: 15px; padding: 20px; height: 100%;
+        }
         
         .stat-card {
-            background: rgba(255,255,255,0.05);
-            border: 1px solid #333;
-            border-radius: 15px;
-            padding: 20px;
-            transition: 0.3s;
+            background: rgba(255,255,255,0.03); border: 1px solid rgba(255,255,255,0.1);
+            border-radius: 12px; padding: 15px; transition: 0.3s; margin-bottom: 20px;
         }
-        .stat-card:hover { border-color: var(--neon-green); transform: translateY(-5px); }
+        .stat-card:hover { border-color: var(--neon-green); transform: translateY(-3px); }
         
         .inventory-img { 
-            width: 100%; 
-            aspect-ratio: 1/1; 
-            object-fit: cover; 
-            border-radius: 10px; 
-            border: 1px solid #444;
+            width: 100%; aspect-ratio: 1/1; object-fit: cover; 
+            border-radius: 10px; border: 2px solid #333; margin-bottom: 10px;
         }
         
-        .bpl-badge { color: var(--neon-green); font-weight: bold; font-size: 1.2rem; }
-        .limit-alert { font-size: 0.8rem; color: #ff4444; border: 1px solid #ff4444; padding: 5px; border-radius: 5px; }
+        .bpl-badge { color: var(--neon-green); font-family: 'Orbitron'; font-weight: bold; font-size: 1.3rem; }
+        .limit-alert { font-size: 0.75rem; color: #ff4444; border: 1px solid #ff4444; padding: 3px 8px; border-radius: 4px; font-family: 'Orbitron'; }
         
-        .nav-btn { width: 100%; margin-bottom: 10px; text-transform: uppercase; font-weight: bold; }
+        .nav-btn { width: 100%; margin-bottom: 12px; font-weight: bold; font-family: 'Orbitron'; font-size: 0.8rem; letter-spacing: 1px; }
         .btn-meeting { border: 2px solid #ffc107; color: #ffc107; }
-        .btn-meeting:hover { background: #ffc107; color: #000; }
+        .btn-meeting:hover { background: #ffc107; color: #000; box-shadow: 0 0 10px #ffc107; }
+
+        .animal-stats { font-size: 0.8rem; color: #aaa; text-align: left; background: rgba(0,0,0,0.3); padding: 8px; border-radius: 5px; }
+        .stat-line { display: flex; justify-content: space-between; margin-bottom: 2px; }
+        .stat-val { color: var(--neon-green); font-weight: bold; }
     </style>
 </head>
 <body>
 
     <div class="header-section">
         <div class="container d-flex justify-content-between align-items-center">
-            <img src="/caracter/logo/logo.jpeg" alt="BPL LOGO" class="logo-img" onerror="this.src='/caracter/page/logo.jpeg'">
+            <a href="/profil"><img src="/caracter/page/logo.jpeg" alt="BPL LOGO" class="logo-img"></a>
             <div class="text-end">
-                <h4 class="mb-0 text-neon"><%= user.nickname %></h4>
-                <span class="bpl-badge"><%= user.bpl.toLocaleString() %> BPL</span>
+                <h5 class="mb-0" style="color: var(--neon-green); font-family: 'Orbitron';"><%= user.nickname %></h5>
+                <span class="bpl-badge"><i class="fas fa-coins me-1"></i><%= user.bpl.toLocaleString() %> BPL</span>
             </div>
         </div>
     </div>
@@ -58,55 +67,61 @@
     <div class="container">
         <div class="row">
             <div class="col-md-3 mb-4">
-                <div class="stat-card">
-                    <h5 class="text-muted border-bottom pb-2 mb-3">MENÜ</h5>
-                    <a href="/market" class="btn btn-outline-success nav-btn"><i class="fas fa-shopping-cart"></i> MARKET</a>
-<a href="/development" class="btn btn-outline-warning w-100 mb-2">
-    <i class="fas fa-tools"></i> GELİŞTİRME MERKEZİ
-</a>
-                    <a href="/arena" class="btn btn-outline-danger nav-btn"><i class="fas fa-swords"></i> ARENA</a>
-                    <a href="/chat" class="btn btn-outline-info nav-btn"><i class="fas fa-comments"></i> GLOBAL CHAT</a>
+                <div class="glass-panel">
+                    <h6 class="text-muted border-bottom border-secondary pb-2 mb-3 font-orbitron">COMMAND CENTER</h6>
+                    <a href="/market" class="btn btn-outline-success nav-btn"><i class="fas fa-shopping-cart me-2"></i>MARKET</a>
+                    <a href="/development" class="btn btn-outline-warning nav-btn"><i class="fas fa-tools me-2"></i>GELİŞTİRME</a>
+                    <a href="/arena" class="btn btn-outline-danger nav-btn"><i class="fas fa-crosshairs me-2"></i>ARENA (BATTLE)</a>
+                    <a href="/chat" class="btn btn-outline-info nav-btn"><i class="fas fa-comments me-2"></i>GLOBAL CHAT</a>
                     
-                    <form action="/create-meeting" method="POST" style="width: 100%;">
+                    <form action="/create-meeting" method="POST">
                         <button type="submit" class="btn btn-meeting nav-btn">
-                            <i class="fas fa-video"></i> BEŞGEN MASA (50 BPL)
+                            <i class="fas fa-video me-2"></i>BEŞGEN MASA (50 BPL)
                         </button>
                     </form>
 
-                    <a href="/wallet" class="btn btn-light nav-btn"><i class="fas fa-wallet"></i> WALLET (CÜZDAN)</a>
-                    <hr>
-                    <a href="/" class="btn btn-dark nav-btn text-danger">ÇIKIŞ YAP</a>
+                    <a href="/wallet" class="btn btn-outline-light nav-btn"><i class="fas fa-wallet me-2"></i>WALLET (CÜZDAN)</a>
+                    <hr class="border-secondary">
+                    <a href="/logout" class="btn btn-dark nav-btn text-danger border-danger"><i class="fas fa-power-off me-2"></i>SİSTEMDEN ÇIK</a>
                 </div>
             </div>
 
             <div class="col-md-9">
-                <div class="d-flex justify-content-between align-items-center mb-3">
-                    <h3>ENVANTER (ASSETS)</h3>
-                    <% if(user.inventory.length >= 3) { %>
-                        <span class="limit-alert">ÇANTA DOLU (MAX 3)</span>
-                    <% } else { %>
-                        <span class="text-muted">Kapasite: <%= user.inventory.length %>/3</span>
-                    <% } %>
-                </div>
+                <div class="glass-panel">
+                    <div class="d-flex justify-content-between align-items-center mb-4">
+                        <h4 class="font-orbitron mb-0"><i class="fas fa-boxes me-2"></i>ENVANTER (ASSETS)</h4>
+                        <% if(user.inventory.length >= 3) { %>
+                            <span class="limit-alert animate__animated animate__flash animate__infinite">KAPASİTE DOLU (3/3)</span>
+                        <% } else { %>
+                            <span class="text-muted small">Slot: <%= user.inventory.length %> / 3</span>
+                        <% } %>
+                    </div>
 
-                <div class="row">
-                    <% if(user.inventory.length === 0) { %>
-                        <div class="col-12 text-center p-5 border border-dashed text-muted">
-                            Henüz bir hayvanınız yok. Marketten hemen bir tane edinin!
-                        </div>
-                    <% } else { %>
-                        <% user.inventory.forEach(item => { %>
-                            <div class="col-md-4 mb-4">
-                                <div class="stat-card text-center">
-                                    <img src="/caracter/profile/<%= item.toLowerCase() %>.jpg" 
-                                         onerror="this.src='/caracter/page/logo.jpeg'" 
-                                         class="inventory-img mb-3">
-                                    <h5 class="text-uppercase"><%= item %></h5>
-                                    <a href="/arena?animal=<%= item %>" class="btn btn-sm btn-danger w-100">SAVAŞA GİT</a>
-                                </div>
+                    <div class="row">
+                        <% if(!user.inventory || user.inventory.length === 0) { %>
+                            <div class="col-12 text-center p-5 border border-secondary border-dashed rounded text-muted">
+                                <i class="fas fa-ghost fa-3x mb-3"></i><br>
+                                Envanterin boş kumandan! Ordunu kurmak için markete uğra.
                             </div>
-                        <% }) %>
-                    <% } %>
+                        <% } else { %>
+                            <% user.inventory.forEach((item, index) => { %>
+                                <div class="col-md-4">
+                                    <div class="stat-card text-center">
+                                        <img src="<%= item.img %>" onerror="this.src='/caracter/page/logo.jpeg'" class="inventory-img">
+                                        <h6 class="text-uppercase mb-2 font-orbitron text-info"><%= item.name %></h6>
+                                        
+                                        <div class="animal-stats mb-3">
+                                            <div class="stat-line"><span>LEVEL:</span> <span class="stat-val"><%= item.level %></span></div>
+                                            <div class="stat-line"><span>SAĞLIK (HP):</span> <span class="stat-val"><%= item.stats.hp %></span></div>
+                                            <div class="stat-line"><span>SALDIRI (ATK):</span> <span class="stat-val"><%= item.stats.atk %></span></div>
+                                        </div>
+
+                                        <a href="/arena?animalIndex=<%= index %>" class="btn btn-sm btn-danger w-100 font-orbitron">SAVAŞA GÖNDER</a>
+                                    </div>
+                                </div>
+                            <% }) %>
+                        <% } %>
+                    </div>
                 </div>
             </div>
         </div>
@@ -115,25 +130,13 @@
     <script src="/socket.io/socket.io.js"></script>
     <script>
         const socket = io();
-        
-        // Kayıt ve Online Takibi
-        socket.emit('register-user', { 
-            id: "<%= user._id %>", 
-            nickname: "<%= user.nickname %>" 
-        });
+        socket.emit('register-user', { id: "<%= user._id %>", nickname: "<%= user.nickname %>" });
 
-        // Arena Daveti Yakalama
         socket.on('challenge-received', (data) => {
             if(confirm(data.challenger + " seni Arena'ya davet ediyor! Kabul ediyor musun?")) {
                 window.location.href = '/arena';
             }
         });
-
-        // Globalden gelen Beşgen Masa davetleri için
-        socket.on('receive-meeting-invite', (data) => {
-            console.log("Masa daveti geldi:", data);
-        });
     </script>
 </body>
 </html>
-
