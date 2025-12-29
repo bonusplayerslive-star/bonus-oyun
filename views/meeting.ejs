@@ -78,6 +78,40 @@
         <button class="control-btn" onclick="toggleCam()"><i class="fas fa-video" id="cam-icon"></i></button>
         <button class="control-btn btn-end" onclick="location.href='/profil'"><i class="fas fa-phone-slash"></i></button>
     </div>
+<div id="video-grid" class="d-flex flex-wrap justify-content-center align-items-center" style="min-height: 70vh;">
+    </div>
+
+<style>
+    #video-grid video {
+        width: 250px; /* Beşgen masa hissi için orta boy */
+        height: 180px;
+        margin: 15px;
+        border: 3px solid #39FF14;
+        border-radius: 20px;
+        object-fit: cover;
+        cursor: pointer;
+        transition: transform 0.3s ease;
+    }
+    /* Tek tıkla ekranı kaplayan sınıf */
+    .zoomed-video {
+        position: fixed;
+        top: 0; left: 0;
+        width: 100vw !important;
+        height: 100vh !important;
+        z-index: 9999;
+        border: none !important;
+        border-radius: 0 !important;
+    }
+</style>
+
+<script>
+    // İstediğin kullanıcıya tık yaptığında ekranı kaplaması için:
+    document.getElementById('video-grid').addEventListener('click', (e) => {
+        if(e.target.tagName === 'VIDEO') {
+            e.target.classList.toggle('zoomed-video');
+        }
+    });
+</script>
 
     <script src="/socket.io/socket.io.js"></script>
     <script>
@@ -158,3 +192,4 @@
     </script>
 </body>
 </html>
+
