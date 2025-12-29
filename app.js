@@ -61,6 +61,22 @@ app.get('/chat', checkAuth, async (req, res) => {
     const user = await User.findById(req.session.userId);
     res.render('chat', { user });
 });
+app.get('/wallet', checkAuth, async (req, res) => {
+    const user = await User.findById(req.session.userId);
+    res.render('wallet', { user });
+});
+
+app.get('/payment', checkAuth, async (req, res) => {
+    const user = await User.findById(req.session.userId);
+    res.render('payment', { user });
+});
+
+app.get('/meeting', checkAuth, async (req, res) => {
+    const user = await User.findById(req.session.userId);
+    // Oda ID yoksa rastgele bir oda ID'si oluştur (örn: global-room)
+    const roomId = req.query.room || "BPL-CENTRAL"; 
+    res.render('meeting', { user, roomId });
+});
 
 // --- POST ROTALARI (SAVAŞ & MARKET) ---
 app.post('/login', async (req, res) => {
@@ -213,6 +229,45 @@ app.post('/verify-payment', checkAuth, async (req, res) => {
     }
 });
 
+
+let onlineUsers = {}; // Nickname -> SocketID eşleşmesi
+
+io.on('connection', (socket) => {
+    
+    // Kullanıcı bağlandığında kendini tanıtır
+    socket.on('register-user', (data) => {
+        socket.nickname = data.nickname;
+        onlineUsers[data.nickname] = socket.id;
+        io.emit('update-online-players', onlineUsers);
+    });
+
+    // Chat Mesajları
+    socket.on('chat-message', (data) => {
+        io.emit('new-message', data);
+    });
+
+    // Savaş Daveti (Özel Mesaj)
+    socket.on('challenge-player', (data) => {
+        const targetSocketId = onlineUsers[data.targetNickname];
+        if (targetSocketId) {
+            io.to(targetSocketId).emit('challenge-received', { 
+                challenger: data.challenger 
+            });
+        }
+    });
+
+    // Bağlantı kesildiğinde listeden çıkar
+    socket.on('disconnect', () => {
+        if (socket.nickname) {
+            delete onlineUsers[socket.nickname];
+            io.emit('update-online-players', onlineUsers);
+        }
+    });
+});
+
+
+
+
 app.post('/verify-payment', checkAuth, async (req, res) => {
     try {
         const { txid, usd, bpl } = req.body;
@@ -233,6 +288,7 @@ app.post('/verify-payment', checkAuth, async (req, res) => {
         // İşlem başarılı mı? (status 0x1 başarı demektir)
         if (receipt.status !== "0x1") return res.json({ status: 'error', msg: 'Bu işlem başarısız (failed) olarak görünüyor.' });
 
+       
         /* GÜVENLİK NOTU: 
            Burada receipt.logs içerisinden 'to' adresinin senin WALLET_ADDRESS olup olmadığı 
            ve 'value' miktarının usd ile eşleştiği doğrulanabilir. 
@@ -271,5 +327,6 @@ app.post('/verify-payment', checkAuth, async (req, res) => {
 
 
 server.listen(PORT, "0.0.0.0", () => console.log(`BPL CALISIYOR: ${PORT}`));
+
 
 
