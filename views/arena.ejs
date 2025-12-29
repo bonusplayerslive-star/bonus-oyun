@@ -2,42 +2,129 @@
 <html lang="tr">
 <head>
     <meta charset="UTF-8">
-    <title>BPL ARENA</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>BPL ARENA | Canlı Savaş</title>
     <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
     <script src="/socket.io/socket.io.js"></script>
     <style>
-        body { background: #000; color: #39FF14; font-family: monospace; }
-        .opponent-card { border: 1px solid #39FF14; padding: 15px; border-radius: 10px; margin-bottom: 10px; display: flex; justify-content: space-between; }
-        .header { color: #FFFF00; text-align: center; margin-bottom: 30px; }
+        body { background: #000; color: #39FF14; font-family: 'Courier New', Courier, monospace; overflow-x: hidden; }
+        .header { color: #FFFF00; text-align: center; margin-top: 30px; text-shadow: 0 0 10px rgba(255, 255, 0, 0.5); }
+        .opponent-card { 
+            border: 1px solid #39FF14; padding: 15px; border-radius: 10px; 
+            margin-bottom: 15px; display: flex; justify-content: space-between; 
+            align-items: center; background: rgba(57, 255, 20, 0.05);
+            transition: 0.3s;
+        }
+        .opponent-card:hover { box-shadow: 0 0 15px rgba(57, 255, 20, 0.3); }
+        
+        /* Video Katmanı - Animasyonlar Burada Oynayacak */
+        #video-overlay { 
+            display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; 
+            background: rgba(0,0,0,0.95); z-index: 9999; justify-content: center; 
+            align-items: center; flex-direction: column;
+        }
+        video { 
+            width: 90%; max-width: 900px; border: 3px solid #39FF14; 
+            box-shadow: 0 0 30px #39FF14; border-radius: 15px;
+        }
+        .status-msg { font-size: 24px; font-weight: bold; margin-bottom: 20px; color: #fff; text-transform: uppercase; }
+        
+        #timer { color: #FF0000; font-weight: bold; }
+        .btn-battle { font-weight: bold; padding: 10px 20px; text-transform: uppercase; }
     </style>
 </head>
 <body>
-    <div class="container py-5" style="max-width: 600px;">
+
+    <div id="video-overlay">
+        <div id="battle-status-text" class="status-msg">SAVAŞ BAŞLADI...</div>
+        <video id="arena-video" playsinline></video>
+    </div>
+
+    <div class="container py-4" style="max-width: 700px;">
         <h1 class="header">ARENA - CANLI RAKİPLER</h1>
-        <div id="status" class="text-center mb-4">Rakip aranıyor... <span id="timer">18</span>s</div>
+        <div id="search-status" class="text-center my-4">
+            <span id="status-text">Rakip aranıyor...</span> <span id="timer">18</span>s
+        </div>
         
         <div id="player-list"></div>
 
         <div id="bot-card" style="display:none;" class="opponent-card border-warning text-warning">
-            <span><b>ELITE BOT #001</b></span>
-            <button class="btn btn-warning btn-sm" onclick="attackBot()">BOTLA SAVAŞ</button>
+            <div>
+                <span style="font-size: 1.2rem;"><b>ELITE BOT #001</b></span><br>
+                <small>Zorluk: Orta</small>
+            </div>
+            <button class="btn btn-warning btn-battle" onclick="startBotBattle()">BOTLA SAVAŞ</button>
         </div>
 
-        <a href="/profil" class="btn btn-outline-danger w-100 mt-4">ARENADAN ÇIK</a>
+        <div class="mt-5">
+            <a href="/profil" class="btn btn-outline-danger w-100">ARENADAN ÇIK</a>
+        </div>
     </div>
 
     <script>
         const socket = io();
-        let timeLeft = 18;
-        
-        socket.emit('join-arena', { id: "<%= user._id %>", nickname: "<%= user.nickname %>" });
+        const userId = "<%= user._id %>";
+        const nickname = "<%= user.nickname %>";
+        const selectedAnimal = "<%= selectedAnimal %>"; // URL'den gelen ?animal=...
 
-        const timer = setInterval(() => {
+        const overlay = document.getElementById('video-overlay');
+        const videoPlayer = document.getElementById('arena-video');
+        const statusMsg = document.getElementById('battle-status-text');
+
+        // Savaş Başlatma Fonksiyonu
+        async function startBotBattle() {
+            try {
+                // Sunucuya istek at (Hayvan ismini query olarak yolla)
+                const response = await fetch(`/attack-bot?animal=${selectedAnimal}`, { method: 'POST' });
+                const data = await response.json();
+
+                if(data.status === 'success') {
+                    // 1. Ekranı Karart ve İlk Videoyu (Saldırı) Oynat
+                    overlay.style.display = 'flex';
+                    videoPlayer.src = data.animation.actionVideo; // Örn: /caracter/move/Bear/Bear1.mp4
+                    statusMsg.innerText = "SALDIRI HAMLESİ YAPILIYOR!";
+                    videoPlayer.play();
+
+                    // 2. İlk video bittiğinde
+                    videoPlayer.onended = () => {
+                        if(data.animation.isWin) {
+                            // Kazandıysa ikinci videoyu (Kükreme/Galibiyet) oynat
+                            statusMsg.innerHTML = `<span style="color:#39FF14">KAZANDIN! +${data.reward} BPL</span>`;
+                            videoPlayer.src = data.animation.winVideo; // Örn: /caracter/move/Bear/Bear.mp4
+                            videoPlayer.play();
+                            
+                            // İkinci video da bitince profile yönlendir
+                            videoPlayer.onended = () => {
+                                setTimeout(() => { location.href = '/profil'; }, 1000);
+                            };
+                        } else {
+                            // Kaybederse
+                            statusMsg.innerHTML = `<span style="color:#FF0000">KAYBETTİN!</span>`;
+                            setTimeout(() => { location.href = '/profil'; }, 3000);
+                        }
+                    };
+                } else {
+                    alert(data.msg || "Savaş hatası!");
+                }
+            } catch (err) {
+                console.error(err);
+                alert("Bağlantı hatası!");
+            }
+        }
+
+        // --- Arena Mantığı ve Socket İşlemleri ---
+        socket.emit('join-arena', { id: userId, nickname: nickname });
+
+        let timeLeft = 18;
+        const countdown = setInterval(() => {
             timeLeft--;
-            document.getElementById('timer').innerText = timeLeft;
+            const timerEl = document.getElementById('timer');
+            if(timerEl) timerEl.innerText = timeLeft;
+
             if(timeLeft <= 0) {
-                clearInterval(timer);
-                document.getElementById('status').innerText = "RAKİP BULUNAMADI - BOT AKTİF";
+                clearInterval(countdown);
+                document.getElementById('status-text').innerText = "RAKİP BULUNAMADI - BOT AKTİF";
+                document.getElementById('timer').style.display = 'none';
                 document.getElementById('bot-card').style.display = 'flex';
             }
         }, 1000);
@@ -46,18 +133,15 @@
             const list = document.getElementById('player-list');
             list.innerHTML = '';
             players.forEach(p => {
-                if(p.id !== "<%= user._id %>") {
-                    list.innerHTML += `<div class="opponent-card"><span>${p.nickname}</span><button class="btn btn-success btn-sm">MEYDAN OKU</button></div>`;
+                if(p.id !== userId) {
+                    list.innerHTML += `
+                        <div class="opponent-card">
+                            <span><b>${p.nickname}</b></span>
+                            <button class="btn btn-success btn-sm btn-battle">MEYDAN OKU</button>
+                        </div>`;
                 }
             });
         });
-
-        async function attackBot() {
-            const res = await fetch('/attack-bot', { method: 'POST' });
-            const data = await res.json();
-            alert(`Savaş Sonucu: ${data.winner}\nÖdül: ${data.reward} BPL`);
-            location.href = '/profil';
-        }
     </script>
 </body>
 </html>
