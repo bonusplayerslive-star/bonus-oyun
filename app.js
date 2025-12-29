@@ -64,7 +64,7 @@ app.post('/register', async (req, res) => {
             return res.send('<script>alert("Bu e-posta zaten kayıtlı!"); window.location.href="/";</script>');
         }
 
-        // 2. Yeni kullanıcıyı oluştur (Başlangıç parası: 1000 BPL)
+        // 2. Yeni kullanıcıyı oluştur (Başlangıç parası: 2500 BPL)
         const newUser = new User({
             nickname,
             email,
@@ -87,6 +87,40 @@ app.post('/register', async (req, res) => {
     } catch (err) {
         console.error("Kayıt Hatası:", err);
         res.status(500).send("Kayıt sırasında bir sunucu hatası oluştu.");
+    }
+});
+
+
+// --- HAYVAN GELİŞTİRME (UPGRADE) ---
+app.post('/upgrade-animal', checkAuth, async (req, res) => {
+    const { animalIndex } = req.body;
+    const upgradeCost = 500; // Her geliştirme 500 BPL olsun
+
+    try {
+        const user = await User.findById(req.session.userId);
+        const animal = user.inventory[animalIndex];
+
+        if (user.bpl < upgradeCost) {
+            return res.json({ status: 'error', msg: 'Yetersiz BPL bakiyesi!' });
+        }
+
+        // İstatistikleri Ateşliyoruz
+        animal.level += 1;
+        animal.stats.hp += 20;  // Her seviyede +20 Can
+        animal.stats.atk += 10; // Her seviyede +10 Saldırı
+
+        user.bpl -= upgradeCost;
+        user.markModified('inventory'); // MongoDB'ye envanterin değiştiğini haber ver
+        await user.save();
+
+        res.json({ 
+            status: 'success', 
+            msg: `${animal.name} seviye atladı! Yeni Seviye: ${animal.level}`,
+            newBpl: user.bpl 
+        });
+
+    } catch (err) {
+        res.status(500).json({ status: 'error', msg: 'Geliştirme başarısız.' });
     }
 });
 
@@ -197,5 +231,6 @@ server.listen(PORT, "0.0.0.0", () => {
     =========================================
     `);
 });
+
 
 
