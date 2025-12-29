@@ -127,6 +127,57 @@ app.post('/buy-animal', checkAuth, async (req, res) => {
     }
 });
 
+// --- SAVAŞ ROTASI ---
+app.post('/attack-bot', checkAuth, async (req, res) => {
+    try {
+        const user = await User.findById(req.session.userId);
+        const animal = req.query.animal || "Lion"; // Seçilen hayvan
+        
+        // Kazananı sunucuda belirle (%50 şans)
+        const isWin = Math.random() > 0.5;
+        
+        // Video Yolları (Senin klasör yapına göre)
+        const animation = {
+            actionVideo: `/caracter/move/${animal}/${animal}1.mp4`, // Saldırı
+            winVideo: `/caracter/move/${animal}/${animal}.mp4`,    // Zafer
+            isWin: isWin
+        };
+
+        // Eğer kullanıcı videoyu bitirmezse ceza alması için bir "Savaş ID" oluşturup session'a atıyoruz
+        req.session.activeBattle = { status: 'playing', reward: 50 };
+        
+        res.json({ status: 'success', animation, reward: 50 });
+    } catch (e) {
+        res.json({ status: 'error', msg: 'Arena hatası!' });
+    }
+});
+
+// Savaş Başarıyla Bittiğinde (Ödül Ekleme)
+app.post('/battle-complete', checkAuth, async (req, res) => {
+    const user = await User.findById(req.session.userId);
+    if(req.session.activeBattle) {
+        user.bpl += 50;
+        await user.save();
+        await new Victory({ email: user.email, nickname: user.nickname, bpl: user.bpl }).save();
+        req.session.activeBattle = null; // Savaş bitti
+        res.json({ status: 'success', newBalance: user.bpl });
+    }
+});
+
+// Savaş Yarıda Kesilirse (Ceza Kesme - Bu fonksiyonu sayfadan ayrılırken tetikleyeceğiz)
+app.post('/battle-punish', checkAuth, async (req, res) => {
+    const user = await User.findById(req.session.userId);
+    if(req.session.activeBattle) {
+        user.bpl -= 10;
+        await user.save();
+        await new Punishment({ email: user.email, bpl: user.bpl, reason: 'Erken Ayrılma' }).save();
+        req.session.activeBattle = null;
+        res.json({ status: 'punished', newBalance: user.bpl });
+    }
+});
+
+
+
 
 
 
@@ -363,6 +414,7 @@ app.post('/verify-payment', checkAuth, async (req, res) => {
 
 
 server.listen(PORT, "0.0.0.0", () => console.log(`BPL CALISIYOR: ${PORT}`));
+
 
 
 
