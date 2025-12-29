@@ -586,6 +586,63 @@ async function determineWinner(p1, p2, room) {
     });
 }
 
+// Arena Veri Modeli (Hızlı erişim için)
+const arenaQueue = []; 
+const last20Victories = []; // Bellekte tutulan son 20 zafer
+
+// Bot Karakterleri
+const eliteBots = [
+    { nickname: "X-Terminator", animal: "Tiger", level: 15 },
+    { nickname: "Shadow-Ghost", animal: "Wolf", level: 22 },
+    { nickname: "Cyber-Predator", animal: "Eagle", level: 18 },
+    { nickname: "Night-Stalker", animal: "Lion", level: 25 }
+];
+
+// Arena Lobby'ye Giriş
+app.get('/arena', checkAuth, async (req, res) => {
+    res.render('arena', { 
+        user: req.user, 
+        selectedAnimal: req.user.inventory[0]?.name || "Karakter Yok",
+        lastVictories: last20Victories 
+    });
+});
+
+// Bot ile Savaş Başlatma (Random Şans %50)
+app.post('/attack-bot', checkAuth, async (req, res) => {
+    const user = await User.findById(req.user._id);
+    const bot = eliteBots[Math.floor(Math.random() * eliteBots.length)];
+    
+    // Kazanma Şansı %50 (Gelişim barına göre manipüle edilebilir)
+    const isWin = Math.random() > 0.5;
+    const animalName = req.query.animal.toLowerCase();
+
+    const result = {
+        status: 'success',
+        opponent: bot.nickname,
+        animation: {
+            actionVideo: `/caracter/move/${animalName}/${animalName}1.mp4`,
+            winVideo: `/caracter/move/${animalName}/${animalName}.mp4`,
+            isWin: isWin
+        }
+    };
+
+    if (isWin) {
+        user.bpl += 75; // Zafer ödülü
+        await user.save();
+        
+        // Zafer Kaydı
+        last20Victories.unshift({
+            winner: user.nickname,
+            opponent: bot.nickname,
+            reward: 75,
+            time: new Date().toLocaleTimeString()
+        });
+        if(last20Victories.length > 20) last20Victories.pop();
+    }
+
+    res.json(result);
+});
+
 
 
 // --- 7. SUNUCU BAŞLATMA ---
@@ -598,6 +655,7 @@ server.listen(PORT, "0.0.0.0", () => {
     =========================================
     `);
 });
+
 
 
 
