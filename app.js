@@ -330,12 +330,13 @@ let onlineUsers = {};
         if (socket.nickname) delete onlineUsers[socket.nickname];
         io.emit('update-online-players', Object.keys(onlineUsers).length);
     });
-});
+
 
 // --- SERVER START ---
 server.listen(PORT, "0.0.0.0", () => {
     console.log(`BPL SERVER RUNNING ON PORT ${PORT}`);
 });
+
 
 
 
