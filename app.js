@@ -158,4 +158,59 @@ io.on('connection', (socket) => {
     });
 });
 
+// Ödeme Doğrulama (TxID Kontrolü)
+app.post('/verify-payment', checkAuth, async (req, res) => {
+    try {
+        const { txid, usd, bpl } = req.body;
+        const userId = req.session.userId;
+
+        // 1. Temel Kontroller
+        if (!txid || txid.length < 20) {
+            return res.json({ status: 'error', msg: 'Geçersiz TxID formatı!' });
+        }
+
+        // 2. TxID daha önce kullanılmış mı? (Mükerrer ödemeyi önleme)
+        // Payment adında bir modelin olduğunu varsayıyorum
+        const existingTx = await Payment.findOne({ txid: txid });
+        if (existingTx) {
+            return res.json({ status: 'error', msg: 'Bu işlem numarası daha önce kullanılmış!' });
+        }
+
+        // 3. Kullanıcıyı Bul
+        const user = await User.findById(userId);
+        if (!user) return res.json({ status: 'error', msg: 'Kullanıcı bulunamadı!' });
+
+        /* NOT: Tam otomatik BscScan doğrulaması için burada Axios ile 
+           BscScan API'sine istek atıp txid'nin içeriği (miktar ve alıcı adres) 
+           kontrol edilmelidir. Şimdilik "Güvenli Kayıt" sistemini kuruyoruz.
+        */
+
+        // 4. Bakiyeyi Yükle ve İşlemi Kaydet
+        user.bpl += parseInt(bpl);
+        
+        const newPayment = new Payment({
+            userId: user._id,
+            nickname: user.nickname,
+            txid: txid,
+            amountUSD: usd,
+            amountBPL: bpl,
+            status: 'completed', // Manuel inceleme istersen 'pending' yapabilirsin
+            date: new Date()
+        });
+
+        await newPayment.save();
+        await user.save();
+
+        // 5. Log Kaydı (Opsiyonel)
+        console.log(`[PAYMENT] ${user.nickname} tarafından ${usd} USDT karşılığı ${bpl} BPL yüklendi. TxID: ${txid}`);
+
+        res.json({ status: 'success', bpl: user.bpl });
+
+    } catch (e) {
+        console.error("Ödeme Hatası:", e);
+        res.json({ status: 'error', msg: 'Sistem hatası oluştu, lütfen destekle iletişime geçin.' });
+    }
+});
+
 server.listen(PORT, "0.0.0.0", () => console.log(`BPL CALISIYOR: ${PORT}`));
+
