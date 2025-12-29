@@ -487,7 +487,81 @@ app.post('/verify-payment', async (req, res) => {
 
 
 
+// Oda ve Savaş Limitleri
+const MEETING_FEE = 50;
+const MIN_GIFT_BALANCE = 3500;
+const REQ_GIFT_LIMIT = 5000;
 
+// Meeting Odası Açma ve Davet
+app.post('/open-special-room', checkAuth, async (req, res) => {
+    const user = await User.findById(req.body.userId);
+    if (user.bpl < MEETING_FEE) return res.json({ status: 'error', msg: 'Yetersiz BPL!' });
+
+    user.bpl -= MEETING_FEE;
+    const roomId = "VIP-" + Math.random().toString(36).substring(7).toUpperCase();
+    await user.save();
+
+    // Global Chat'e Şehvetli Bildiri
+    io.emit('new-message', {
+        sender: "SYSTEM",
+        text: `🔥 <b style="color:#ff003c">${user.nickname}</b> karanlık odayı açtı! Davetliler yola çıktı...`,
+        isSystem: true
+    });
+
+    res.json({ status: 'success', roomId });
+});
+
+// Socket.io Hediye ve Savaş Dinamiği
+io.on('connection', (socket) => {
+    socket.on('send-gift-vip', async (data) => {
+        const { senderId, targetNick, amount, tax } = data;
+        const sender = await User.findById(senderId);
+        const target = await User.findOne({ nickname: targetNick });
+
+        if (sender.bpl < REQ_GIFT_LIMIT) return socket.emit('err', 'Hediye için 5000 BPL üstü bakiye lazım!');
+        if (sender.bpl - amount < MIN_GIFT_BALANCE) return socket.emit('err', 'Limit altına düşemezsin!');
+
+        const netAmount = amount * (1 - (tax / 100));
+        sender.bpl -= amount;
+        target.bpl += netAmount;
+
+        await sender.save();
+        await target.save();
+        
+        io.to(data.room).emit('gift-alert', { msg: `${sender.nickname} 🔥 ${targetNick} kullanıcısına şehvetli bir ikramda bulundu!` });
+    });
+
+    // VIP Arena (8 Saniyelik Video Sınıfı)
+    socket.on('start-vip-battle', async ({ room, p1, p2 }) => {
+        // 5 sn geri sayım başlat
+        let count = 5;
+        const timer = setInterval(() => {
+            io.to(room).emit('battle-countdown', count);
+            if (count <= 0) {
+                clearInterval(timer);
+                determineWinner(p1, p2, room);
+            }
+            count--;
+        }, 1000);
+    });
+});
+
+async function determineWinner(p1, p2, room) {
+    // Burada p1 ve p2'nin HP/ATK değerlerine göre kazananı belirle
+    const winner = Math.random() > 0.5 ? p1 : p2; 
+    const loser = winner === p1 ? p2 : p1;
+
+    const winUser = await User.findOne({nickname: winner});
+    winUser.bpl += 75; // Kazanan bonusu
+    await winUser.save();
+
+    io.to(room).emit('battle-video-play', {
+        winner,
+        loser,
+        video: `/caracter/move/${winUser.inventory[0].name.toLowerCase()}/${winUser.inventory[0].name.toLowerCase()}.mp4`,
+        moveVideo: `/caracter/move/${winUser.inventory[0].name.toLowerCase()}/${winUser.inventory[0].name.toLowerCase()}1.mp4`
+    });
+}
 
 
 
@@ -501,6 +575,7 @@ server.listen(PORT, "0.0.0.0", () => {
     =========================================
     `);
 });
+
 
 
 
