@@ -49,35 +49,37 @@
         <p class="text-muted">Envanter: <span class="<%= user.inventory.length >= 3 ? 'text-danger' : 'text-success' %>"><%= user.inventory.length %> / 3</span></p>
     </div>
 
-    <div class="row g-4">
-        <% animals.forEach(animal => { %>
-            <div class="col-md-3 col-sm-6">
-                <div class="animal-card">
-                    <div class="rarity-tag <%= animal.price >= 5000 ? 'legendary' : 'wild' %>">
-                        <%= animal.price >= 5000 ? 'EFSANEVİ' : 'VAHŞİ' %>
-                    </div>
-                    <div class="card-img-wrapper">
-                        <img src="<%= animal.img %>" class="animal-img" onerror="this.src='/caracter/profile/Bear.jpg'">
-                    </div>
-                    <div class="p-3">
-                        <h5 class="text-center fw-bold"><%= animal.name %></h5>
-                        <p class="text-center text-warning fw-bold mb-3"><%= animal.price %> BPL</p>
-                        
-                        <% 
-                           // Envanterde olup olmadığını kontrol et
-                           const isOwned = user.inventory.some(i => i.name === animal.name);
-                        %>
+<div class="row g-4">
+    <% animals.forEach(animal => { %>
+        <div class="col-md-3">
+            <div class="animal-card">
+                <div class="rarity-tag <%= animal.price === 5000 ? 'legendary' : 'wild' %>">
+                    <%= animal.price === 5000 ? 'PREMIUM' : 'NORMAL' %>
+                </div>
+                
+                <div class="card-img-wrapper">
+                    <img src="<%= animal.img %>" class="animal-img" onerror="this.src='/caracter/profile/Bear.jpg'">
+                </div>
 
-                        <button onclick="buyAnimal('<%= animal.id %>', '<%= animal.name %>')" 
-                                class="btn-buy-action" 
-                                <%= (user.inventory.length >= 3 || isOwned) ? 'disabled' : '' %>>
-                            <%= isOwned ? 'SAHİPSİN' : (user.inventory.length >= 3 ? 'ÇANTA DOLU' : 'SATIN AL') %>
-                        </button>
-                    </div>
+                <div class="p-3">
+                    <h5 class="text-center fw-bold"><%= animal.name %></h5>
+                    <p class="text-center text-warning fw-bold mb-3"><%= animal.price %> BPL</p>
+
+                    <% 
+                        // Kullanıcıda bu hayvan var mı kontrol et
+                        const hasAnimal = user.inventory.some(i => i.name === animal.name);
+                    %>
+
+                    <button onclick="buyAnimal('<%= animal.id %>', '<%= animal.name %>')" 
+                            class="btn-buy-action" 
+                            <%= (user.inventory.length >= 3 || hasAnimal) ? 'disabled' : '' %>>
+                        <%= hasAnimal ? 'SAHİPSİN' : (user.inventory.length >= 3 ? 'KONTENJAN DOLU' : 'SATIN AL') %>
+                    </button>
                 </div>
             </div>
-        <% }) %>
-    </div>
+        </div>
+    <% }) %>
+</div>
 </div>
 
 <script>
@@ -110,3 +112,4 @@
 
 </body>
 </html>
+
