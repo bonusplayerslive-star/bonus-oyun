@@ -4,14 +4,17 @@ const bodyParser = require('body-parser');
 const http = require('http');
 const socketIo = require('socket.io');
 const session = require('express-session');
-const rateLimit = require('express-rate-limit');
-const nodemailer = require('nodemailer');
+const mongoose = require('mongoose'); // Mongoose eklendi
 const axios = require('axios');
 
 const connectDB = require('./db');
 const User = require('./models/User');
 const Log = require('./models/Log');
 const Payment = require('./models/Payment');
+// Victory, Punishment ve Income modellerini içe aktardığından emin ol
+const Victory = require('./models/Victory'); 
+const Punishment = require('./models/Punishment');
+const Income = require('./models/Income'); 
 
 connectDB();
 
@@ -33,34 +36,34 @@ app.use(session({
 }));
 app.set('view engine', 'ejs');
 
-// --- E-POSTA VE LOG ---
-const transporter = nodemailer.createTransport({
-    service: 'gmail',
-    auth: { user: process.env.EMAIL_USER, pass: process.env.EMAIL_PASS }
-});
-
+// --- AUTH MIDDLEWARE ---
 const checkAuth = (req, res, next) => {
     if (req.session.userId) next(); else res.redirect('/');
 };
 
 // --- GET ROTALARI ---
 app.get('/', (req, res) => res.render('index', { userIp: req.ip }));
+
 app.get('/profil', checkAuth, async (req, res) => {
     const user = await User.findById(req.session.userId);
     res.render('profil', { user });
 });
+
 app.get('/market', checkAuth, async (req, res) => {
     const user = await User.findById(req.session.userId);
     res.render('market', { user });
 });
+
 app.get('/arena', checkAuth, async (req, res) => {
     const user = await User.findById(req.session.userId);
     res.render('arena', { user, selectedAnimal: req.query.animal });
 });
+
 app.get('/chat', checkAuth, async (req, res) => {
     const user = await User.findById(req.session.userId);
     res.render('chat', { user });
 });
+
 app.get('/wallet', checkAuth, async (req, res) => {
     const user = await User.findById(req.session.userId);
     res.render('wallet', { user });
@@ -73,12 +76,11 @@ app.get('/payment', checkAuth, async (req, res) => {
 
 app.get('/meeting', checkAuth, async (req, res) => {
     const user = await User.findById(req.session.userId);
-    // Oda ID yoksa rastgele bir oda ID'si oluştur (örn: global-room)
-    const roomId = req.query.room || "BPL-CENTRAL"; 
+    const roomId = req.query.roomId || "BPL-CENTRAL"; 
     res.render('meeting', { user, roomId });
 });
 
-// --- POST ROTALARI (SAVAŞ & MARKET) ---
+// --- POST ROTALARI (GİRİŞ & KAYIT) ---
 app.post('/login', async (req, res) => {
     const { email, password } = req.body;
     const user = await User.findOne({ email, password });
@@ -94,330 +96,150 @@ app.post('/register', async (req, res) => {
     } catch (e) { res.send("Kayıt Hatası!"); }
 });
 
+// --- MARKET İŞLEMLERİ ---
 app.post('/buy-animal', checkAuth, async (req, res) => {
     try {
         const { animalName, price } = req.body;
         const user = await User.findById(req.session.userId);
+        if (user.inventory.length >= 3) return res.json({ status: 'error', msg: 'Çantanız dolu!' });
+        if (user.bpl < price) return res.json({ status: 'error', msg: 'Yetersiz BPL!' });
 
-        // 1. Envanter Kontrolü (Max 3)
-        if (user.inventory.length >= 3) {
-            return res.json({ status: 'error', msg: 'Çantanız dolu! En fazla 3 hayvan taşıyabilirsiniz.' });
-        }
-
-        // 2. Bakiye Kontrolü
-        if (user.bpl < price) {
-            return res.json({ status: 'error', msg: 'Yetersiz BPL bakiyesi!' });
-        }
-
-        // 3. İşlemi Gerçekleştir
         user.bpl -= price;
         user.inventory.push(animalName);
-        
-        // Hayvana başlangıç statları ata (Opsiyonel)
-        if (!user.stats) user.stats = {};
-        user.stats[animalName] = { hp: 100, atk: 20, def: 10 };
-        
         user.markModified('inventory');
-        user.markModified('stats');
         await user.save();
-
-        res.json({ status: 'success', msg: `${animalName} başarıyla alındı!` });
-    } catch (e) {
-        res.json({ status: 'error', msg: 'Satın alma hatası!' });
-    }
-});
-// --- 1. SAVAŞ BAŞLATMA (POST /attack-bot) ---
-app.post('/attack-bot', checkAuth, async (req, res) => {
-    try {
-        const user = await User.findById(req.session.userId);
-        
-        // Gelen hayvan ismini temizle ve formatla (örn: bear -> Bear)
-        let animal = req.query.animal || "Lion";
-        animal = animal.charAt(0).toUpperCase() + animal.slice(1).toLowerCase();
-
-        // %50 Şansla Kazananı Belirle
-        const isWin = Math.random() > 0.5;
-
-        // Session'a Savaş Kaydını At (Ceza kontrolü için kritik)
-        req.session.activeBattle = { 
-            status: 'playing', 
-            animal: animal,
-            reward: 50,
-            penalty: 10 
-        };
-
-        // Frontend'e video yollarını ve sonucu gönder
-        res.json({
-            status: 'success',
-            animation: {
-                actionVideo: `/caracter/move/${animal}/${animal}1.mp4`, // 8sn Saldırı
-                winVideo: `/caracter/move/${animal}/${animal}.mp4`,     // 8sn Zafer
-                isWin: isWin
-            },
-            reward: 50
-        });
-
-    } catch (e) {
-        console.error("Arena Başlatma Hatası:", e);
-        res.json({ status: 'error', msg: 'Arena motoru hazır değil.' });
-    }
+        res.json({ status: 'success', msg: `${animalName} alındı!` });
+    } catch (e) { res.json({ status: 'error' }); }
 });
 
-// --- 2. SAVAŞI BAŞARIYLA TAMAMLAMA (POST /battle-complete) ---
-app.post('/battle-complete', checkAuth, async (req, res) => {
-    try {
-        // Eğer aktif bir savaş yoksa ödül verme (Güvenlik)
-        if (!req.session.activeBattle) return res.json({ status: 'error', msg: 'Geçersiz işlem.' });
-
-        const user = await User.findById(req.session.userId);
-        user.bpl += 50; 
-
-        // Veritabanına Zafer Kaydı
-        await new Victory({ 
-            email: user.email, 
-            nickname: user.nickname, 
-            bpl: user.bpl 
-        }).save();
-
-        await user.save();
-        req.session.activeBattle = null; // Savaşı kapat
-        
-        res.json({ status: 'success', newBalance: user.bpl });
-    } catch (e) {
-        res.json({ status: 'error' });
-    }
-});
-
-// --- 3. ERKEN ÇIKANLARA CEZA (POST /battle-punish) ---
-// Bu rota Beacon API (navigator.sendBeacon) ile çalıştığı için res.json yerine res.end kullanır.
-app.post('/battle-punish', checkAuth, async (req, res) => {
-    try {
-        if (!req.session.activeBattle) return res.end();
-
-        const user = await User.findById(req.session.userId);
-        user.bpl -= 10; 
-
-        // Veritabanına Ceza Kaydı
-        await new Punishment({ 
-            email: user.email, 
-            bpl: user.bpl, 
-            reason: 'Savaşı yarıda bıraktı' 
-        }).save();
-
-        await user.save();
-        req.session.activeBattle = null; // Savaşı temizle
-        res.end(); 
-    } catch (e) {
-        res.end();
-    }
-});
 app.post('/sell-animal', checkAuth, async (req, res) => {
     const { animalName } = req.body;
     const user = await User.findById(req.session.userId);
     if (user.inventory.includes(animalName)) {
         user.inventory = user.inventory.filter(a => a !== animalName);
         user.bpl += 700;
-        user.markModified('stats');
         await user.save();
         res.json({ status: 'success', newBalance: user.bpl });
     } else res.json({ status: 'error' });
 });
 
-// --- SOCKET SİSTEMİ (TEK BLOKTA) ---
-let onlineArena = [];
-let onlinePlayers = {}; // Nickname -> SocketId
+// --- BEŞGEN MASA OLUŞTURMA ---
+app.post('/create-meeting', checkAuth, async (req, res) => {
+    try {
+        const user = await User.findById(req.session.userId);
+        if (user.bpl < 50) return res.send("<script>alert('Yetersiz BPL (50 Gerekiyor)'); window.history.back();</script>");
+
+        user.bpl -= 50;
+        await user.save();
+
+        const roomId = "Masa_" + Math.random().toString(36).substr(2, 9);
+        await new Income({ userId: user._id, nickname: user.nickname, amount: 50, roomId }).save();
+
+        io.emit('receive-meeting-invite', { from: user.nickname, room: roomId, toNick: "Herkes" });
+        res.redirect(`/meeting?roomId=${roomId}`);
+    } catch (e) { res.redirect('/chat'); }
+});
+
+// --- ARENA SAVAŞ MOTORU ---
+app.post('/attack-bot', checkAuth, async (req, res) => {
+    try {
+        const user = await User.findById(req.session.userId);
+        let animal = req.query.animal || "Lion";
+        animal = animal.charAt(0).toUpperCase() + animal.slice(1).toLowerCase();
+        const isWin = Math.random() > 0.5;
+
+        req.session.activeBattle = { status: 'playing', reward: 50 };
+        res.json({ status: 'success', animation: {
+            actionVideo: `/caracter/move/${animal}/${animal}1.mp4`,
+            winVideo: `/caracter/move/${animal}/${animal}.mp4`,
+            isWin: isWin
+        }});
+    } catch (e) { res.json({ status: 'error' }); }
+});
+
+app.post('/battle-complete', checkAuth, async (req, res) => {
+    if (!req.session.activeBattle) return res.json({ status: 'error' });
+    const user = await User.findById(req.session.userId);
+    user.bpl += 50;
+    await new Victory({ email: user.email, nickname: user.nickname, bpl: user.bpl }).save();
+    await user.save();
+    req.session.activeBattle = null;
+    res.json({ status: 'success', newBalance: user.bpl });
+});
+
+app.post('/battle-punish', checkAuth, async (req, res) => {
+    if (!req.session.activeBattle) return res.end();
+    const user = await User.findById(req.session.userId);
+    user.bpl -= 10;
+    await new Punishment({ email: user.email, bpl: user.bpl, reason: 'Yarıda Bırakma' }).save();
+    await user.save();
+    req.session.activeBattle = null;
+    res.end();
+});
+
+// --- BSC SCAN ÖDEME DOĞRULAMA ---
+app.post('/verify-payment', checkAuth, async (req, res) => {
+    try {
+        const { txid, usd, bpl } = req.body;
+        const existingTx = await Payment.findOne({ txid });
+        if (existingTx) return res.json({ status: 'error', msg: 'TxID kullanılmış!' });
+
+        const bscScanUrl = `https://api.bscscan.com/api?module=proxy&action=eth_getTransactionReceipt&txhash=${txid}&apikey=${process.env.BSCSCAN_API_KEY}`;
+        const response = await axios.get(bscScanUrl);
+        if (response.data.result && response.data.result.status === "0x1") {
+            const user = await User.findById(req.session.userId);
+            user.bpl += parseInt(bpl);
+            await new Payment({ userId: user._id, txid, amountUSD: usd, amountBPL: bpl, status: 'completed' }).save();
+            await user.save();
+            return res.json({ status: 'success', newBalance: user.bpl });
+        }
+        res.json({ status: 'error', msg: 'Blockchain onayı alınamadı.' });
+    } catch (e) { res.json({ status: 'error' }); }
+});
+
+// --- SOCKET SİSTEMİ (GLOBAL) ---
+let onlineUsers = {}; 
 
 io.on('connection', (socket) => {
-    // Giriş yapan her kullanıcıyı kaydet
     socket.on('register-user', (data) => {
-        socket.userId = data.id;
         socket.nickname = data.nickname;
-        onlinePlayers[data.nickname] = socket.id;
+        socket.userId = data.id;
+        onlineUsers[data.nickname] = socket.id;
+        io.emit('update-online-players', Object.keys(onlineUsers));
     });
 
-    // Arena Listesi
-    socket.on('join-arena', (data) => {
-        socket.userId = data.id;
-        socket.nickname = data.nickname;
-        if(!onlineArena.find(u => u.id === data.id)) onlineArena.push(data);
-        io.emit('arena-list-update', onlineArena);
-    });
+    socket.on('join-chat', (data) => { socket.join('Global'); });
 
-    // Chat
     socket.on('chat-message', (data) => {
         io.emit('new-message', { sender: data.nickname, text: data.message });
     });
 
-    // Meydan Okuma
-    socket.on('challenge-player', (data) => {
-        const targetId = onlinePlayers[data.targetNickname];
-        if(targetId) {
-            io.to(targetId).emit('challenge-received', { challenger: socket.nickname });
+    socket.on('join-room', (data) => {
+        socket.join(data.roomId);
+        socket.to(data.roomId).emit('new-message', { sender: 'Sistem', text: `${data.nickname} masaya katıldı.` });
+    });
+
+    socket.on('send-gift-room', async (data) => {
+        // Hediyeleşme mantığı (Backend bakiye güncelleme)
+        const sender = await User.findById(socket.userId);
+        const receiver = await User.findOne({ nickname: data.targetNickname });
+        if(sender && receiver && sender.bpl >= data.amount) {
+            sender.bpl -= data.amount;
+            receiver.bpl += data.amount;
+            await sender.save(); await receiver.save();
+            io.to(data.roomId).emit('gift-received', { from: sender.nickname, to: receiver.nickname, amount: data.amount, senderNewBalance: sender.bpl });
         }
+    });
+
+    socket.on('challenge-player', (data) => {
+        const targetId = onlineUsers[data.targetNickname];
+        if (targetId) io.to(targetId).emit('challenge-received', { challenger: socket.nickname });
     });
 
     socket.on('disconnect', () => {
-        onlineArena = onlineArena.filter(u => u.id !== socket.userId);
-        if(socket.nickname) delete onlinePlayers[socket.nickname];
-        io.emit('arena-list-update', onlineArena);
+        if (socket.nickname) delete onlineUsers[socket.nickname];
+        io.emit('update-online-players', Object.keys(onlineUsers));
     });
 });
 
-// Ödeme Doğrulama (TxID Kontrolü)
-app.post('/verify-payment', checkAuth, async (req, res) => {
-    try {
-        const { txid, usd, bpl } = req.body;
-        const userId = req.session.userId;
-
-        // 1. Temel Kontroller
-        if (!txid || txid.length < 20) {
-            return res.json({ status: 'error', msg: 'Geçersiz TxID formatı!' });
-        }
-
-        // 2. TxID daha önce kullanılmış mı? (Mükerrer ödemeyi önleme)
-        // Payment adında bir modelin olduğunu varsayıyorum
-        const existingTx = await Payment.findOne({ txid: txid });
-        if (existingTx) {
-            return res.json({ status: 'error', msg: 'Bu işlem numarası daha önce kullanılmış!' });
-        }
-
-        // 3. Kullanıcıyı Bul
-        const user = await User.findById(userId);
-        if (!user) return res.json({ status: 'error', msg: 'Kullanıcı bulunamadı!' });
-
-        /* NOT: Tam otomatik BscScan doğrulaması için burada Axios ile 
-           BscScan API'sine istek atıp txid'nin içeriği (miktar ve alıcı adres) 
-           kontrol edilmelidir. Şimdilik "Güvenli Kayıt" sistemini kuruyoruz.
-        */
-
-        // 4. Bakiyeyi Yükle ve İşlemi Kaydet
-        user.bpl += parseInt(bpl);
-        
-        const newPayment = new Payment({
-            userId: user._id,
-            nickname: user.nickname,
-            txid: txid,
-            amountUSD: usd,
-            amountBPL: bpl,
-            status: 'completed', // Manuel inceleme istersen 'pending' yapabilirsin
-            date: new Date()
-        });
-
-        await newPayment.save();
-        await user.save();
-
-        // 5. Log Kaydı (Opsiyonel)
-        console.log(`[PAYMENT] ${user.nickname} tarafından ${usd} USDT karşılığı ${bpl} BPL yüklendi. TxID: ${txid}`);
-
-        res.json({ status: 'success', bpl: user.bpl });
-
-    } catch (e) {
-        console.error("Ödeme Hatası:", e);
-        res.json({ status: 'error', msg: 'Sistem hatası oluştu, lütfen destekle iletişime geçin.' });
-    }
-});
-
-
-let onlineUsers = {}; // Nickname -> SocketID eşleşmesi
-
-io.on('connection', (socket) => {
-    
-    // Kullanıcı bağlandığında kendini tanıtır
-    socket.on('register-user', (data) => {
-        socket.nickname = data.nickname;
-        onlineUsers[data.nickname] = socket.id;
-        io.emit('update-online-players', onlineUsers);
-    });
-
-    // Chat Mesajları
-    socket.on('chat-message', (data) => {
-        io.emit('new-message', data);
-    });
-
-    // Savaş Daveti (Özel Mesaj)
-    socket.on('challenge-player', (data) => {
-        const targetSocketId = onlineUsers[data.targetNickname];
-        if (targetSocketId) {
-            io.to(targetSocketId).emit('challenge-received', { 
-                challenger: data.challenger 
-            });
-        }
-    });
-
-    // Bağlantı kesildiğinde listeden çıkar
-    socket.on('disconnect', () => {
-        if (socket.nickname) {
-            delete onlineUsers[socket.nickname];
-            io.emit('update-online-players', onlineUsers);
-        }
-    });
-});
-
-
-
-
-app.post('/verify-payment', checkAuth, async (req, res) => {
-    try {
-        const { txid, usd, bpl } = req.body;
-        const userId = req.session.userId;
-
-        // 1. Mükerrer İşlem Kontrolü
-        const existingTx = await Payment.findOne({ txid: txid });
-        if (existingTx) return res.json({ status: 'error', msg: 'Bu TxID zaten kullanılmış!' });
-
-        // 2. BscScan API Sorgusu
-        const bscScanUrl = `https://api.bscscan.com/api?module=proxy&action=eth_getTransactionReceipt&txhash=${txid}&apikey=${process.env.BSCSCAN_API_KEY}`;
-        
-        const response = await axios.get(bscScanUrl);
-        const receipt = response.data.result;
-
-        if (!receipt) return res.json({ status: 'error', msg: 'İşlem BSC ağında bulunamadı. Lütfen biraz bekleyip tekrar deneyin.' });
-
-        // İşlem başarılı mı? (status 0x1 başarı demektir)
-        if (receipt.status !== "0x1") return res.json({ status: 'error', msg: 'Bu işlem başarısız (failed) olarak görünüyor.' });
-
-       
-        /* GÜVENLİK NOTU: 
-           Burada receipt.logs içerisinden 'to' adresinin senin WALLET_ADDRESS olup olmadığı 
-           ve 'value' miktarının usd ile eşleştiği doğrulanabilir. 
-           Şimdilik temel BscScan onayını ve TxID eşsizliğini baz alıyoruz.
-        */
-
-        // 3. Kullanıcıya Bakiyeyi Yükle
-        const user = await User.findById(userId);
-        user.bpl += parseInt(bpl);
-        
-        // 4. Ödemeyi Veritabanına Kaydet
-        const newPayment = new Payment({
-            userId: user._id,
-            nickname: user.nickname,
-            txid: txid,
-            amountUSD: usd,
-            amountBPL: bpl,
-            status: 'completed',
-            confirmedAt: new Date()
-        });
-
-        await newPayment.save();
-        await user.save();
-
-        res.json({ 
-            status: 'success', 
-            msg: 'Ödeme onaylandı!', 
-            newBalance: user.bpl 
-        });
-
-    } catch (e) {
-        console.error("BscScan Onay Hatası:", e);
-        res.json({ status: 'error', msg: 'Blockchain doğrulaması sırasında bir hata oluştu.' });
-    }
-});
-
-
-server.listen(PORT, "0.0.0.0", () => console.log(`BPL CALISIYOR: ${PORT}`));
-
-
-
-
-
-
+server.listen(PORT, "0.0.0.0", () => console.log(`BPL SERVER RUNNING ON ${PORT}`));
