@@ -65,21 +65,20 @@ const transporter = nodemailer.createTransport({
 });
 
 // ==========================================
-// 1. MARKET MANTIĞI (10 HAYVAN & ÇANTA SINIRI)
+// 1. MARKET MANTIĞI (SENİN DOSYA İSİMLERİNLE %100 UYUMLU)
 // ==========================================
 const MARKET_ANIMALS = [
-    { id: 1, name: 'Cyber Wolf', price: 1000, img: '/caracter/market/wolf.png' },
-    { id: 2, name: 'Neon Tiger', price: 2000, img: '/caracter/market/tiger.png' },
-    { id: 3, name: 'Bio Rhino', price: 3000, img: '/caracter/market/rhino.png' },
-    { id: 4, name: 'Plasma Eagle', price: 4000, img: '/caracter/market/eagle.png' },
-    { id: 5, name: 'Droid Bear', price: 5000, img: '/caracter/market/bear.png' },
-    { id: 6, name: 'Mecha Lion', price: 7000, img: '/caracter/market/lion.png' },
-    { id: 7, name: 'Volt Cobra', price: 8000, img: '/caracter/market/cobra.png' },
-    { id: 8, name: 'Aero Shark', price: 10000, img: '/caracter/market/shark.png' },
-    { id: 9, name: 'Titan Mammoth', price: 15000, img: '/caracter/market/mammoth.png' },
-    { id: 10, name: 'Dark Dragon', price: 25000, img: '/caracter/market/dragon.png' }
+    { id: 1, name: 'Bear', price: 1000, img: '/caracter/profile/Bear.jpg' },
+    { id: 2, name: 'Crocodile', price: 2000, img: '/caracter/profile/Crocodile.jpg' },
+    { id: 3, name: 'Eagle', price: 3000, img: '/caracter/profile/Eagle.jpg' },
+    { id: 4, name: 'Gorilla', price: 4000, img: '/caracter/profile/Gorilla.jpg' },
+    { id: 5, name: 'Kurd', price: 5000, img: '/caracter/profile/Kurd.jpg' },
+    { id: 6, name: 'Lion', price: 7000, img: '/caracter/profile/Lion.jpg' },
+    { id: 7, name: 'Peregrinefalcon', price: 8000, img: '/caracter/profile/Peregrinefalcon.jpg' },
+    { id: 8, name: 'Rhino', price: 10000, img: '/caracter/profile/Rhino.jpg' },
+    { id: 9, name: 'Snake', price: 15000, img: '/caracter/profile/Snake.jpg' },
+    { id: 10, name: 'Tiger', price: 25000, img: '/caracter/profile/Tiger.jpg' }
 ];
-
 app.post('/buy-animal', checkAuth, async (req, res) => {
     try {
         const { animalId } = req.body;
@@ -474,5 +473,6 @@ io.on('connection', (socket) => {
 server.listen(PORT, "0.0.0.0", () => {
     console.log(`BPL SERVER RUNNING ON PORT ${PORT}`);
 });
+
 
 
