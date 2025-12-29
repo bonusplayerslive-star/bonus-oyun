@@ -294,7 +294,81 @@ socket.on('transfer-bpl', async (data) => {
     }
 });
 
+// --- SOCKET.IO MANTIĞI (CHAT, TRANSFER, CHALLENGE) ---
+io.on('connection', (socket) => {
+    console.log('Bir kumandan bağlandı:', socket.id);
 
+    // Kullanıcıyı Socket'e kaydet (ID eşleştirmesi için)
+    socket.on('register-user', ({ id, nickname }) => {
+        socket.userId = id;
+        socket.nickname = nickname;
+        socket.join('Global'); // Herkesi Global odaya sok
+    });
+
+    // Mesajlaşma
+    socket.on('chat-message', (data) => {
+        io.to('Global').emit('new-message', {
+            sender: socket.nickname,
+            text: data.text
+        });
+    });
+
+    // --- BPL TRANSFER VE YAKIM SİSTEMİ ---
+    socket.on('transfer-bpl', async (data) => {
+        try {
+            const sender = await User.findById(socket.userId);
+            const receiver = await User.findOne({ nickname: data.to });
+
+            if (!receiver) return;
+
+            const amount = Math.min(Math.abs(data.amount), 1000); // Max 1000, Negatif sayı koruması
+            const tax = Math.floor(amount * 0.25); // %25 Vergi
+            const netAmount = amount - tax;
+
+            if (sender.bpl >= 6000 && sender.bpl >= amount) {
+                sender.bpl -= amount;
+                receiver.bpl += netAmount;
+
+                await sender.save();
+                await receiver.save();
+
+                // MongoDB'ye Yakım Kaydı (Log Modeline Uygun)
+                await new Log({
+                    type: 'BPL_BURN',
+                    content: `${sender.nickname} -> ${receiver.nickname} transferinden ${tax} BPL yakıldı.`,
+                    userEmail: sender.email
+                }).save();
+
+                // Taraflara bilgi uçur
+                socket.emit('gift-result', { 
+                    newBalance: sender.bpl.toLocaleString(), 
+                    message: `Başarılı! ${tax} BPL vergi yakıldı.` 
+                });
+                
+                // Alıcıya anlık mesaj gönder
+                socket.to('Global').emit('new-message', {
+                    sender: 'SİSTEM',
+                    text: `🎁 ${sender.nickname}, ${receiver.nickname} kumandana hediye gönderdi!`
+                });
+            }
+        } catch (err) {
+            console.error("Transfer Hatası:", err);
+        }
+    });
+
+    // --- KAVGAYA DAVET (CHALLENGE) ---
+    socket.on('send-challenge', (data) => {
+        // Hedef kullanıcıya (Global odasındakilere) meydan okuma sinyali gönder
+        socket.to('Global').emit('challenge-received', {
+            from: socket.nickname,
+            target: data.target
+        });
+    });
+
+    socket.on('disconnect', () => {
+        console.log('Bir kumandan ayrıldı.');
+    });
+});
 
 
 
@@ -308,6 +382,7 @@ server.listen(PORT, "0.0.0.0", () => {
     =========================================
     `);
 });
+
 
 
 
