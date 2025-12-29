@@ -37,7 +37,7 @@ app.use(session({
     cookie: { secure: false, maxAge: 24 * 60 * 60 * 1000 }
 }));
 app.set('view engine', 'ejs');
-
+app.set('views', path.join(__dirname, 'views'));
 
 app.get('/', (req, res) => {
     res.render('index'); // veya senin ana sayfa dosyanın adı neyse
@@ -195,4 +195,5 @@ server.listen(PORT, "0.0.0.0", () => {
     =========================================
     `);
 });
+
 
