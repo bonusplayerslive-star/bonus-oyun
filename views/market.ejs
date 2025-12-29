@@ -1,107 +1,153 @@
-// Path: views\market.ejs
 <!DOCTYPE html>
 <html lang="tr">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>BPL Market - Karakter Mağazası</title>
+    <title>BPL ULTIMATE MARKET</title>
     <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css">
     <style>
-        body { background-color: #050505; color: #ffffff; font-family: 'Segoe UI', sans-serif; }
-        .navbar-bpl { border-bottom: 2px solid #39FF14; background: rgba(0, 0, 0, 0.9); padding: 10px 20px; }
-        .neon-text { color: #39FF14; text-shadow: 0 0 10px #39FF14; }
-        .neon-border { border: 1px solid #39FF14; box-shadow: 0 0 15px rgba(57, 255, 20, 0.2); transition: 0.3s; }
-        .neon-border:hover { box-shadow: 0 0 25px rgba(57, 255, 20, 0.5); transform: translateY(-5px); }
-        .card { background: #111; border-radius: 15px; overflow: hidden; border: none; }
-        .animal-img { width: 100%; height: 220px; object-fit: cover; border-bottom: 1px solid #333; }
-        .price-tag { font-size: 1.4rem; font-weight: bold; color: #ffc107; margin: 10px 0; }
-        .btn-buy { background: transparent; border: 2px solid #39FF14; color: #39FF14; font-weight: bold; transition: 0.3s; }
-        .btn-buy:hover { background: #39FF14; color: #000; }
-        .section-title { border-left: 5px solid #39FF14; padding-left: 15px; margin: 40px 0 25px 0; text-transform: uppercase; }
+        :root { --neon-green: #39FF14; --neon-blue: #00d4ff; --dark-bg: #050505; }
+        body { background-color: var(--dark-bg); color: #fff; font-family: 'Orbitron', sans-serif; }
         
-        /* Güç Göstergeleri */
-        .stat-bar { height: 6px; background: #222; border-radius: 3px; margin-bottom: 8px; }
-        .stat-fill { height: 100%; border-radius: 3px; }
-        .stat-label { font-size: 0.75rem; color: #aaa; text-align: left; margin-bottom: 2px; }
+        /* Navbar */
+        .navbar-bpl { background: rgba(0,0,0,0.95); border-bottom: 2px solid var(--neon-green); padding: 15px; }
+        .balance-box { background: rgba(57, 255, 20, 0.1); border: 1px solid var(--neon-green); padding: 5px 15px; border-radius: 50px; }
+
+        /* Market Cards */
+        .animal-card { 
+            background: #111; border-radius: 20px; overflow: hidden; position: relative; 
+            border: 1px solid #222; transition: all 0.4s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+        }
+        .animal-card:hover { 
+            border-color: var(--neon-green); transform: translateY(-10px);
+            box-shadow: 0 10px 30px rgba(57, 255, 20, 0.2);
+        }
+        
+        .card-img-wrapper { position: relative; overflow: hidden; height: 250px; }
+        .animal-img { width: 100%; height: 100%; object-fit: cover; transition: 0.5s; }
+        .animal-card:hover .animal-img { transform: scale(1.1) rotate(2deg); }
+
+        .rarity-tag {
+            position: absolute; top: 10px; left: 10px; padding: 4px 12px; 
+            border-radius: 5px; font-size: 0.7rem; font-weight: bold; text-transform: uppercase;
+            z-index: 10;
+        }
+        .legendary { background: linear-gradient(to right, #ff8c00, #ff0000); color: white; }
+        .wild { background: linear-gradient(to right, #00d4ff, #0055ff); color: white; }
+
+        /* Stats */
+        .stat-row { margin-bottom: 8px; }
+        .stat-label { font-size: 0.7rem; color: #888; margin-bottom: 2px; display: flex; justify-content: space-between; }
+        .progress { height: 6px; background: #222; border-radius: 10px; overflow: visible; }
+        .progress-bar { border-radius: 10px; box-shadow: 0 0 10px currentColor; }
+
+        /* Button Custom */
+        .btn-buy-action {
+            background: transparent; border: 2px solid var(--neon-green); color: var(--neon-green);
+            font-weight: bold; border-radius: 10px; padding: 10px; width: 100%; transition: 0.3s;
+        }
+        .btn-buy-action:hover:not(:disabled) { background: var(--neon-green); color: #000; box-shadow: 0 0 20px var(--neon-green); }
+        .btn-buy-action:disabled { border-color: #444; color: #444; cursor: not-allowed; }
+
+        .inventory-status { font-size: 0.8rem; color: #aaa; text-align: center; margin-top: 10px; }
     </style>
 </head>
 <body>
 
 <nav class="navbar navbar-bpl sticky-top">
-    <div class="container-fluid d-flex justify-content-between align-items-center">
-        <a class="navbar-brand d-flex align-items-center" href="/profil?id=<%= user.id %>">
-            <img src="/caracter/page/logo.JPEG" alt="BPL Logo" style="width: 40px; height: 40px; margin-right: 15px; border-radius: 5px;">
-            <span class="neon-text fw-bold h4 mb-0">BPL MARKET</span>
+    <div class="container d-flex justify-content-between align-items-center">
+        <a class="navbar-brand d-flex align-items-center" href="/profil">
+            <img src="/caracter/logo/logo.jpeg" alt="BPL" style="width: 45px; border-radius: 8px; margin-right: 12px;">
+            <span style="color: var(--neon-green); font-weight: 800; letter-spacing: 2px;">BPL MARKET</span>
         </a>
         <div class="d-flex align-items-center">
-            <span class="h5 me-4 mb-0">Bakiyeniz: <strong class="text-warning" id="balanceDisplay"><%= user.bpl %> BPL</strong></span>
-            <a href="/profil?id=<%= user.id %>" class="btn btn-outline-light btn-sm px-4">Profile Dön</a>
+            <div class="balance-box me-3">
+                <i class="fas fa-coins text-warning"></i> 
+                <span class="ms-1 fw-bold" id="balanceDisplay"><%= user.bpl.toLocaleString() %> BPL</span>
+            </div>
+            <a href="/profil" class="btn btn-outline-light btn-sm"><i class="fas fa-user"></i> Profile</a>
         </div>
     </div>
 </nav>
 
-<div class="container pb-5">
-    
-    <h3 class="section-title neon-text">Efsanevi Hayvanlar (5000 BPL)</h3>
-    <div class="row g-4">
-        <% 
-        // Klasördeki büyük harf dosya isimlerine göre düzenlendi
-        const efsanevi = [
-            {ad: 'Aslan', dosya: 'Lion.jpg', fiyat: 5000, hp: 150, atk: 90},
-            {ad: 'Gergedan', dosya: 'Rhino.jpg', fiyat: 5000, hp: 200, atk: 60},
-            {ad: 'Goril', dosya: 'Gorilla.jpg', fiyat: 5000, hp: 160, atk: 85},
-            {ad: 'Kaplan', dosya: 'Tiger.jpg', fiyat: 5000, hp: 140, atk: 95}
-        ]; 
-        %>
-        <% efsanevi.forEach(animal => { %>
-            <div class="col-md-3">
-                <div class="card neon-border h-100">
-                    <img src="/caracter/profile/<%= animal.dosya %>" class="animal-img" alt="<%= animal.ad %>" onerror="this.src='/caracter/page/welcome.jpg'">
-                    <div class="card-body text-center">
-                        <h4 class="card-title text-white"><%= animal.ad %></h4>
-                        
-                        <div class="stats-box my-3">
-                            <div class="stat-label">SALDIRI: <%= animal.atk %></div>
-                            <div class="stat-bar"><div class="stat-fill" style="width: <%= (animal.atk/100)*100 %>%; background: #ff4444;"></div></div>
-                            <div class="stat-label">HP (CAN): <%= animal.hp %></div>
-                            <div class="stat-bar"><div class="stat-fill" style="width: <%= (animal.hp/200)*100 %>%; background: #00C851;"></div></div>
-                        </div>
+<div class="container py-5">
+    <div class="text-center mb-5">
+        <h2 class="text-uppercase fw-bold" style="letter-spacing: 5px;">Karakterini Seç</h2>
+        <div class="inventory-status">
+            Çanta Kapasitesi: 
+            <span class="<%= user.inventory.length >= 3 ? 'text-danger fw-bold' : 'text-success' %>">
+                <%= user.inventory.length %> / 3
+            </span>
+        </div>
+    </div>
 
-                        <div class="price-tag"><%= animal.fiyat %> BPL</div>
-                        <button onclick="buyAnimal('<%= animal.ad %>', <%= animal.fiyat %>)" class="btn btn-buy w-100">SATIN AL</button>
+    <h4 class="mb-4 d-flex align-items-center"><span class="badge legendary me-2">LEGENDARY</span> 5000 BPL</h4>
+    <div class="row g-4 mb-5">
+        <% 
+        const legends = [
+            {id: 'LION', ad: 'Aslan', dosya: 'Lion.jpg', atk: 95, hp: 150},
+            {id: 'RHINO', ad: 'Gergedan', dosya: 'Rhino.jpg', atk: 60, hp: 200},
+            {id: 'GORILLA', ad: 'Goril', dosya: 'Gorilla.jpg', atk: 85, hp: 160},
+            {id: 'TIGER', ad: 'Kaplan', dosya: 'Tiger.jpg', atk: 90, hp: 140}
+        ];
+        %>
+        <% legends.forEach(animal => { %>
+            <div class="col-md-3">
+                <div class="animal-card">
+                    <div class="rarity-tag legendary">EFSANEVİ</div>
+                    <div class="card-img-wrapper">
+                        <img src="/caracter/profile/<%= animal.dosya %>" class="animal-img" onerror="this.src='/caracter/page/welcome.jpg'">
+                    </div>
+                    <div class="p-3">
+                        <h5 class="text-center text-uppercase fw-bold mb-3"><%= animal.ad %></h5>
+                        <div class="stat-row">
+                            <div class="stat-label"><span>SALDIRI</span><span><%= animal.atk %></span></div>
+                            <div class="progress"><div class="progress-bar" style="width: <%= animal.atk %>%; background: #ff4444;"></div></div>
+                        </div>
+                        <div class="stat-row mb-4">
+                            <div class="stat-label"><span>SAĞLIK</span><span><%= animal.hp %></span></div>
+                            <div class="progress"><div class="progress-bar" style="width: <%= (animal.hp/200)*100 %>%; background: #00C851;"></div></div>
+                        </div>
+                        <button onclick="buyAnimal('<%= animal.id %>', 5000)" 
+                                class="btn-buy-action" 
+                                <%= (user.inventory.length >= 3 || user.inventory.includes(animal.id)) ? 'disabled' : '' %>>
+                            <%= user.inventory.includes(animal.id) ? 'SAHİPSİN' : (user.inventory.length >= 3 ? 'ÇANTA DOLU' : 'SATIN AL') %>
+                        </button>
                     </div>
                 </div>
             </div>
         <% }) %>
     </div>
 
-    <h3 class="section-title text-info" style="border-left-color: #0dcaf0;">Vahşi Hayvanlar (1000 BPL)</h3>
+    <h4 class="mb-4 d-flex align-items-center"><span class="badge wild me-2">WILD</span> 1000 BPL</h4>
     <div class="row g-4">
         <% 
-        // Vahşi hayvanlar klasördeki dosya isimlerine göre (Bear, Crocodile, vb.) güncellendi
-        const vahsi = [
-            {ad: 'Ayı', dosya: 'Bear.jpg', fiyat: 1000, hp: 110, atk: 45},
-            {ad: 'Gökdoğan', dosya: 'Peregrinefalcon.jpg', fiyat: 1000, hp: 80, atk: 65},
-            {ad: 'Kartal', dosya: 'Eagle.jpg', fiyat: 1000, hp: 85, atk: 60},
-            {ad: 'Timsah', dosya: 'Crocodile.jpg', fiyat: 1000, hp: 120, atk: 50},
-            {ad: 'Yılan', dosya: 'Snake.jpg', fiyat: 1000, hp: 70, atk: 75},
-            {ad: 'Kurt', dosya: 'Kurd.jpg', fiyat: 1000, hp: 90, atk: 55}
-        ]; 
+        const wilds = [
+            {id: 'BEAR', ad: 'Ayı', dosya: 'Bear.jpg', atk: 55, hp: 110},
+            {id: 'SNAKE', ad: 'Yılan', dosya: 'Snake.jpg', atk: 80, hp: 70},
+            {id: 'WOLF', ad: 'Kurt', dosya: 'Kurd.jpg', atk: 65, hp: 95},
+            {id: 'EAGLE', ad: 'Kartal', dosya: 'Eagle.jpg', atk: 75, hp: 80}
+        ];
         %>
-        <% vahsi.forEach(animal => { %>
-            <div class="col-md-4">
-                <div class="card border-secondary h-100" style="background: #0a0a0a;">
-                    <img src="/caracter/profile/<%= animal.dosya %>" class="animal-img" alt="<%= animal.ad %>" onerror="this.src='/caracter/page/welcome.jpg'">
-                    <div class="card-body text-center">
-                        <h4 class="card-title text-white text-uppercase"><%= animal.ad %></h4>
-                        
-                        <div class="stats-box my-3">
-                            <div class="stat-label">GÜÇ DENGESİ</div>
-                            <div class="stat-bar"><div class="stat-fill" style="width: <%= (animal.atk/100)*100 %>%; background: #33b5e5;"></div></div>
+        <% wilds.forEach(animal => { %>
+            <div class="col-md-3">
+                <div class="animal-card">
+                    <div class="rarity-tag wild">VAHŞİ</div>
+                    <div class="card-img-wrapper">
+                        <img src="/caracter/profile/<%= animal.dosya %>" class="animal-img" onerror="this.src='/caracter/page/welcome.jpg'">
+                    </div>
+                    <div class="p-3">
+                        <h5 class="text-center text-uppercase fw-bold mb-3"><%= animal.ad %></h5>
+                        <div class="stat-row mb-4">
+                            <div class="stat-label">GÜÇ SEVİYESİ <span><%= animal.atk %></span></div>
+                            <div class="progress"><div class="progress-bar" style="width: <%= animal.atk %>%; background: var(--neon-blue);"></div></div>
                         </div>
-
-                        <div class="price-tag text-info" style="font-size: 1.1rem;"><%= animal.fiyat %> BPL</div>
-                        <button onclick="buyAnimal('<%= animal.ad %>', <%= animal.fiyat %>)" class="btn btn-outline-info w-100">SATIN AL</button>
+                        <button onclick="buyAnimal('<%= animal.id %>', 1000)" 
+                                class="btn-buy-action"
+                                <%= (user.inventory.length >= 3 || user.inventory.includes(animal.id)) ? 'disabled' : '' %>>
+                            <%= user.inventory.includes(animal.id) ? 'SAHİPSİN' : (user.inventory.length >= 3 ? 'ÇANTA DOLU' : 'SATIN AL') %>
+                        </button>
                     </div>
                 </div>
             </div>
@@ -111,44 +157,30 @@
 
 <script>
     function buyAnimal(animalName, price) {
-        const userId = '<%= user.id %>';
-        if(!confirm(animalName + ' karakterini ' + price + ' BPL karşılığında satın alıyor musunuz?')) return;
+        if(!confirm(animalName + ' karakterini orduya katmak istiyor musun?')) return;
 
         fetch('/buy-animal', {
             method: 'POST',
-            headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
-            // URLSearchParams kullanarak daha güvenli veri gönderimi
-            body: new URLSearchParams({
-                userId: userId,
-                animalName: animalName,
-                price: price
-            })
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ animalName, price })
         })
-        .then(res => res.json())
+        .then(r => r.json())
         .then(data => {
             if(data.status === 'success') {
-                alert('Tebrikler! ' + animalName + ' envanterine eklendi.');
-                document.getElementById('balanceDisplay').innerText = data.newBalance + ' BPL';
+                alert('İşlem Başarılı! Karakter envantere eklendi.');
+                location.reload();
             } else {
-                alert('Hata: ' + (data.msg || 'Bakiye yetersiz!'));
+                alert('Hata: ' + data.msg);
             }
-        })
-        .catch(err => alert('Sunucu hatası!'));
+        });
     }
 </script>
 
 <script src="/socket.io/socket.io.js"></script>
 <script>
-    const socket = io(); // Her sayfada bu bağlantıyı başlatır
-    
-    // Aktif sayısını her sayfada güncel tutmak için:
-    socket.on('update-active-count', (count) => {
-        const playerEl = document.getElementById('active-players');
-        if(playerEl) playerEl.innerText = count + " OYUNCU";
-    });
+    const socket = io();
+    socket.emit('register-user', { id: "<%= user._id %>", nickname: "<%= user.nickname %>" });
 </script>
 
-
 </body>
-
 </html>
