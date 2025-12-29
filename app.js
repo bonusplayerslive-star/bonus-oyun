@@ -513,23 +513,46 @@ app.post('/open-special-room', checkAuth, async (req, res) => {
 
 // Socket.io Hediye ve Savaş Dinamiği
 io.on('connection', (socket) => {
-    socket.on('send-gift-vip', async (data) => {
-        const { senderId, targetNick, amount, tax } = data;
-        const sender = await User.findById(senderId);
-        const target = await User.findOne({ nickname: targetNick });
+   // Hediye Gönderim Kontrolü
+socket.on('send-gift-vip', async (data) => {
+    const { senderId, targetNick, amount, tax } = data;
+    const sender = await User.findById(senderId);
 
-        if (sender.bpl < REQ_GIFT_LIMIT) return socket.emit('err', 'Hediye için 5000 BPL üstü bakiye lazım!');
-        if (sender.bpl - amount < MIN_GIFT_BALANCE) return socket.emit('err', 'Limit altına düşemezsin!');
+    // 5000 BPL Altı Kontrolü (Fakirler davetle girer ama hediye gönderemez)
+    if (!sender || sender.bpl < 5000) {
+        return socket.emit('gift-result', { 
+            status: 'error', 
+            message: 'Konseyde hediye dağıtmak için en az 5000 BPL bakiye gerekir!' 
+        });
+    }
 
-        const netAmount = amount * (1 - (tax / 100));
-        sender.bpl -= amount;
-        target.bpl += netAmount;
+    // Gönderim sonrası 3500 BPL altına düşme kontrolü
+    if (sender.bpl - amount < 3500) {
+        return socket.emit('gift-result', { 
+            status: 'error', 
+            message: 'Hediye sonrası minimum 3500 BPL bakiyen kalmalıdır!' 
+        });
+    }
 
-        await sender.save();
-        await target.save();
-        
-        io.to(data.room).emit('gift-alert', { msg: `${sender.nickname} 🔥 ${targetNick} kullanıcısına şehvetli bir ikramda bulundu!` });
+    const target = await User.findOne({ nickname: targetNick });
+    if (!target) return socket.emit('gift-result', { status: 'error', message: 'Alıcı bulunamadı!' });
+
+    // Matematiksel hesaplama: Net Tutar = Brüt - (Brüt * Vergi/100)
+    const netAmount = amount * (1 - (tax / 100));
+    sender.bpl -= amount;
+    target.bpl += netAmount;
+
+    await sender.save();
+    await target.save();
+
+    io.to(data.room).emit('new-message', {
+        sender: "SİSTEM",
+        text: `💎 ${sender.nickname}, ${targetNick} kullanıcısına cömert davrandı!`,
+        isSystem: true
     });
+
+    socket.emit('gift-result', { status: 'success', newBalance: sender.bpl, message: 'Hediye başarıyla iletildi.' });
+});
 
     // VIP Arena (8 Saniyelik Video Sınıfı)
     socket.on('start-vip-battle', async ({ room, p1, p2 }) => {
@@ -575,6 +598,7 @@ server.listen(PORT, "0.0.0.0", () => {
     =========================================
     `);
 });
+
 
 
 
