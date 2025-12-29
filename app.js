@@ -35,60 +35,50 @@ app.use(session({
 }));
 app.set('view engine', 'ejs');
 
-// --- GLOBAL DEĞİŞKENLER ---
 const onlineUsers = {}; 
 const busyUsers = new Set();
 
-// --- AUTH MIDDLEWARE ---
 const checkAuth = (req, res, next) => {
     if (req.session.userId) next(); else res.redirect('/');
 };
 
-// --- GET ROTALARI (SAYFA GEÇİŞLERİ) ---
+// --- ROTALAR ---
 app.get('/', (req, res) => res.render('index', { userIp: req.ip }));
-
 app.get('/profil', checkAuth, async (req, res) => {
     const user = await User.findById(req.session.userId);
     res.render('profil', { user });
 });
-
 app.get('/market', checkAuth, async (req, res) => {
     const user = await User.findById(req.session.userId);
     res.render('market', { user });
 });
-
 app.get('/arena', checkAuth, async (req, res) => {
     const user = await User.findById(req.session.userId);
     res.render('arena', { user, selectedAnimal: req.query.animal });
 });
-
 app.get('/chat', checkAuth, async (req, res) => {
     const user = await User.findById(req.session.userId);
     res.render('chat', { user });
 });
-
 app.get('/wallet', checkAuth, async (req, res) => {
     const user = await User.findById(req.session.userId);
     res.render('wallet', { user });
 });
-
 app.get('/payment', checkAuth, async (req, res) => {
     const user = await User.findById(req.session.userId);
     res.render('payment', { user });
 });
-
 app.get('/meeting', checkAuth, async (req, res) => {
     const user = await User.findById(req.session.userId);
     const roomId = req.query.roomId || "BPL-CENTRAL"; 
     res.render('meeting', { user, roomId });
 });
-
 app.get('/development', checkAuth, async (req, res) => {
     const user = await User.findById(req.session.userId);
     res.render('development', { user });
 });
 
-// --- POST ROTALARI ---
+// --- POST İŞLEMLERİ ---
 app.post('/login', async (req, res) => {
     const { email, password } = req.body;
     const user = await User.findOne({ email, password });
@@ -120,24 +110,8 @@ app.post('/upgrade-stat', checkAuth, async (req, res) => {
     } catch (e) { res.json({ status: 'error', msg: 'Sunucu hatası!' }); }
 });
 
-app.post('/buy-animal', checkAuth, async (req, res) => {
-    try {
-        const { animalName, price } = req.body;
-        const user = await User.findById(req.session.userId);
-        if (user.inventory.length >= 3) return res.json({ status: 'error', msg: 'Çantanız dolu!' });
-        if (user.bpl < price) return res.json({ status: 'error', msg: 'Yetersiz BPL!' });
-        user.bpl -= price;
-        user.inventory.push(animalName);
-        user.markModified('inventory');
-        await user.save();
-        res.json({ status: 'success', msg: `${animalName} alındı!` });
-    } catch (e) { res.json({ status: 'error' }); }
-});
-
-// --- SOCKET SİSTEMİ (ARENA, CHAT, MEETING) ---
+// --- SOCKET SİSTEMİ ---
 io.on('connection', (socket) => {
-    console.log('Yeni bağlantı:', socket.id);
-
     socket.on('register-user', (data) => {
         socket.nickname = data.nickname;
         socket.userId = data.id;
@@ -163,24 +137,8 @@ io.on('connection', (socket) => {
         }
     });
 
-    socket.on('join-chat', () => { socket.join('Global'); });
     socket.on('chat-message', (data) => {
         io.emit('new-message', { sender: data.nickname, text: data.message });
-    });
-
-    socket.on('send-gift', async (data) => {
-        try {
-            const sender = await User.findById(data.userId || socket.userId);
-            const receiver = await User.findOne({ nickname: data.to });
-            const giftAmount = parseInt(data.amount);
-            if (sender && receiver && sender.bpl >= giftAmount) {
-                sender.bpl -= giftAmount;
-                receiver.bpl += giftAmount;
-                await sender.save(); await receiver.save();
-                socket.emit('gift-result', { newBalance: sender.bpl, message: "Hediye gönderildi!" });
-                io.emit('new-message', { sender: "SİSTEM", text: `🎁 ${sender.nickname} -> ${receiver.nickname} kişisine ${giftAmount} BPL hediye etti!` });
-            }
-        } catch (e) { console.log(e); }
     });
 
     socket.on('disconnect', () => {
