@@ -1,195 +1,137 @@
 <!DOCTYPE html>
 <html lang="tr">
 <head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>BPL BEŞGEN MASA | VIP</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=0">
+    <title>BPL | BEŞGEN KONSEY</title>
     <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
-    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css">
     <style>
-        :root { --neon-green: #39FF14; --dark-bg: #0a0a0a; }
-        body { background: var(--dark-bg); color: white; font-family: 'Segoe UI', sans-serif; height: 100vh; overflow: hidden; }
+        :root { --gold: #d4af37; --erotic-red: #800020; --neon-cyan: #0ff; }
+        body { background: #000; color: white; height: 100vh; overflow: hidden; font-family: 'Cinzel', serif; }
 
-        .meeting-nav {
-            background: rgba(0,0,0,0.8); border-bottom: 1px solid var(--neon-green);
-            padding: 10px 20px; display: flex; justify-content: space-between; align-items: center;
+        /* Beşgen Masa Dizilimi */
+        .pentagon-grid {
+            position: relative; width: 100vw; height: 60vh;
+            display: flex; justify-content: center; align-items: center;
         }
-        .meeting-nav img { height: 40px; }
+        .v-slot {
+            position: absolute; width: 140px; height: 140px;
+            border: 2px solid var(--gold); border-radius: 50%;
+            overflow: hidden; box-shadow: 0 0 15px var(--erotic-red);
+            transition: 0.5s; cursor: pointer;
+        }
+        /* Köşe Dizilimleri (Matematiksel Beşgen) */
+        .v1 { top: 10%; } .v2 { top: 35%; left: 10%; } .v3 { top: 35%; right: 10%; }
+        .v4 { bottom: 10%; left: 20%; } .v5 { bottom: 10%; right: 20%; }
 
-        .meeting-container { display: flex; height: calc(100vh - 65px); }
-        
-        /* Video Alanı (Beşgen Masa Dizilimi İçin) */
-        .video-grid { flex: 3; background: #000; padding: 20px; display: grid; grid-template-columns: repeat(auto-fit, minmax(280px, 1fr)); gap: 15px; overflow-y: auto; }
-        .video-box { background: #1a1a1a; border: 1px solid #333; border-radius: 15px; position: relative; aspect-ratio: 16/9; }
-        .video-box video { width: 100%; height: 100%; object-fit: cover; border-radius: 15px; }
-        .user-label { position: absolute; bottom: 10px; left: 10px; background: rgba(0,0,0,0.7); padding: 2px 10px; border-radius: 5px; border-left: 3px solid var(--neon-green); }
+        video { width: 100%; height: 100%; object-fit: cover; }
 
-        .side-panel { flex: 1; border-left: 1px solid #222; background: #0f0f0f; display: flex; flex-direction: column; }
-        .chat-area { flex: 1; overflow-y: auto; padding: 15px; font-size: 0.85rem; border-bottom: 1px solid #222; }
-        .msg { margin-bottom: 8px; border-left: 2px solid var(--neon-green); padding-left: 8px; }
+        /* Savaş Overlay - Victory Erotica */
+        #battle-overlay {
+            display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%;
+            background: rgba(0,0,0,0.95); z-index: 10000; text-align: center;
+        }
+        .victory-text {
+            color: var(--gold); font-size: 4rem; text-shadow: 0 0 20px red;
+            animation: pulse 1s infinite; margin-top: 20vh;
+        }
+        @keyframes pulse { 0% { opacity: 0.5; } 50% { opacity: 1; } 100% { opacity: 0.5; } }
 
-        .gift-section { padding: 15px; background: #141414; }
-        .gift-btn { width: 48%; margin-bottom: 5px; font-size: 0.75rem; font-weight: bold; }
-
-        .controls { position: fixed; bottom: 30px; left: 50%; transform: translateX(-50%); display: flex; gap: 20px; z-index: 100; }
-        .control-btn { width: 55px; height: 55px; border-radius: 50%; border: none; background: #222; color: white; }
-        .control-btn:hover { background: var(--neon-green); color: black; }
-        .btn-end { background: #ff4444; }
+        .side-panel { background: rgba(15,15,15,0.9); border-top: 1px solid var(--gold); height: 40vh; }
+        .gift-btn { background: var(--erotic-red); border: 1px solid var(--gold); font-size: 0.7rem; }
     </style>
 </head>
 <body>
 
-    <nav class="meeting-nav">
-        <img src="/caracter/logo/logo.jpeg" onerror="this.src='/caracter/page/logo.jpeg'">
-        <div class="small text-info">MASA ID: <%= roomId %></div>
-        <div class="text-success fw-bold">BAKİYE: <span id="user-bpl"><%= user.bpl %></span> BPL</div>
-    </nav>
+    <div id="invite-bar" style="display:none;" class="alert alert-warning position-fixed top-0 w-100 z-3 shadow-lg">
+        🔥 Konseye Davet Edildin! <button onclick="joinVIP()" class="btn btn-sm btn-dark ms-3">KATIL</button>
+    </div>
 
-    <div class="meeting-container">
-        <div class="video-grid" id="video-grid">
-            <div class="video-box">
-                <video id="my-video" muted autoplay playsinline></video>
-                <div class="user-label">Siz (<%= user.nickname %>)</div>
+    <div class="pentagon-grid" id="video-area">
+        <div class="v-slot v1" id="local-video-box">
+            <video id="my-video" autoplay muted playsinline></video>
+            <small class="position-absolute bottom-0 start-50 translate-middle-x bg-dark px-2">SİZ</small>
+        </div>
+    </div>
+
+    <div id="battle-overlay">
+        <div class="victory-text" id="battle-status">HAZIRLANIN...</div>
+        <video id="full-battle-video" style="max-width: 90vw; border: 3px solid var(--gold); margin-top: 20px;"></video>
+    </div>
+
+    <div class="side-panel p-3">
+        <div class="row">
+            <div class="col-7">
+                <div id="vip-chat" style="height: 150px; overflow-y: auto; font-size: 0.8rem;" class="mb-2"></div>
+                <input type="text" id="vip-msg" class="form-control form-control-sm bg-black text-white" placeholder="Sessizce fısılda...">
             </div>
-            </div>
-
-        <div class="side-panel">
-            <div class="p-2 bg-dark text-center text-neon small">MASA SOHBETİ</div>
-            <div class="chat-area" id="chat-messages"></div>
-
-            <div class="gift-section">
-                <input type="text" id="target-user" class="form-control form-control-sm bg-dark text-white border-secondary mb-2" placeholder="Kime? (Nickname)">
-                <div class="d-flex flex-wrap justify-content-between">
-                    <button class="btn btn-outline-warning gift-btn" onclick="sendGift(50)">50 BPL</button>
-                    <button class="btn btn-outline-info gift-btn" onclick="sendGift(200)">200 BPL</button>
-                    <button class="btn btn-outline-danger gift-btn" onclick="sendGift(500)">500 BPL</button>
-                    <button class="btn btn-outline-success gift-btn" onclick="challengeUser()">SAVAŞ</button>
-                </div>
-                <div class="input-group mt-2">
-                    <input type="text" id="chat-input" class="form-control bg-dark text-white border-secondary" placeholder="Mesaj...">
-                    <button class="btn btn-success" onclick="sendMessage()"><i class="fas fa-paper-plane"></i></button>
+            <div class="col-5 border-start border-secondary">
+                <input type="text" id="gift-target" class="form-control form-control-sm mb-1" placeholder="Nick...">
+                <div class="d-flex flex-wrap gap-1">
+                    <button class="btn gift-btn" onclick="sendGiftVIP(50, 25)">50 (-%25)</button>
+                    <button class="btn gift-btn" onclick="sendGiftVIP(250, 30)">250 (-%30)</button>
+                    <button class="btn btn-warning btn-sm w-100 mt-2" onclick="initArena()">SAVAŞA DAVET (200 BPL)</button>
                 </div>
             </div>
         </div>
     </div>
 
-    <div class="controls">
-        <button class="control-btn" onclick="toggleMic()"><i class="fas fa-microphone" id="mic-icon"></i></button>
-        <button class="control-btn" onclick="toggleCam()"><i class="fas fa-video" id="cam-icon"></i></button>
-        <button class="control-btn btn-end" onclick="location.href='/profil'"><i class="fas fa-phone-slash"></i></button>
-    </div>
-<div id="video-grid" class="d-flex flex-wrap justify-content-center align-items-center" style="min-height: 70vh;">
-    </div>
-
-<style>
-    #video-grid video {
-        width: 250px; /* Beşgen masa hissi için orta boy */
-        height: 180px;
-        margin: 15px;
-        border: 3px solid #39FF14;
-        border-radius: 20px;
-        object-fit: cover;
-        cursor: pointer;
-        transition: transform 0.3s ease;
-    }
-    /* Tek tıkla ekranı kaplayan sınıf */
-    .zoomed-video {
-        position: fixed;
-        top: 0; left: 0;
-        width: 100vw !important;
-        height: 100vh !important;
-        z-index: 9999;
-        border: none !important;
-        border-radius: 0 !important;
-    }
-</style>
-
+<script src="/socket.io/socket.io.js"></script>
 <script>
-    // İstediğin kullanıcıya tık yaptığında ekranı kaplaması için:
-    document.getElementById('video-grid').addEventListener('click', (e) => {
+    const socket = io();
+    const myNickname = "<%= user.nickname %>";
+    
+    // Zoom Özelliği
+    document.addEventListener('click', (e) => {
         if(e.target.tagName === 'VIDEO') {
-            e.target.classList.toggle('zoomed-video');
+            e.target.parentElement.classList.toggle('zoomed-video');
         }
     });
+
+    // Savaş ve Video Mantığı
+    socket.on('battle-video-play', (data) => {
+        const overlay = document.getElementById('battle-overlay');
+        const video = document.getElementById('full-battle-video');
+        const status = document.getElementById('battle-status');
+        
+        overlay.style.display = 'block';
+        
+        // Önce Hamle Videosu (hayvanismi1.mp4)
+        video.src = data.moveVideo;
+        video.play();
+        
+        video.onended = () => {
+            // Sonra Zafer Videosu (hayvanismi.mp4)
+            status.innerHTML = `🏆 ZAFER: ${data.winner}`;
+            status.style.color = "gold";
+            video.src = data.video;
+            video.play();
+            
+            video.onended = () => {
+                setTimeout(() => {
+                    location.href = '/profil'; // 48 saat yorgunluğuyla profil sayfasına geri dönüş
+                }, 2000);
+            };
+        };
+    });
+
+    function initArena() {
+        const target = document.getElementById('gift-target').value;
+        if(!target) return alert("Rakip seç!");
+        socket.emit('start-vip-battle', { room: "<%= roomId %>", p1: myNickname, p2: target });
+    }
+
+    function sendGiftVIP(amount, tax) {
+        const target = document.getElementById('gift-target').value;
+        socket.emit('send-gift-vip', { senderId: "<%= user._id %>", targetNick: target, amount, tax, room: "<%= roomId %>" });
+    }
 </script>
 
-    <script src="/socket.io/socket.io.js"></script>
-    <script>
-        const socket = io();
-        const nickname = "<%= user.nickname %>";
-        const roomId = "<%= roomId %>";
-        const myId = "<%= user._id %>";
-        let myStream;
-
-        // 1. Kamera Başlat
-        navigator.mediaDevices.getUserMedia({ video: true, audio: true }).then(stream => {
-            myStream = stream;
-            document.getElementById('my-video').srcObject = stream;
-        }).catch(err => alert("Kamera izni verilmedi!"));
-
-        // 2. Odaya Kaydol ve Katıl
-        socket.emit('register-user', { id: myId, nickname: nickname });
-        socket.emit('join-room', { roomId: roomId, nickname: nickname });
-
-        // 3. Mesajlaşma
-        function sendMessage() {
-            const input = document.getElementById('chat-input');
-            if(input.value) {
-                socket.emit('chat-message', { nickname, message: input.value, room: roomId });
-                input.value = '';
-            }
-        }
-
-        socket.on('new-message', (data) => {
-            const chat = document.getElementById('chat-messages');
-            chat.innerHTML += `<div class="msg"><b>${data.sender}:</b> ${data.text}</div>`;
-            chat.scrollTop = chat.scrollHeight;
-        });
-
-        // 4. Hediye Gönderme (Backend Entegrasyonlu)
-        function sendGift(amount) {
-            const target = document.getElementById('target-user').value;
-            if(!target) { alert("Lütfen alıcı nickname yazın!"); return; }
-            
-            socket.emit('send-gift', { 
-                userId: myId,
-                to: target, 
-                amount: amount, 
-                room: roomId 
-            });
-        }
-
-        socket.on('gift-result', (data) => {
-            if(data.newBalance !== undefined) {
-                document.getElementById('user-bpl').innerText = data.newBalance;
-            }
-            alert(data.message);
-        });
-
-        // 5. Meydan Okuma
-        function challengeUser() {
-            const target = document.getElementById('target-user').value;
-            if(target) {
-                socket.emit('challenge-player', { targetNickname: target });
-                alert(target + " kullanıcısına meydan okundu!");
-            } else {
-                alert("Kime meydan okuyacağınızı yazın!");
-            }
-        }
-
-        // Kontroller
-        function toggleMic() {
-            const audioTrack = myStream.getAudioTracks()[0];
-            audioTrack.enabled = !audioTrack.enabled;
-            document.getElementById('mic-icon').className = audioTrack.enabled ? 'fas fa-microphone' : 'fas fa-microphone-slash';
-        }
-
-        function toggleCam() {
-            const videoTrack = myStream.getVideoTracks()[0];
-            videoTrack.enabled = !videoTrack.enabled;
-            document.getElementById('cam-icon').className = videoTrack.enabled ? 'fas fa-video' : 'fas fa-video-slash';
-        }
-    </script>
+<style>
+    .zoomed-video {
+        position: fixed !important; top: 0 !important; left: 0 !important;
+        width: 100vw !important; height: 100vh !important;
+        z-index: 99999 !important; border-radius: 0 !important;
+    }
+</style>
 </body>
 </html>
-
