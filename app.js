@@ -417,7 +417,7 @@ app.post('/sell-character', checkAuth, async (req, res) => {
 });
 
 
-const Payment = require('./models/Payment'); // Ödeme kayıtları için model
+
 
 app.post('/verify-payment', async (req, res) => {
     const { userId, txid, usd, bpl } = req.body;
@@ -706,6 +706,7 @@ server.listen(PORT, "0.0.0.0", () => {
     =========================================
     `);
 });
+
 
 
 
