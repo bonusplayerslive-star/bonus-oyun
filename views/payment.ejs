@@ -1,121 +1,112 @@
-// Path: views\payment.ejs
 <!DOCTYPE html>
 <html lang="tr">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>BPL Satın Al - Güvenli Ödeme</title>
+    <title>BPL MARKET | Güvenli İkmal</title>
     <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css">
     <style>
-        body { background: #0f0f0f; color: #fff; padding-top: 50px; font-family: 'Courier New', monospace; }
-        .neon-border { border: 1px solid #39FF14; box-shadow: 0 0 15px rgba(57, 255, 20, 0.2); background: rgba(0,0,0,0.8); border-radius: 20px; }
-        .text-neon { color: #39FF14; text-shadow: 0 0 5px #39FF14; }
+        body { background: #050505; color: #fff; font-family: 'Courier New', monospace; padding: 40px 0; }
+        .neon-border { border: 1px solid #39FF14; box-shadow: 0 0 20px rgba(57, 255, 20, 0.1); background: #000; border-radius: 20px; }
+        .text-neon { color: #39FF14; text-shadow: 0 0 10px #39FF14; }
         
+        /* Paket Kartları */
         .package-card {
-            background: rgba(20, 20, 20, 0.9);
-            border: 1px solid #333;
+            background: #0f0f0f;
+            border: 1px solid #222;
             border-radius: 15px;
-            transition: 0.3s;
-            cursor: pointer;
+            transition: 0.4s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+            position: relative;
+            overflow: hidden;
         }
-        .package-card:hover {
-            border-color: #39FF14;
-            transform: translateY(-10px);
-            background: rgba(57, 255, 20, 0.05);
+        .package-card::before {
+            content: ''; position: absolute; top: -50%; left: -50%; width: 200%; height: 200%;
+            background: radial-gradient(circle, rgba(57,255,20,0.1) 0%, transparent 70%);
+            opacity: 0; transition: 0.5s;
         }
-        .price-tag { font-size: 2rem; font-weight: bold; color: #fff; }
-        .bpl-amount { color: #39FF14; font-size: 1.5rem; }
-        
-        .bep20-badge {
-            background: #ff0000;
-            color: #fff;
-            padding: 5px 15px;
-            border-radius: 50px;
-            font-size: 0.8rem;
-            font-weight: bold;
-            display: inline-block;
-            margin-bottom: 10px;
-        }
+        .package-card:hover { border-color: #39FF14; transform: scale(1.05); }
+        .package-card:hover::before { opacity: 1; }
+        .package-card.active { border-color: #39FF14; box-shadow: 0 0 20px rgba(57, 255, 20, 0.3); background: rgba(57,255,20,0.05); }
 
-        /* TxID Giriş Alanı Tasarımı */
-        .tx-input-group {
-            background: rgba(255, 255, 255, 0.05);
-            padding: 20px;
-            border-radius: 10px;
-            border: 1px dashed #39FF14;
+        .price-tag { font-size: 2.5rem; font-weight: 900; color: #fff; }
+        .bpl-amount { color: #39FF14; font-size: 1.2rem; letter-spacing: 2px; }
+        
+        /* Ödeme Alanı */
+        .payment-terminal { background: #0a0a0a; border-left: 4px solid #39FF14; padding: 30px; }
+        .tx-input { background: #000 !important; border: 1px solid #333 !important; color: #39FF14 !important; font-family: monospace; }
+        .tx-input:focus { border-color: #39FF14 !important; box-shadow: 0 0 10px rgba(57, 255, 20, 0.3); }
+        
+        .step-num { width: 30px; height: 30px; background: #39FF14; color: #000; display: inline-block; border-radius: 50%; font-weight: bold; margin-right: 10px; text-align: center; line-height: 30px; }
+        
+        .btn-verify {
+            background: transparent; border: 1px solid #39FF14; color: #39FF14;
+            padding: 15px; font-weight: bold; font-size: 1.1rem; letter-spacing: 2px; transition: 0.4s;
         }
+        .btn-verify:hover { background: #39FF14; color: #000; box-shadow: 0 0 30px #39FF14; }
+        
+        .loading-spinner { display: none; }
     </style>
 </head>
 <body>
 
-<div class="container pb-5">
+<div class="container">
     <div class="text-center mb-5">
-        <div class="bep20-badge">SADECE USDT (BEP20)</div>
-        <h1 class="text-neon fw-bold">BPL MARKETİ</h1>
-        <p class="text-muted">Paketinizi seçin, ödemeyi yapın ve işlem numaranızı (TxID) girin.</p>
+        <h1 class="text-neon fw-bold mb-2">BPL LOGISTICS & TERMINAL</h1>
+        <p class="text-muted small">PAKET SEÇİMİ > TRANSFER > DOĞRULAMA</p>
     </div>
 
     <div class="row mb-5">
-        <div class="col-md-3 mb-4">
-            <div class="package-card p-4 text-center h-100" onclick="selectPackage(1, 100)">
-                <div class="bpl-amount">100 BPL</div>
-                <div class="price-tag">1$</div>
-                <small class="text-muted">Standart Paket</small>
+        <% const packages = [ {usd: 1, bpl: 100, note: 'Standart'}, {usd: 4, bpl: 500, note: '%20 Bonus'}, {usd: 7, bpl: 1000, note: '%30 Fırsat'}, {usd: 33, bpl: 5000, note: '%34 Mega'} ]; %>
+        <% packages.forEach(pkg => { %>
+            <div class="col-md-3 mb-4">
+                <div class="package-card p-4 text-center h-100" onclick="selectPackage(this, <%= pkg.usd %>, <%= pkg.bpl %>)">
+                    <div class="bpl-amount mb-2"><%= pkg.bpl %> BPL</div>
+                    <div class="price-tag mb-2">$<%= pkg.usd %></div>
+                    <span class="badge bg-dark text-neon border border-secondary"><%= pkg.note %></span>
+                </div>
             </div>
-        </div>
-        <div class="col-md-3 mb-4">
-            <div class="package-card p-4 text-center h-100 border-info" onclick="selectPackage(4, 500)">
-                <div class="bpl-amount">500 BPL</div>
-                <div class="price-tag">4$</div>
-                <small class="text-info">%20 İndirimli</small>
-            </div>
-        </div>
-        <div class="col-md-3 mb-4">
-            <div class="package-card p-4 text-center h-100 border-warning" onclick="selectPackage(7, 1000)">
-                <div class="bpl-amount">1000 BPL</div>
-                <div class="price-tag">7$</div>
-                <small class="text-warning">%30 İndirimli</small>
-            </div>
-        </div>
-        <div class="col-md-3 mb-4">
-            <div class="package-card p-4 text-center h-100 border-danger" onclick="selectPackage(33, 5000)">
-                <div class="bpl-amount">5000 BPL</div>
-                <div class="price-tag">33$</div>
-                <small class="text-danger">%34 Fırsat!</small>
-            </div>
-        </div>
+        <% }) %>
     </div>
 
     <div class="row justify-content-center">
-        <div class="col-md-8">
-            <div class="neon-border p-4">
-                <h4 class="text-neon mb-4 text-center">ÖDEME BİLDİRİMİ</h4>
-                
-                <div class="alert alert-dark border-secondary small mb-4">
-                    <strong>1. Adım:</strong> Aşağıdaki adrese seçtiğiniz paketin tutarı kadar USDT (BEP20) gönderin.<br>
-                    <strong>2. Adım:</strong> Transfer başarılı olduktan sonra "TxID" kodunu buraya yapıştırın.
-                </div>
-
-                <div class="mb-4 text-center">
-                    <label class="text-muted small d-block">Şirket USDT (BEP20) Cüzdan Adresi:</label>
-                    <code class="h5 text-white bg-dark p-2 d-block rounded mt-2">0x9f63e92E8B316b7119b4586998966dF4446Dc754</code>
-                </div>
-
-                <div class="tx-input-group">
-                    <div class="mb-3">
-                        <label class="form-label">Seçilen Paket:</label>
-                        <input type="text" id="displayPackage" class="form-control bg-dark text-warning fw-bold" readonly value="Lütfen yukarıdan paket seçin">
+        <div class="col-lg-10">
+            <div class="payment-terminal neon-border">
+                <div class="row">
+                    <div class="col-md-6 border-end border-secondary">
+                        <h5 class="text-neon mb-4"><i class="fas fa-satellite-dish me-2"></i>TRANSFER TALİMATI</h5>
+                        <div class="mb-4">
+                            <p class="small text-muted mb-1"><span class="step-num">1</span> Ağ Tipi:</p>
+                            <span class="badge bg-danger px-3 py-2">BEP20 (BNB Smart Chain)</span>
+                        </div>
+                        <div class="mb-4">
+                            <p class="small text-muted mb-1"><span class="step-num">2</span> Şirket Cüzdanı:</p>
+                            <div class="d-flex align-items-center bg-black p-2 rounded border border-secondary">
+                                <code class="text-white small" id="walletAddr">0x9f63e92E8B316b7119b4586998966dF4446Dc754</code>
+                                <i class="fas fa-copy ms-auto text-neon" style="cursor:pointer" onclick="copyWallet()"></i>
+                            </div>
+                        </div>
+                        <div class="alert alert-warning bg-transparent border-warning small">
+                            <i class="fas fa-info-circle me-1"></i> Sadece USDT gönderin. Gönderdikten sonra TxID kodunu yan tarafa girin.
+                        </div>
                     </div>
-                    <div class="mb-3">
-                        <label class="form-label">İşlem Numarası (TxID):</label>
-                        <input type="text" id="txidInput" class="form-control bg-dark text-white border-success" placeholder="0x...">
-                        <small class="text-muted">BSCScan üzerindeki Transaction Hash kodudur.</small>
+                    
+                    <div class="col-md-6 ps-md-4 mt-4 mt-md-0">
+                        <h5 class="text-neon mb-4"><i class="fas fa-fingerprint me-2"></i>İŞLEM DOĞRULAMA</h5>
+                        <div class="mb-3">
+                            <label class="small text-muted">Seçilen Yükleme:</label>
+                            <input type="text" id="displayPackage" class="form-control tx-input" readonly value="Lütfen Paket Seçin">
+                        </div>
+                        <div class="mb-4">
+                            <label class="small text-muted">Transaction Hash (TxID):</label>
+                            <input type="text" id="txidInput" class="form-control tx-input" placeholder="0x...">
+                        </div>
+                        
+                        <button onclick="submitPayment()" class="btn btn-verify w-100" id="verifyBtn">
+                            <span class="btn-text">PROTOKOLÜ BAŞLAT</span>
+                            <div class="spinner-border spinner-border-sm loading-spinner" role="status"></div>
+                        </button>
                     </div>
-                    <button onclick="submitPayment()" class="btn btn-neon w-100 py-3">ÖDEMEYİ DOĞRULA VE BPL AL</button>
-                </div>
-                
-                <div class="text-center mt-3">
-                    <a href="/wallet?id=<%= user.id %>" class="text-muted small text-decoration-none">← Cüzdana Geri Dön</a>
                 </div>
             </div>
         </div>
@@ -123,24 +114,33 @@
 </div>
 
 <script>
-    let selectedUSD = 0;
-    let selectedBPL = 0;
+    let selectedUSD = 0; let selectedBPL = 0;
 
-    function selectPackage(usd, bpl) {
-        selectedUSD = usd;
-        selectedBPL = bpl;
-        document.getElementById('displayPackage').value = `${bpl} BPL - (${usd} USDT)`;
-        // Görsel geri bildirim
-        window.scrollTo({ top: document.body.scrollHeight, behavior: 'smooth' });
+    function selectPackage(el, usd, bpl) {
+        document.querySelectorAll('.package-card').forEach(c => c.classList.remove('active'));
+        el.classList.add('active');
+        selectedUSD = usd; selectedBPL = bpl;
+        document.getElementById('displayPackage').value = bpl + " BPL ( " + usd + " USDT )";
+    }
+
+    function copyWallet() {
+        navigator.clipboard.writeText("0x9f63e92E8B316b7119b4586998966dF4446Dc754");
+        alert("Cüzdan adresi kopyalandı!");
     }
 
     function submitPayment() {
         const txid = document.getElementById('txidInput').value.trim();
-        
-        if (selectedUSD === 0) return alert("Lütfen önce bir paket seçin!");
-        if (txid.length < 10) return alert("Lütfen geçerli bir TxID (Transaction Hash) girin!");
+        if (selectedUSD === 0) return alert("Önce paket seçmelisin!");
+        if (txid.length < 20) return alert("Geçerli bir TxID girin!");
 
-        // API'ye gönderim
+        const btn = document.getElementById('verifyBtn');
+        const spinner = btn.querySelector('.loading-spinner');
+        const btnText = btn.querySelector('.btn-text');
+
+        btn.disabled = true;
+        spinner.style.display = 'inline-block';
+        btnText.innerText = "SİSTEM TARANIYOR...";
+
         fetch('/verify-payment', {
             method: 'POST',
             headers: {'Content-Type': 'application/x-www-form-urlencoded'},
@@ -149,27 +149,16 @@
         .then(r => r.json())
         .then(data => {
             if(data.status === 'success') {
-                alert("Tebrikler! Ödemeniz alındı ve BPL hesabınıza yüklendi.");
-                window.location.href = '/wallet?id=<%= user.id %>';
+                alert("DOĞRULAMA BAŞARILI! BPL Hesabınıza Aktarıldı.");
+                window.location.href = '/wallet';
             } else {
-                alert("Hata: " + data.msg);
+                alert("SİSTEM REDDETTİ: " + data.msg);
+                btn.disabled = false;
+                spinner.style.display = 'none';
+                btnText.innerText = "TEKRAR DENE";
             }
-        })
-        .catch(err => alert("Bir sistem hatası oluştu!"));
+        });
     }
 </script>
-
-<script src="/socket.io/socket.io.js"></script>
-<script>
-    const socket = io(); // Her sayfada bu bağlantıyı başlatır
-    
-    // Aktif sayısını her sayfada güncel tutmak için:
-    socket.on('update-active-count', (count) => {
-        const playerEl = document.getElementById('active-players');
-        if(playerEl) playerEl.innerText = count + " OYUNCU";
-    });
-</script>
-
 </body>
-
 </html>
