@@ -40,6 +40,66 @@ const checkAuth = (req, res, next) => {
     if (req.session.userId) next(); else res.redirect('/');
 };
 
+// 1. Bunlar dosyanın en üstünde, require'ların altında olsun
+const onlineUsers = {}; 
+const busyUsers = new Set();
+
+// 2. Socket.io ana bloğu
+io.on('connection', (socket) => {
+    console.log('Yeni bağlantı:', socket.id);
+
+    // Kullanıcı Kaydı
+    socket.on('register-user', (data) => {
+        socket.nickname = data.nickname;
+        socket.userId = data.id;
+        onlineUsers[data.nickname] = socket.id;
+        io.emit('update-online-players', Object.keys(onlineUsers).length);
+    });
+
+    // ARENA EŞLEŞME (Burası rakip bulmanı sağlar)
+    socket.on('join-arena', () => {
+        // Meşgul olmayan başka birini ara
+        const opponentNickname = Object.keys(onlineUsers).find(nick => 
+            nick !== socket.nickname && !busyUsers.has(nick)
+        );
+
+        if (opponentNickname) {
+            const opponentSocketId = onlineUsers[opponentNickname];
+            const roomId = `arena_${socket.nickname}_${opponentNickname}`;
+
+            socket.join(roomId);
+            const opponentSocket = io.sockets.sockets.get(opponentSocketId);
+            if (opponentSocket) opponentSocket.join(roomId);
+
+            busyUsers.add(socket.nickname);
+            busyUsers.add(opponentNickname);
+
+            io.to(roomId).emit('match-found', { 
+                player1: socket.nickname, 
+                player2: opponentNickname,
+                roomId: roomId 
+            });
+        } else {
+            socket.emit('waiting-for-opponent');
+        }
+    });
+
+    // Bağlantı kopunca temizlik
+    socket.on('disconnect', () => {
+        if (socket.nickname) {
+            delete onlineUsers[socket.nickname];
+            busyUsers.delete(socket.nickname);
+            io.emit('update-online-players', Object.keys(onlineUsers).length);
+        }
+    });
+}); // <--- Ana blok burada bitiyor
+
+
+
+
+
+
+
 // --- GET ROTALARI ---
 app.get('/', (req, res) => res.render('index', { userIp: req.ip }));
 
@@ -336,6 +396,7 @@ let onlineUsers = {};
 server.listen(PORT, "0.0.0.0", () => {
     console.log(`BPL SERVER RUNNING ON PORT ${PORT}`);
 });
+
 
 
 
