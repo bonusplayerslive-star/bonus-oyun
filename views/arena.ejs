@@ -2,70 +2,61 @@
 <html lang="tr">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
     <title>BPL ARENA</title>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+    <script src="/socket.io/socket.io.js"></script>
     <style>
-        body { 
-            background: #000; color: #39FF14; font-family: 'Courier New', monospace; 
-            margin: 0; padding: 20px; -webkit-text-size-adjust: 100%;
-        }
-        .arena-box { max-width: 500px; margin: auto; }
-        .opponent-card { 
-            border: 1px solid #39FF14; padding: 15px; border-radius: 10px; margin-bottom: 15px;
-            display: flex; justify-content: space-between; align-items: center;
-            background: rgba(57, 255, 20, 0.05);
-        }
-        .btn-attack { 
-            background: transparent; border: 1px solid #39FF14; color: #39FF14;
-            padding: 10px 15px; border-radius: 5px; cursor: pointer;
-            font-weight: bold; -webkit-tap-highlight-color: transparent;
-        }
-        .btn-attack:active { background: #39FF14; color: #000; }
-        .header { text-align: center; color: #FFFF00; letter-spacing: 2px; }
+        body { background: #000; color: #39FF14; font-family: monospace; }
+        .opponent-card { border: 1px solid #39FF14; padding: 15px; border-radius: 10px; margin-bottom: 10px; display: flex; justify-content: space-between; }
+        .header { color: #FFFF00; text-align: center; margin-bottom: 30px; }
     </style>
 </head>
 <body>
+    <div class="container py-5" style="max-width: 600px;">
+        <h1 class="header">ARENA - CANLI RAKİPLER</h1>
+        <div id="status" class="text-center mb-4">Rakip aranıyor... <span id="timer">18</span>s</div>
+        
+        <div id="player-list"></div>
 
-    <div class="arena-box">
-        <h1 class="header">ARENA</h1>
-        <p style="text-align: center;">Aktif Hayvan: <strong><%= selectedAnimal || (user.inventory[0] || 'Yok') %></strong></p>
-        <p style="text-align: center; font-size: 0.8em; color: #888;">Bakiye: <span id="balance"><%= user.bpl %></span> BPL</p>
-
-        <div id="opponents-list">
-            <div class="opponent-card">
-                <div>
-                    <span style="color: #FFFF00;">Elite_Savaşçı</span><br>
-                    <small>Güç: 85</small>
-                </div>
-                <button class="btn-attack" onclick="fight('BOT_123')">SALDIR</button>
-            </div>
+        <div id="bot-card" style="display:none;" class="opponent-card border-warning text-warning">
+            <span><b>ELITE BOT #001</b></span>
+            <button class="btn btn-warning btn-sm" onclick="attackBot()">BOTLA SAVAŞ</button>
         </div>
 
-        <a href="/profil" style="display:block; text-align:center; color:red; text-decoration:none; margin-top:20px;">← GERİ DÖN</a>
+        <a href="/profil" class="btn btn-outline-danger w-100 mt-4">ARENADAN ÇIK</a>
     </div>
 
     <script>
-        async function fight(oppId) {
-            const animal = "<%= selectedAnimal || user.inventory[0] %>";
-            if(!animal || animal === 'undefined') return alert("Önce marketten bir hayvan almalısın!");
+        const socket = io();
+        let timeLeft = 18;
+        
+        socket.emit('join-arena', { id: "<%= user._id %>", nickname: "<%= user.nickname %>" });
 
-            if(!confirm("Savaşa girmek istediğine emin misin?")) return;
+        const timer = setInterval(() => {
+            timeLeft--;
+            document.getElementById('timer').innerText = timeLeft;
+            if(timeLeft <= 0) {
+                clearInterval(timer);
+                document.getElementById('status').innerText = "RAKİP BULUNAMADI - BOT AKTİF";
+                document.getElementById('bot-card').style.display = 'flex';
+            }
+        }, 1000);
 
-            try {
-                const res = await fetch('/attack', {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ defenderId: oppId, animalName: animal })
-                });
-                const data = await res.json();
-                
-                if(data.status === 'success') {
-                    alert(`SAVAŞ BİTTİ!\nKazanan: ${data.winner}\nÖdül: ${data.reward} BPL`);
-                    document.getElementById('balance').innerText = data.newBalance;
-                } else {
-                    alert(data.msg);
+        socket.on('arena-list-update', (players) => {
+            const list = document.getElementById('player-list');
+            list.innerHTML = '';
+            players.forEach(p => {
+                if(p.id !== "<%= user._id %>") {
+                    list.innerHTML += `<div class="opponent-card"><span>${p.nickname}</span><button class="btn btn-success btn-sm">MEYDAN OKU</button></div>`;
                 }
-            } catch(e) { alert("Bağlantı hatası!"); }
+            });
+        });
+
+        async function attackBot() {
+            const res = await fetch('/attack-bot', { method: 'POST' });
+            const data = await res.json();
+            alert(`Savaş Sonucu: ${data.winner}\nÖdül: ${data.reward} BPL`);
+            location.href = '/profil';
         }
     </script>
 </body>
