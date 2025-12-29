@@ -94,6 +94,42 @@ app.post('/register', async (req, res) => {
     } catch (e) { res.send("Kayıt Hatası!"); }
 });
 
+app.post('/buy-animal', checkAuth, async (req, res) => {
+    try {
+        const { animalName, price } = req.body;
+        const user = await User.findById(req.session.userId);
+
+        // 1. Envanter Kontrolü (Max 3)
+        if (user.inventory.length >= 3) {
+            return res.json({ status: 'error', msg: 'Çantanız dolu! En fazla 3 hayvan taşıyabilirsiniz.' });
+        }
+
+        // 2. Bakiye Kontrolü
+        if (user.bpl < price) {
+            return res.json({ status: 'error', msg: 'Yetersiz BPL bakiyesi!' });
+        }
+
+        // 3. İşlemi Gerçekleştir
+        user.bpl -= price;
+        user.inventory.push(animalName);
+        
+        // Hayvana başlangıç statları ata (Opsiyonel)
+        if (!user.stats) user.stats = {};
+        user.stats[animalName] = { hp: 100, atk: 20, def: 10 };
+        
+        user.markModified('inventory');
+        user.markModified('stats');
+        await user.save();
+
+        res.json({ status: 'success', msg: `${animalName} başarıyla alındı!` });
+    } catch (e) {
+        res.json({ status: 'error', msg: 'Satın alma hatası!' });
+    }
+});
+
+
+
+
 // BOT SAVAŞI (VİDEO DESTEKLİ)
 app.post('/attack-bot', checkAuth, async (req, res) => {
     try {
@@ -327,6 +363,7 @@ app.post('/verify-payment', checkAuth, async (req, res) => {
 
 
 server.listen(PORT, "0.0.0.0", () => console.log(`BPL CALISIYOR: ${PORT}`));
+
 
 
 
