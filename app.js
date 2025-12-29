@@ -4,14 +4,13 @@ const bodyParser = require('body-parser');
 const http = require('http');
 const socketIo = require('socket.io');
 const session = require('express-session');
-const mongoose = require('mongoose'); // Mongoose eklendi
+const mongoose = require('mongoose');
 const axios = require('axios');
 
 const connectDB = require('./db');
 const User = require('./models/User');
 const Log = require('./models/Log');
 const Payment = require('./models/Payment');
-// Victory, Punishment ve Income modellerini içe aktardığından emin ol
 const Victory = require('./models/Victory'); 
 const Punishment = require('./models/Punishment');
 const Income = require('./models/Income'); 
@@ -197,17 +196,6 @@ app.post('/verify-payment', checkAuth, async (req, res) => {
     } catch (e) { res.json({ status: 'error' }); }
 });
 
-// --- SOCKET SİSTEMİ (GLOBAL) ---
-let onlineUsers = {}; 
-
-io.on('connection', (socket) => {
-    socket.on('register-user', (data) => {
-        socket.nickname = data.nickname;
-        socket.userId = data.id;
-        onlineUsers[data.nickname] = socket.id;
-        io.emit('update-online-players', Object.keys(onlineUsers));
-    });
-
 // --- SOCKET SİSTEMİ (ARENA, CHAT, MEETING & GIFT) ---
 let onlineUsers = {}; 
 
@@ -224,14 +212,13 @@ io.on('connection', (socket) => {
     socket.on('join-chat', (data) => { socket.join('Global'); });
 
     socket.on('chat-message', (data) => {
-        // Hem Global odaya hem genel emit (Undefined hatasını önlemek için veri yapısı sabitlendi)
         io.emit('new-message', { 
             sender: data.nickname, 
             text: data.message 
         });
     });
 
-    // 3. HEDİYE SİSTEMİ (CHART & MEETING İÇİN)
+    // 3. HEDİYE SİSTEMİ
     socket.on('send-gift', async (data) => {
         try {
             const sender = await User.findById(data.userId || socket.userId);
@@ -239,7 +226,6 @@ io.on('connection', (socket) => {
 
             if (!sender || !receiver) return;
 
-            // ŞİRKET KURALI: 6000 BPL Altı Globalde hediye gönderemez
             if (data.room === 'Global' && sender.bpl < 6000) {
                 return socket.emit('gift-result', { message: "Hediye için en az 6000 BPL bakiye gerekir!" });
             }
@@ -251,17 +237,14 @@ io.on('connection', (socket) => {
                 await sender.save();
                 await receiver.save();
 
-                // Gönderene yeni bakiyesini bildir
                 socket.emit('gift-result', { 
                     newBalance: sender.bpl, 
                     message: `${data.to} kişisine ${giftAmount} BPL gönderildi!` 
                 });
 
-                // Odadakilere duyur
                 const announceMsg = `🎁 ${sender.nickname} -> ${receiver.nickname} kullanıcısına ${giftAmount} BPL hediye etti!`;
                 if(data.room) {
                     io.to(data.room).emit('new-message', { sender: "SİSTEM", text: announceMsg });
-                    io.to(data.room).emit('gift-result', { message: announceMsg });
                 } else {
                     io.emit('new-message', { sender: "SİSTEM", text: announceMsg });
                 }
@@ -269,7 +252,7 @@ io.on('connection', (socket) => {
         } catch (e) { console.log("Hediye hatası:", e); }
     });
 
-    // 4. BEŞGEN MASA (MEETING) ÖZEL SİNYALLERİ
+    // 4. BEŞGEN MASA & MEYDAN OKUMA
     socket.on('join-room', (data) => {
         socket.join(data.roomId);
         io.to(data.roomId).emit('new-message', { 
@@ -278,7 +261,6 @@ io.on('connection', (socket) => {
         });
     });
 
-    // 5. MEYDAN OKUMA (ARENA DAVETİ)
     socket.on('challenge-player', (data) => {
         const targetSocketId = onlineUsers[data.targetNickname];
         if (targetSocketId) {
@@ -292,5 +274,7 @@ io.on('connection', (socket) => {
     });
 });
 
-server.listen(PORT, "0.0.0.0", () => console.log(`BPL SERVER RUNNING ON ${PORT}`));
-
+// --- SERVER START ---
+server.listen(PORT, "0.0.0.0", () => {
+    console.log(`BPL SERVER RUNNING ON PORT ${PORT}`);
+});
