@@ -126,90 +126,91 @@ app.post('/buy-animal', checkAuth, async (req, res) => {
         res.json({ status: 'error', msg: 'Satın alma hatası!' });
     }
 });
-
-// --- SAVAŞ ROTASI ---
+// --- 1. SAVAŞ BAŞLATMA (POST /attack-bot) ---
 app.post('/attack-bot', checkAuth, async (req, res) => {
     try {
         const user = await User.findById(req.session.userId);
-        const animal = req.query.animal || "Lion"; // Seçilen hayvan
         
-        // Kazananı sunucuda belirle (%50 şans)
+        // Gelen hayvan ismini temizle ve formatla (örn: bear -> Bear)
+        let animal = req.query.animal || "Lion";
+        animal = animal.charAt(0).toUpperCase() + animal.slice(1).toLowerCase();
+
+        // %50 Şansla Kazananı Belirle
         const isWin = Math.random() > 0.5;
-        
-        // Video Yolları (Senin klasör yapına göre)
-        const animation = {
-            actionVideo: `/caracter/move/${animal}/${animal}1.mp4`, // Saldırı
-            winVideo: `/caracter/move/${animal}/${animal}.mp4`,    // Zafer
-            isWin: isWin
+
+        // Session'a Savaş Kaydını At (Ceza kontrolü için kritik)
+        req.session.activeBattle = { 
+            status: 'playing', 
+            animal: animal,
+            reward: 50,
+            penalty: 10 
         };
 
-        // Eğer kullanıcı videoyu bitirmezse ceza alması için bir "Savaş ID" oluşturup session'a atıyoruz
-        req.session.activeBattle = { status: 'playing', reward: 50 };
-        
-        res.json({ status: 'success', animation, reward: 50 });
-    } catch (e) {
-        res.json({ status: 'error', msg: 'Arena hatası!' });
-    }
-});
-
-// Savaş Başarıyla Bittiğinde (Ödül Ekleme)
-app.post('/battle-complete', checkAuth, async (req, res) => {
-    const user = await User.findById(req.session.userId);
-    if(req.session.activeBattle) {
-        user.bpl += 50;
-        await user.save();
-        await new Victory({ email: user.email, nickname: user.nickname, bpl: user.bpl }).save();
-        req.session.activeBattle = null; // Savaş bitti
-        res.json({ status: 'success', newBalance: user.bpl });
-    }
-});
-
-// Savaş Yarıda Kesilirse (Ceza Kesme - Bu fonksiyonu sayfadan ayrılırken tetikleyeceğiz)
-app.post('/battle-punish', checkAuth, async (req, res) => {
-    const user = await User.findById(req.session.userId);
-    if(req.session.activeBattle) {
-        user.bpl -= 10;
-        await user.save();
-        await new Punishment({ email: user.email, bpl: user.bpl, reason: 'Erken Ayrılma' }).save();
-        req.session.activeBattle = null;
-        res.json({ status: 'punished', newBalance: user.bpl });
-    }
-});
-
-
-
-
-
-
-// BOT SAVAŞI (VİDEO DESTEKLİ)
-app.post('/attack-bot', checkAuth, async (req, res) => {
-    try {
-        const user = await User.findById(req.session.userId);
-        const animal = req.query.animal || user.inventory[0];
-        if(!animal) return res.json({status:'error', msg:'Hayvan yok!'});
-
-        const pStats = user.stats[animal] || { hp: 120, atk: 20, def: 15 };
-        const win = (pStats.hp + pStats.atk) > 130; // Basit mantık
-        const reward = win ? 150 : 0;
-
-        if(win) {
-            user.bpl += reward;
-            await user.save();
-        }
-
+        // Frontend'e video yollarını ve sonucu gönder
         res.json({
             status: 'success',
-            winner: win ? user.nickname : 'Elite_Bot',
-            reward,
             animation: {
-                actionVideo: `/caracter/move/${animal}/${animal}1.mp4`,
-                winVideo: `/caracter/move/${animal}/${animal}.mp4`,
-                isWin: win
-            }
+                actionVideo: `/caracter/move/${animal}/${animal}1.mp4`, // 8sn Saldırı
+                winVideo: `/caracter/move/${animal}/${animal}.mp4`,     // 8sn Zafer
+                isWin: isWin
+            },
+            reward: 50
         });
-    } catch (e) { res.json({status:'error'}); }
+
+    } catch (e) {
+        console.error("Arena Başlatma Hatası:", e);
+        res.json({ status: 'error', msg: 'Arena motoru hazır değil.' });
+    }
 });
 
+// --- 2. SAVAŞI BAŞARIYLA TAMAMLAMA (POST /battle-complete) ---
+app.post('/battle-complete', checkAuth, async (req, res) => {
+    try {
+        // Eğer aktif bir savaş yoksa ödül verme (Güvenlik)
+        if (!req.session.activeBattle) return res.json({ status: 'error', msg: 'Geçersiz işlem.' });
+
+        const user = await User.findById(req.session.userId);
+        user.bpl += 50; 
+
+        // Veritabanına Zafer Kaydı
+        await new Victory({ 
+            email: user.email, 
+            nickname: user.nickname, 
+            bpl: user.bpl 
+        }).save();
+
+        await user.save();
+        req.session.activeBattle = null; // Savaşı kapat
+        
+        res.json({ status: 'success', newBalance: user.bpl });
+    } catch (e) {
+        res.json({ status: 'error' });
+    }
+});
+
+// --- 3. ERKEN ÇIKANLARA CEZA (POST /battle-punish) ---
+// Bu rota Beacon API (navigator.sendBeacon) ile çalıştığı için res.json yerine res.end kullanır.
+app.post('/battle-punish', checkAuth, async (req, res) => {
+    try {
+        if (!req.session.activeBattle) return res.end();
+
+        const user = await User.findById(req.session.userId);
+        user.bpl -= 10; 
+
+        // Veritabanına Ceza Kaydı
+        await new Punishment({ 
+            email: user.email, 
+            bpl: user.bpl, 
+            reason: 'Savaşı yarıda bıraktı' 
+        }).save();
+
+        await user.save();
+        req.session.activeBattle = null; // Savaşı temizle
+        res.end(); 
+    } catch (e) {
+        res.end();
+    }
+});
 app.post('/sell-animal', checkAuth, async (req, res) => {
     const { animalName } = req.body;
     const user = await User.findById(req.session.userId);
@@ -414,6 +415,7 @@ app.post('/verify-payment', checkAuth, async (req, res) => {
 
 
 server.listen(PORT, "0.0.0.0", () => console.log(`BPL CALISIYOR: ${PORT}`));
+
 
 
 
