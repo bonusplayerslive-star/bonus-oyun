@@ -94,7 +94,7 @@ app.post('/register', async (req, res) => {
 // --- HAYVAN GELİŞTİRME (UPGRADE) ---
 app.post('/upgrade-animal', checkAuth, async (req, res) => {
     const { animalIndex } = req.body;
-    const upgradeCost = 500; // Her geliştirme 500 BPL olsun
+    const upgradeCost = 50; // Her geliştirme 500 BPL olsun
 
     try {
         const user = await User.findById(req.session.userId);
@@ -231,6 +231,7 @@ server.listen(PORT, "0.0.0.0", () => {
     =========================================
     `);
 });
+
 
 
 
