@@ -29,7 +29,7 @@
             border-bottom: 1px solid rgba(57, 255, 20, 0.3);
             backdrop-filter: blur(10px);
         }
-        /* LOGO DÜZELTMESİ */
+        
         .navbar-brand img {
             height: 50px;
             filter: drop-shadow(0 0 5px var(--neon-green));
@@ -56,14 +56,13 @@
             position: relative;
         }
 
-        /* 4. VE 13. RESİMDEKİ BARLARIN KUTU İÇİNE SIĞDIRILMASI */
         .token-bar-container { 
             height: 200px; 
             display: flex; 
             align-items: flex-end; 
             justify-content: space-around; 
             margin-top: 30px;
-            padding-bottom: 40px; /* Alttaki isimler için boşluk */
+            padding-bottom: 40px;
             border-bottom: 2px solid rgba(57, 255, 20, 0.1);
         }
         .token-bar { 
@@ -98,17 +97,21 @@
 
         .auth-overlay {
             display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%;
-            background: rgba(0,0,0,0.9); z-index: 9999; justify-content: center; align-items: center;
+            background: rgba(0,0,0,0.95); z-index: 9999; justify-content: center; align-items: center;
         }
         .custom-input {
             background: rgba(255,255,255,0.05); border: 1px solid rgba(57,255,20,0.3);
             color: white; border-radius: 8px; padding: 12px; margin-bottom: 15px;
         }
+        .custom-input:focus {
+            background: rgba(255,255,255,0.1); border-color: var(--neon-green); color: white; box-shadow: none;
+        }
         .contract-address {
             background: rgba(57, 255, 20, 0.1); padding: 10px; border-radius: 5px;
             font-family: monospace; border: 1px dashed var(--neon-green); cursor: pointer;
-            word-break: break-all;
+            word-break: break-all; transition: 0.3s;
         }
+        .contract-address:hover { background: rgba(57, 255, 20, 0.2); }
     </style>
 </head>
 <body>
@@ -116,7 +119,7 @@
     <nav class="navbar navbar-expand-lg fixed-top">
         <div class="container">
             <a class="navbar-brand" href="/">
-                <img src="/caracter/page/logo.jpeg" alt="BPL LOGO">
+                <img src="/caracter/page/logo.jpeg" alt="BPL LOGO" onerror="this.src='/caracter/page/welcome.jpg'">
             </a>
             <div class="ms-auto">
                 <button class="btn btn-outline-info btn-sm me-2" onclick="openAuth('login')"><i class="fas fa-sign-in-alt"></i> SIGN IN</button>
@@ -132,7 +135,7 @@
         <div class="row g-4 mt-5">
             <div class="col-md-6 text-start">
                 <div class="glass-card">
-                    <h4 class="neon-text mb-4">TOKEN ALLOCATION</h4>
+                    <h4 class="neon-text mb-4" style="color: var(--neon-green);">TOKEN ALLOCATION</h4>
                     <div class="token-bar-container">
                         <div class="token-bar bg-success" style="height: 75%;"><span class="bar-label">75%</span><span class="bar-name">Company</span></div>
                         <div class="token-bar bg-info" style="height: 15%;"><span class="bar-label">15%</span><span class="bar-name">Market</span></div>
@@ -145,13 +148,13 @@
             <div class="col-md-6 text-start">
                 <div class="glass-card">
                     <h4 class="text-warning mb-3">CONTRACT ADDRESS (BEP20)</h4>
-                    <p class="small text-secondary">Add this to your MetaMask or TrustWallet:</p>
+                    <p class="small text-secondary">Add this to your MetaMask or TrustWallet to receive your earnings:</p>
                     <div class="contract-address" onclick="copyContract()">0xB47FD3EFAcDdB316685D14B89598D78B4ce25181</div>
                     <ul class="mt-4 small text-secondary list-unstyled">
-                        <li><i class="fas fa-check-circle text-success me-2"></i> Instant 2500 BPL Bonus on Registration</li>
-                        <li><i class="fas fa-check-circle text-success me-2"></i> Video/Voice Meeting Rooms</li>
-                        <li><i class="fas fa-check-circle text-success me-2"></i> Global Gifting System</li>
-                        <li><i class="fas fa-check-circle text-success me-2"></i> BEP20 Withdrawal Support</li>
+                        <li class="mb-2"><i class="fas fa-check-circle text-success me-2"></i> Instant 2500 BPL Bonus on Registration</li>
+                        <li class="mb-2"><i class="fas fa-check-circle text-success me-2"></i> Video/Voice Meeting Rooms</li>
+                        <li class="mb-2"><i class="fas fa-check-circle text-success me-2"></i> Global Gifting System</li>
+                        <li class="mb-2"><i class="fas fa-check-circle text-success me-2"></i> BEP20 Withdrawal Support</li>
                     </ul>
                 </div>
             </div>
@@ -180,16 +183,16 @@
     </div>
 
     <div class="auth-overlay" id="authOverlay">
-        <div class="glass-card" style="width: 450px; border-color: var(--neon-green);">
+        <div class="glass-card" style="width: 450px; border-color: var(--neon-green); height: auto;">
             <div class="text-center mb-4">
-                <img src="/caracter/page/logo.jpeg" style="height: 60px;">
-                <h3 id="authTitle" class="neon-text mt-3">ACCESS PANEL</h3>
+                <img src="/caracter/page/logo.jpeg" style="height: 60px;" onerror="this.src='/caracter/page/welcome.jpg'">
+                <h3 id="authTitle" class="mt-3" style="color: var(--neon-green); font-family: 'Orbitron';">ACCESS PANEL</h3>
             </div>
             
             <form id="authForm" method="POST">
                 <div id="nicknameGroup">
                     <label class="small text-success">OPERATOR NICKNAME</label>
-                    <input type="text" name="nickname" class="form-control custom-input" placeholder="Choose a name...">
+                    <input type="text" name="nickname" id="nicknameInput" class="form-control custom-input" placeholder="Choose a name...">
                 </div>
                 <label class="small text-success">EMAIL ADDRESS</label>
                 <input type="email" name="email" class="form-control custom-input" placeholder="name@example.com" required>
@@ -220,24 +223,35 @@
             document.getElementById('authOverlay').style.display = 'flex';
             const title = document.getElementById('authTitle');
             const nickGroup = document.getElementById('nicknameGroup');
+            const nickInput = document.getElementById('nicknameInput');
             const forgot = document.getElementById('forgotSection');
             const form = document.getElementById('authForm');
+            
             if(type === 'login') {
-                form.action = '/login'; title.innerText = 'CORE LOGIN';
-                nickGroup.style.display = 'none'; forgot.style.display = 'block';
+                form.action = '/login'; 
+                title.innerText = 'CORE LOGIN';
+                nickGroup.style.display = 'none'; 
+                nickInput.required = false;
+                forgot.style.display = 'block';
             } else {
-                form.action = '/register'; title.innerText = 'NEW RECRUIT';
-                nickGroup.style.display = 'block'; forgot.style.display = 'none';
+                form.action = '/register'; 
+                title.innerText = 'NEW RECRUIT';
+                nickGroup.style.display = 'block'; 
+                nickInput.required = true;
+                forgot.style.display = 'none';
             }
         }
+        
         function closeAuth() { document.getElementById('authOverlay').style.display = 'none'; }
+        
         function toggleForgot() {
             const ff = document.getElementById('forgotForm');
             ff.style.display = ff.style.display === 'none' ? 'block' : 'none';
         }
+        
         function copyContract() {
             navigator.clipboard.writeText('0xB47FD3EFAcDdB316685D14B89598D78B4ce25181');
-            alert('Contract Address Copied!');
+            alert('Contract Address Copied to Clipboard!');
         }
     </script>
 </body>
