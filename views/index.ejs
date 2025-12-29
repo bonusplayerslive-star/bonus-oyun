@@ -2,393 +2,77 @@
 <html lang="en">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>BonusPlayersLive | Elite Gaming & Vision</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>BonusPlayersLive</title>
     <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
-    <script src="/socket.io/socket.io.js"></script>
     <style>
-        :root {
-            --neon-green: #39FF14;
-            --neon-blue: #00f3ff;
-            --neon-red: #ff003c;
-            --dark-glass: rgba(0, 0, 0, 0.7); /* Zemin görünmesi için düşürüldü */
-        }
-
-        body {
-            background: #050505 url('/caracter/page/welcome.jpg') no-repeat center center fixed;
-            background-size: cover;
-            color: white;
-            font-family: 'Segoe UI', Roboto, sans-serif;
-            overflow-x: hidden;
-            min-height: 100vh;
-        }
-
-        /* Sağ Üst Yanar Döner Butonlar */
-        .auth-nav {
-            position: fixed;
-            top: 20px;
-            right: 20px;
-            z-index: 1050;
-            display: flex;
-            gap: 15px;
-        }
-
-        .btn-glow {
-            padding: 10px 25px;
-            border: none;
-            border-radius: 50px;
-            font-weight: 800;
-            text-transform: uppercase;
-            cursor: pointer;
-            transition: 0.5s;
-            background-size: 200% auto;
-            color: white;
-            box-shadow: 0 0 15px rgba(0,0,0,0.5);
-        }
-
-        .btn-login-glow { background-image: linear-gradient(to right, #00d2ff 0%, #3a7bd5 51%, #00d2ff 100%); }
-        .btn-register-glow { background-image: linear-gradient(to right, #39FF14 0%, #008000 51%, #39FF14 100%); }
-
-        .btn-glow:hover {
-            background-position: right center;
-            transform: scale(1.05);
-            box-shadow: 0 0 30px var(--neon-green);
-        }
-
-        .main-logo {
-            position: absolute;
-            top: 20px;
-            left: 20px;
-            width: 55px;
-            height: 55px;
-            border-radius: 50%;
-            border: 2px solid var(--neon-green);
-            box-shadow: 0 0 15px var(--neon-green);
-            z-index: 1000;
-        }
-
-        .glass-box {
-            background: rgba(0, 0, 0, 0.65);
-            border: 1px solid rgba(255, 255, 255, 0.1);
-            backdrop-filter: blur(10px);
-            border-radius: 20px;
-            padding: 20px;
-            margin-bottom: 20px;
-            height: 100%;
-        }
-
-        .token-progress {
-            height: 25px;
-            display: flex;
-            border-radius: 12px;
-            overflow: hidden;
-            margin: 10px 0;
-            border: 1px solid rgba(255,255,255,0.2);
-        }
-
-        /* Form Overlay */
-        .form-overlay {
-            display: none;
-            position: fixed;
-            top: 0; left: 0; width: 100%; height: 100%;
-            background: rgba(0,0,0,0.75);
-            backdrop-filter: blur(12px);
-            z-index: 2000;
-            justify-content: center;
-            align-items: center;
-        }
-
-        .auth-card {
-            background: rgba(0, 0, 0, 0.6); /* Şeffaf form kartı */
-            border: 1px solid var(--neon-green);
-            border-radius: 24px;
-            padding: 30px;
-            width: 90%;
-            max-width: 400px;
-            box-shadow: 0 0 40px rgba(0, 255, 0, 0.15);
-        }
-
-        .form-control {
-            background: rgba(255, 255, 255, 0.1) !important;
-            border: 1px solid rgba(255, 255, 255, 0.2) !important;
-            color: white !important;
-        }
-
-        .ip-footer {
-            position: fixed;
-            bottom: 0; left: 0; width: 100%;
-            background: rgba(0, 0, 0, 0.8);
-            padding: 6px;
-            text-align: center;
-            font-size: 10px;
-            z-index: 100;
-        }
-
-        .neon-text { color: var(--neon-green); text-shadow: 0 0 10px var(--neon-green); }
-        .text-justify { text-align: justify; }
+        body { background: #050505 url('/caracter/page/welcome.jpg') no-repeat center center fixed; background-size: cover; color: white; }
+        .glass-box { background: rgba(0, 0, 0, 0.65); border: 1px solid rgba(255,255,255,0.1); backdrop-filter: blur(10px); border-radius: 20px; padding: 25px; height: 100%; }
+        .neon-text { color: #39FF14; text-shadow: 0 0 10px #39FF14; }
+        .form-overlay { display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.85); z-index: 2000; justify-content: center; align-items: center; }
+        .auth-card { background: rgba(0,0,0,0.6); border: 1px solid #39FF14; padding: 30px; border-radius: 20px; width: 350px; }
+        .btn-revolution { background: linear-gradient(45deg, #ff003c, #39FF14); color: white; border: none; padding: 15px 40px; border-radius: 50px; font-weight: 900; animation: pulse 2s infinite; }
+        @keyframes pulse { 0% { transform: scale(1); } 50% { transform: scale(1.05); } 100% { transform: scale(1); } }
     </style>
 </head>
 <body>
-
-    <img src="/caracter/page/logo.jpeg" class="main-logo" alt="BPL">
-
-    <div class="auth-nav">
-        <button class="btn-glow btn-login-glow" onclick="showAuth('login')">LOGIN</button>
-        <button class="btn-glow btn-register-glow" onclick="showAuth('register')">REGISTER</button>
-    </div>
-
-    <div class="container py-5" style="margin-top: 60px;">
-        <div class="row mb-4">
-            <div class="col-12 text-center">
-                <h1 class="display-4 fw-bold neon-text">BonusPlayersLive</h1>
-                <p class="h5">Canlı oyuncular her zaman kazanır.</p>
+    <div class="container py-5">
+        <div class="text-center mb-5">
+            <h1 class="display-3 neon-text fw-bold">BonusPlayersLive</h1>
+            <div class="d-flex justify-content-center gap-3 mt-3">
+                <button class="btn btn-outline-info" onclick="showAuth('login')">LOGIN</button>
+                <button class="btn btn-success" onclick="showAuth('register')">REGISTER</button>
             </div>
         </div>
 
         <div class="row g-4">
-            <div class="col-lg-4">
+            <div class="col-md-4">
                 <div class="glass-box">
-                    <h5 class="neon-text">***** HEDEFİMİZ *****</h5>
-                    <p class="small text-justify">Bu küçük ve basit oyunlar ile dolaşımı sağlayıp ismimizden söz ettireceğiz. Siz değerli kullanıcılar ile beraber tokenimiz en iyi yerlerde ve en iyi ücretlerle talep görecektir. İstenilen kullanıcı sayısına ulaşılırsa mutlaka V2 ve farklı karakterlerle karşınıza çıkacağız.</p>
-                    <p class="small text-justify">Beklediğimiz talep olursa <b>V3</b> ve can alıcı mükemmel oyunumuzla karşınıza çıkacağız. <b>VR gözlükle</b> oynanabilen, gerçekçi ve hayal gücünü zorlayan oyunumuzun bilinen bir token ile oynanması çok kolay olacak. 2026 yılında oyun hedeflerimize ulaşacağımıza inancımız tam.</p>
+                    <h4 class="neon-text">BLOK 1: VR VİZYONU</h4>
+                    <p>V3 hedefimiz VR gözlükle oynanabilen, hayal gücünü zorlayan gerçekçi bir oyun dünyasıdır. 2026'da bu hedefe ulaşacağız.</p>
                 </div>
             </div>
-
-            <div class="col-lg-4">
-                <div class="glass-box text-center">
-                    <h5 class="neon-text">TOKEN & KAZANÇ SİSTEMİ</h5>
-                    <div class="token-progress">
-                        <div style="width: 75%; background: #39FF14; color: black; font-size: 10px; font-weight:bold; display:flex; align-items:center; justify-content:center;">%75 ŞİRKET</div>
-                        <div style="width: 15%; background: #00f3ff; color: black; font-size: 10px; display:flex; align-items:center; justify-content:center;">%15 BORSA</div>
-                        <div style="width: 5%; background: #ff003c; font-size: 8px;">%5 OYN</div>
-                        <div style="width: 5%; background: #bc13fe; font-size: 8px;">%5 REK</div>
-                    </div>
-                    <p class="small text-justify mt-3">Kayıt olduğunuzda <b>2500 BPL</b> hesabınıza direkt geçer. Profil sayfanızdan markete girip 6 adet hayvandan birini seçerek geliştirip, diğer oyuncularla veya botlarla oynayarak BPL kazanabilirsiniz. Kazandığınız BPL'leri <b>BEP20</b> tabanlı cüzdanınıza aktarabilirsiniz.</p>
-                    <div class="p-2 bg-black rounded border border-info small" style="word-break: break-all; font-family: monospace;">
-                        0xB47FD3EFAcDdB316685D14B89598D78B4ce25181
-                    </div>
+            <div class="col-md-4">
+                <div class="glass-box">
+                    <h4 class="neon-text">BLOK 2: EKONOMİ</h4>
+                    <p>%75 Şirket, %15 Borsa, %5 Oyun, %5 Reklam. Kayıtta 2500 BPL hediye! BEP20 cüzdanınıza transfer imkanı.</p>
                 </div>
             </div>
-
-            <div class="col-lg-4">
+            <div class="col-md-4">
                 <div class="glass-box">
-                    <h5 class="neon-text">2028 SAĞLIK VİZYONU</h5>
-                    <p class="small text-justify">2028'in ilk çeyreğinde sağlık sektöründe büyük bir hammadde tedarikçisi olacağız. Ağrı kesici kullanımında %100 başarılı ve piyasada az bulunan, <b>göğüs kanseri</b> tedavisinde ciddi başarı sağlamış bir hammadde üzerinde çalışıyoruz.</p>
-                    <p class="small text-justify">Bu hammadde yüksek protein içerdiği için <b>akciğer kanseri</b> araştırmalarında Avrupa'da başarı sağlamıştır. Üniversiteler ile protokol imzalayıp AR-GE çalışmalarında hammadde ve ilaç tedariğinde bulunacağız. Oyunla başlayan eğlence, sağlıklı insanlarla devam edecek.</p>
+                    <h4 class="neon-text">BLOK 3: 2028 SAĞLIK</h4>
+                    <p>Kanser araştırmaları ve hammadde tedariği ile sağlık sektöründe devrim yaratacağız. Üniversite protokollerimiz yolda.</p>
                 </div>
             </div>
         </div>
 
-       <div class="row g-4">
-            <div class="col-lg-4">
-                <div class="glass-box">
-                    <h5 class="neon-text">  How to Play  </h5>
-                    <p class="small text-justify"> Gaming & Interaction (Social Hub)
-"You can send gifts to any user within limits in the Global Chat. If you want a more private experience, 
-join our Meeting Rooms for up to 5 people, featuring real-time voice and video chat. Feel the competition? 
-Send a Duel Challenge directly from the chat or meeting rooms and settle the score in the Arena!"
-</p>
-                    <p class="small text-justify"> Battle & Earn (The Economy)
-"Win BPL by defeating your opponents or bots in the Arena. Your earned BPL can be used for Character Evolution to become the strongest, 
-or you can withdraw them directly to your BEP-20 wallet. 
-Please note that a nominal transaction fee (minimal cut) applies to wallet transfers to maintain the ecosystem's health."  </p>
- 
-<p class="small text-justify"> Easy Access (Seamless Entry)
-"Getting into the action is easy! You can access the game directly from the Chat page or enter through the Meeting rooms.
-Wherever you are on the platform, the Arena is just one click away."  </p>
-</div>
- </div>
-
-<ul class="small text-white-50 ps-3">
-    <li><strong>Direct Access:</strong> Jump into the game from Chat or Meeting pages.</li>
-    <li><strong>Social Play:</strong> 5-player Video/Voice rooms & Global Gifting.</li>
-    <li><strong>Duel System:</strong> Challenge anyone in Chat to a fight in the Arena.</li>
-    <li><strong>Wallet Transfer:</strong> Withdraw BPL to your BEP-20 wallet (with a small nominal fee).</li>
-</ul>
-
-
-<div class="row mt-4 mb-5">
-    <div class="col-12 text-center">
-        <button class="btn-revolution" onclick="showAuth('register')">
-            JOIN THE REVOLUTION
-        </button>
-    </div>
-</div>
-
-<style>
-    .btn-revolution {
-        background: linear-gradient(45deg, #ff003c, #bc13fe, #39FF14, #00f3ff);
-        background-size: 400% 400%;
-        color: white;
-        border: none;
-        padding: 20px 50px;
-        font-size: 1.5rem;
-        font-weight: 900;
-        text-transform: uppercase;
-        letter-spacing: 4px;
-        border-radius: 50px;
-        cursor: pointer;
-        animation: gradientShift 5s ease infinite, pulseGlow 2s infinite;
-        transition: 0.4s;
-        box-shadow: 0 0 20px rgba(57, 255, 20, 0.4);
-    }
-
-    .btn-revolution:hover {
-        transform: scale(1.1) rotate(-1deg);
-        box-shadow: 0 0 50px rgba(0, 243, 255, 0.8);
-        letter-spacing: 6px;
-    }
-
-    @keyframes gradientShift {
-        0% { background-position: 0% 50%; }
-        50% { background-position: 100% 50%; }
-        100% { background-position: 0% 50%; }
-    }
-
-    @keyframes pulseGlow {
-        0% { box-shadow: 0 0 15px rgba(57, 255, 20, 0.4); }
-        50% { box-shadow: 0 0 35px rgba(0, 243, 255, 0.7); }
-        100% { box-shadow: 0 0 15px rgba(57, 255, 20, 0.4); }
-    }
-</style>
-
-
-      <div class="row mt-5">
-    <div class="col-12">
-        <div class="glass-box text-center shadow-lg" style="border: 2px solid var(--neon-blue); background: rgba(0, 243, 255, 0.05);">
-            <h4 class="fw-bold mb-3" style="color: var(--neon-blue); text-shadow: 0 0 15px var(--neon-blue);">
-                OUR PROMISE TO YOU
-            </h4>
-            <p class="lead fw-bold" style="color: #fff; letter-spacing: 1px;">
-                "Our potential, expertise, and dedicated team go beyond our promises. <br>
-                <span class="neon-text" style="font-size: 1.4rem;">With your support, we will achieve even more."</span>
-            </p>
-            <div class="mt-3">
-                <small class="text-white-50 text-uppercase" style="letter-spacing: 3px;">BonusPlayersLive Executive Team</small>
+        <div class="text-center mt-5">
+            <div class="p-4 glass-box border-info">
+                <h3 class="text-info">OUR PROMISE</h3>
+                <p class="lead">"Our potential, expertise, and dedicated team go beyond our promises. With your support, we will achieve even more."</p>
+                <button class="btn-revolution" onclick="showAuth('register')">JOIN THE REVOLUTION</button>
             </div>
         </div>
     </div>
-</div>
 
-    <div class="form-overlay" id="authOverlay" onclick="closeAuth(event)">
-        <div class="auth-card" onclick="event.stopPropagation()">
-            <ul class="nav nav-pills nav-justified mb-4" id="pills-tab">
-                <li class="nav-item">
-                    <button class="nav-link active" id="tab-login" data-bs-toggle="pill" data-bs-target="#pills-login">LOGIN</button>
-                </li>
-                <li class="nav-item">
-                    <button class="nav-link" id="tab-register" data-bs-toggle="pill" data-bs-target="#pills-register">JOIN</button>
-                </li>
-            </ul>
-            <div class="tab-content">
-                <div class="tab-pane fade show active" id="pills-login">
-                    <form action="/login" method="POST">
-                        <input type="email" name="email" class="form-control mb-3" placeholder="Email" required>
-                        <input type="password" name="password" class="form-control mb-4" placeholder="Password" required>
-                        <button type="submit" class="btn btn-cyber w-100">CONNECT SYSTEM</button>
-                    </form>
-                    <div class="text-center mt-3"><a href="#" onclick="toggleForgot(true)" class="text-white-50 small">Forgot Password?</a></div>
-                </div>
-                <div class="tab-pane fade" id="pills-register">
-                    <form action="/register" method="POST">
-                        <input type="text" name="nickname" class="form-control mb-2" placeholder="Nickname" required>
-                        <input type="email" name="email" class="form-control mb-2" placeholder="Email" required>
-                        <input type="password" name="password" class="form-control mb-3" placeholder="Password" required>
-                        <button type="submit" class="btn btn-cyber w-100">GENERATE HERO</button>
-                    </form>
-                </div>
-                <div id="forgotForm" style="display: none;">
-                    <h5 class="text-center mb-3">RECOVERY</h5>
-                    <input type="email" id="forgotEmail" class="form-control mb-3" placeholder="Email">
-                    <button type="button" onclick="sendForgotMail()" class="btn btn-cyber w-100 mb-2">SEND LINK</button>
-                    <div class="text-center"><a href="#" onclick="toggleForgot(false)" class="text-white-50 small">Back</a></div>
-                </div>
-            </div>
-
-<div class="row mt-4 mb-5">
-    <div class="col-12 text-center">
-        <button class="btn-revolution" onclick="showAuth('register')">
-            JOIN THE REVOLUTION
-        </button>
-    </div>
-</div>
-
-<style>
-    .btn-revolution {
-        background: linear-gradient(45deg, #ff003c, #bc13fe, #39FF14, #00f3ff);
-        background-size: 400% 400%;
-        color: white;
-        border: none;
-        padding: 20px 50px;
-        font-size: 1.5rem;
-        font-weight: 900;
-        text-transform: uppercase;
-        letter-spacing: 4px;
-        border-radius: 50px;
-        cursor: pointer;
-        animation: gradientShift 5s ease infinite, pulseGlow 2s infinite;
-        transition: 0.4s;
-        box-shadow: 0 0 20px rgba(57, 255, 20, 0.4);
-    }
-
-    .btn-revolution:hover {
-        transform: scale(1.1) rotate(-1deg);
-        box-shadow: 0 0 50px rgba(0, 243, 255, 0.8);
-        letter-spacing: 6px;
-    }
-
-    @keyframes gradientShift {
-        0% { background-position: 0% 50%; }
-        50% { background-position: 100% 50%; }
-        100% { background-position: 0% 50%; }
-    }
-
-    @keyframes pulseGlow {
-        0% { box-shadow: 0 0 15px rgba(57, 255, 20, 0.4); }
-        50% { box-shadow: 0 0 35px rgba(0, 243, 255, 0.7); }
-        100% { box-shadow: 0 0 15px rgba(57, 255, 20, 0.4); }
-    }
-</style>
+    <div class="form-overlay" id="authOverlay">
+        <div class="auth-card">
+            <h3 class="text-center mb-4">ACCESS PANEL</h3>
+            <form id="authForm" method="POST">
+                <input type="email" name="email" class="form-control mb-3 bg-dark text-white" placeholder="Email Address" required>
+                <input type="password" name="password" class="form-control mb-3 bg-dark text-white" placeholder="Password" required>
+                <button type="submit" class="btn btn-success w-100">SUBMIT</button>
+                <button type="button" class="btn btn-link text-white w-100 mt-2" onclick="closeAuth()">Close</button>
+            </form>
         </div>
-    </div>
-
-    <div class="ip-footer">
-        IP: <%= locals.userIp || '0.0.0.0' %> | LIVE: <span id="active-players">CONNECTING...</span>
     </div>
 
     <script>
-        const socket = io();
-        const authOverlay = document.getElementById('authOverlay');
-
-        function showAuth(type) {
-            authOverlay.style.display = 'flex';
-            type === 'login' ? document.getElementById('tab-login').click() : document.getElementById('tab-register').click();
+        function showAuth(type) { 
+            document.getElementById('authOverlay').style.display = 'flex';
+            document.getElementById('authForm').action = '/' + type;
         }
-
-        function closeAuth(e) { if(e.target.id === 'authOverlay') authOverlay.style.display = 'none'; }
-
-        socket.on('update-active-count', (count) => {
-            document.getElementById('active-players').innerText = count + " USERS ONLINE";
-        });
-
-        function toggleForgot(show) {
-            document.getElementById('pills-tab').style.display = show ? 'none' : 'flex';
-            document.getElementById('pills-login').style.display = show ? 'none' : 'block';
-            document.getElementById('forgotForm').style.display = show ? 'block' : 'none';
-        }
-
-        function sendForgotMail() {
-            const email = document.getElementById('forgotEmail').value;
-            fetch('/forgot-password', {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ email })
-            }).then(res => res.json()).then(data => alert(data.msg));
-        }
+        function closeAuth() { document.getElementById('authOverlay').style.display = 'none'; }
     </script>
-    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
 </body>
 </html>
-
-
-
