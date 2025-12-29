@@ -643,6 +643,57 @@ app.post('/attack-bot', checkAuth, async (req, res) => {
     res.json(result);
 });
 
+// --- ARENA SAVAŞ VE ÖDÜL SİSTEMİ ---
+app.post('/attack-bot', checkAuth, async (req, res) => {
+    try {
+        const user = await User.findById(req.session.userId);
+        const entryFee = 200; // Savaş giriş bedeli
+        const reward = 400;   // Toplam ödül (Giriş dahil)
+
+        if (user.bpl < entryFee) {
+            return res.json({ status: 'error', msg: 'Yetersiz bakiye! 200 BPL gerekli.' });
+        }
+
+        const bot = eliteBots[Math.floor(Math.random() * eliteBots.length)];
+        const isWin = Math.random() > 0.4; // %60 Kazanma Şansı
+
+        user.bpl -= entryFee; // Önce ücreti alıyoruz (Risk)
+
+        if (isWin) {
+            user.bpl += reward; 
+            
+            // Son 20 Zafer Listesine Ekle (Reklam Alanı)
+            last20Victories.unshift({
+                winner: user.nickname,
+                opponent: bot.nickname,
+                reward: (reward - entryFee), // Net kazanç
+                time: new Date().toLocaleTimeString('tr-TR')
+            });
+
+            // Chat'e otomatik kutlama mesajı düşer (Dilersen)
+            io.emit('new-message', {
+                sender: "ARENA_DUYURU",
+                text: `🏆 ${user.nickname}, ${bot.nickname} karşısında kan döktü ve ${reward - entryFee} BPL kazandı!`,
+                isSystem: true
+            });
+        }
+
+        await user.save();
+        if(last20Victories.length > 20) last20Victories.pop();
+
+        res.json({
+            status: 'success',
+            animation: {
+                actionVideo: `/caracter/move/${req.query.animal.toLowerCase()}/${req.query.animal.toLowerCase()}1.mp4`,
+                winVideo: `/caracter/move/${req.query.animal.toLowerCase()}/${req.query.animal.toLowerCase()}.mp4`,
+                isWin: isWin
+            }
+        });
+
+    } catch (err) {
+        res.status(500).json({ status: 'error', msg: 'Arena bağlantı hatası.' });
+    }
+});
 
 
 // --- 7. SUNUCU BAŞLATMA ---
@@ -655,6 +706,7 @@ server.listen(PORT, "0.0.0.0", () => {
     =========================================
     `);
 });
+
 
 
 
