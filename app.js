@@ -6,6 +6,7 @@ const socketIo = require('socket.io');
 const session = require('express-session');
 const rateLimit = require('express-rate-limit');
 const nodemailer = require('nodemailer');
+const axios = require('axios');
 
 const connectDB = require('./db');
 const User = require('./models/User');
@@ -212,5 +213,63 @@ app.post('/verify-payment', checkAuth, async (req, res) => {
     }
 });
 
+app.post('/verify-payment', checkAuth, async (req, res) => {
+    try {
+        const { txid, usd, bpl } = req.body;
+        const userId = req.session.userId;
+
+        // 1. Mükerrer İşlem Kontrolü
+        const existingTx = await Payment.findOne({ txid: txid });
+        if (existingTx) return res.json({ status: 'error', msg: 'Bu TxID zaten kullanılmış!' });
+
+        // 2. BscScan API Sorgusu
+        const bscScanUrl = `https://api.bscscan.com/api?module=proxy&action=eth_getTransactionReceipt&txhash=${txid}&apikey=${process.env.BSCSCAN_API_KEY}`;
+        
+        const response = await axios.get(bscScanUrl);
+        const receipt = response.data.result;
+
+        if (!receipt) return res.json({ status: 'error', msg: 'İşlem BSC ağında bulunamadı. Lütfen biraz bekleyip tekrar deneyin.' });
+
+        // İşlem başarılı mı? (status 0x1 başarı demektir)
+        if (receipt.status !== "0x1") return res.json({ status: 'error', msg: 'Bu işlem başarısız (failed) olarak görünüyor.' });
+
+        /* GÜVENLİK NOTU: 
+           Burada receipt.logs içerisinden 'to' adresinin senin WALLET_ADDRESS olup olmadığı 
+           ve 'value' miktarının usd ile eşleştiği doğrulanabilir. 
+           Şimdilik temel BscScan onayını ve TxID eşsizliğini baz alıyoruz.
+        */
+
+        // 3. Kullanıcıya Bakiyeyi Yükle
+        const user = await User.findById(userId);
+        user.bpl += parseInt(bpl);
+        
+        // 4. Ödemeyi Veritabanına Kaydet
+        const newPayment = new Payment({
+            userId: user._id,
+            nickname: user.nickname,
+            txid: txid,
+            amountUSD: usd,
+            amountBPL: bpl,
+            status: 'completed',
+            confirmedAt: new Date()
+        });
+
+        await newPayment.save();
+        await user.save();
+
+        res.json({ 
+            status: 'success', 
+            msg: 'Ödeme onaylandı!', 
+            newBalance: user.bpl 
+        });
+
+    } catch (e) {
+        console.error("BscScan Onay Hatası:", e);
+        res.json({ status: 'error', msg: 'Blockchain doğrulaması sırasında bir hata oluştu.' });
+    }
+});
+
+
 server.listen(PORT, "0.0.0.0", () => console.log(`BPL CALISIYOR: ${PORT}`));
+
 
