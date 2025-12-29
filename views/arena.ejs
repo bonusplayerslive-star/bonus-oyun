@@ -3,163 +3,171 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>BPL ARENA | Canlı Savaş</title>
+    <title>BPL ARENA | Ölümcül Karşılaşma</title>
     <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css">
     <script src="/socket.io/socket.io.js"></script>
     <style>
-        body { background: #000; color: #39FF14; font-family: 'Courier New', Courier, monospace; overflow-x: hidden; }
-        .header { color: #FFFF00; text-align: center; margin-top: 30px; text-shadow: 0 0 10px rgba(255, 255, 0, 0.5); }
-        .opponent-card { 
-            border: 1px solid #39FF14; padding: 15px; border-radius: 10px; 
-            margin-bottom: 15px; display: flex; justify-content: space-between; 
-            align-items: center; background: rgba(57, 255, 20, 0.05);
-            transition: 0.3s;
-        }
-        .opponent-card:hover { box-shadow: 0 0 15px rgba(57, 255, 20, 0.3); }
+        @import url('https://fonts.googleapis.com/css2?family=Orbitron:wght@400;900&display=swap');
         
-        /* Video Katmanı - Animasyonlar Burada Oynayacak */
+        body { background: #000; color: #39FF14; font-family: 'Orbitron', sans-serif; overflow-x: hidden; }
+        
+        .header-title { color: #FFFF00; text-align: center; margin-top: 30px; text-shadow: 0 0 20px rgba(255, 255, 0, 0.7); font-weight: 900; }
+        
+        /* Video Katmanı (Cinematic Overlay) */
         #video-overlay { 
-            display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; 
-            background: rgba(0,0,0,0.95); z-index: 9999; justify-content: center; 
-            align-items: center; flex-direction: column;
+            display: none; position: fixed; inset: 0; background: rgba(0,0,0,0.98); 
+            z-index: 9999; flex-direction: column; align-items: center; justify-content: center;
         }
-        video { 
-            width: 90%; max-width: 900px; border: 3px solid #39FF14; 
-            box-shadow: 0 0 30px #39FF14; border-radius: 15px;
-        }
-        .status-msg { font-size: 24px; font-weight: bold; margin-bottom: 20px; color: #fff; text-transform: uppercase; }
         
-        #timer { color: #FF0000; font-weight: bold; }
-        .btn-battle { font-weight: bold; padding: 10px 20px; text-transform: uppercase; }
+        .battle-frame { 
+            width: 90%; max-width: 1000px; border: 5px solid #39FF14; 
+            box-shadow: 0 0 50px rgba(57, 255, 20, 0.5); border-radius: 20px; overflow: hidden; position: relative;
+        }
+        
+        #arena-video { width: 100%; display: block; }
+        
+        .win-banner { 
+            position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%);
+            font-size: 4rem; font-weight: 900; color: #FFFF00; text-shadow: 0 0 30px #000;
+            z-index: 10001; display: none; text-transform: uppercase; white-space: nowrap;
+        }
+
+        .status-top-text { font-size: 1.5rem; margin-bottom: 20px; color: #fff; letter-spacing: 3px; }
+
+        /* Arena Arayüzü */
+        .search-container { 
+            border: 2px dashed #39FF14; padding: 40px; border-radius: 20px; 
+            background: rgba(57, 255, 20, 0.05); margin-top: 50px;
+        }
+        #timer { font-size: 4rem; color: #ff0000; font-weight: 900; }
+        
+        .victory-log { 
+            background: rgba(255,255,255,0.05); border-radius: 10px; padding: 15px; 
+            height: 300px; overflow-y: auto; font-family: 'Courier New', monospace; font-size: 0.85rem;
+        }
+        .log-item { border-bottom: 1px solid #222; padding: 5px 0; color: #0dcaf0; }
     </style>
 </head>
 <body>
 
     <div id="video-overlay">
-        <div id="battle-status-text" class="status-msg">SAVAŞ BAŞLADI...</div>
-        <video id="arena-video" playsinline></video>
+        <div id="battle-top-status" class="status-top-text">SAVAŞ BAŞLIYOR...</div>
+        <div class="battle-frame">
+            <div id="win-banner" class="win-banner">TEBRİKLER!</div>
+            <video id="arena-video" playsinline></video>
+        </div>
+        <div class="mt-4 text-danger small">Dikkat: Videoyu bitirmeden çıkarsanız -10 BPL ceza alırsınız!</div>
     </div>
 
-    <div class="container py-4" style="max-width: 700px;">
-        <h1 class="header">ARENA - CANLI RAKİPLER</h1>
-        <div id="search-status" class="text-center my-4">
-            <span id="status-text">Rakip aranıyor...</span> <span id="timer">18</span>s
-        </div>
-        
-        <div id="player-list"></div>
+    <div class="container">
+        <div class="row justify-content-center">
+            <div class="col-lg-8">
+                <h1 class="header-title">BPL ARENA HUB</h1>
+                
+                <div class="search-container text-center">
+                    <h4 id="search-msg">RAKİP ARANIYOR</h4>
+                    <div id="timer">18</div>
+                    <p class="text-muted">Karakterin: <span class="text-white"><%= selectedAnimal %></span></p>
+                    
+                    <div id="bot-section" class="d-none mt-4">
+                        <div class="alert alert-warning bg-dark text-warning border-warning">
+                            <strong>RAKİP BULUNAMADI!</strong><br>
+                            Sinyal gücü düşük, Elite Bot meydan okumanı bekliyor.
+                        </div>
+                        <button class="btn btn-warning btn-lg fw-bold w-100" onclick="startBattle()">ELITE BOT İLE SAVAŞI BAŞLAT</button>
+                    </div>
+                </div>
 
-        <div id="bot-card" style="display:none;" class="opponent-card border-warning text-warning">
-            <div>
-                <span style="font-size: 1.2rem;"><b>ELITE BOT #001</b></span><br>
-                <small>Zorluk: Orta</small>
+                <div class="mt-5">
+                    <h5 class="text-neon mb-3"><i class="fas fa-trophy"></i> SON ZAFERLER (VICTORY LOG)</h5>
+                    <div class="victory-log" id="victory-list">
+                        <div class="log-item text-muted">Sistem kayıtları taranıyor...</div>
+                    </div>
+                </div>
+
+                <div class="text-center mt-4">
+                    <a href="/profil" class="text-danger text-decoration-none small">← ARENADAN AYRIL</a>
+                </div>
             </div>
-            <button class="btn btn-warning btn-battle" onclick="startBotBattle()">BOTLA SAVAŞ</button>
-        </div>
-
-        <div class="mt-5">
-            <a href="/profil" class="btn btn-outline-danger w-100">ARENADAN ÇIK</a>
         </div>
     </div>
 
     <script>
         const socket = io();
-        const userId = "<%= user._id %>";
-        const nickname = "<%= user.nickname %>";
-        const selectedAnimal = "<%= selectedAnimal %>"; // URL'den gelen ?animal=...
-
-        const overlay = document.getElementById('video-overlay');
         const videoPlayer = document.getElementById('arena-video');
-        const statusMsg = document.getElementById('battle-status-text');
+        const overlay = document.getElementById('video-overlay');
+        const battleTopText = document.getElementById('battle-top-status');
+        const winBanner = document.getElementById('win-banner');
+        
+        let isBattleActive = false; // Ceza kontrolü için
 
-        // Savaş Başlatma Fonksiyonu
-        async function startBotBattle() {
+        // 1. SAVAŞI BAŞLATAN ANA FONKSİYON
+        async function startBattle() {
             try {
-                // Sunucuya istek at (Hayvan ismini query olarak yolla)
-                const response = await fetch(`/attack-bot?animal=${selectedAnimal}`, { method: 'POST' });
+                const response = await fetch(`/attack-bot?animal=<%= selectedAnimal %>`, { method: 'POST' });
                 const data = await response.json();
 
                 if(data.status === 'success') {
-                    // 1. Ekranı Karart ve İlk Videoyu (Saldırı) Oynat
+                    isBattleActive = true;
                     overlay.style.display = 'flex';
-                    videoPlayer.src = data.animation.actionVideo; // Örn: /caracter/move/Bear/Bear1.mp4
-                    statusMsg.innerText = "SALDIRI HAMLESİ YAPILIYOR!";
+                    
+                    // --- 1. AŞAMA: SALDIRI VİDEOSU (8 SN) ---
+                    videoPlayer.src = data.animation.actionVideo;
+                    battleTopText.innerText = "SALDIRI HAMLESİ YAPILIYOR...";
                     videoPlayer.play();
 
-                    // 2. İlk video bittiğinde
-                    videoPlayer.onended = () => {
+                    videoPlayer.onended = async () => {
                         if(data.animation.isWin) {
-                            // Kazandıysa ikinci videoyu (Kükreme/Galibiyet) oynat
-                            statusMsg.innerHTML = `<span style="color:#39FF14">KAZANDIN! +${data.reward} BPL</span>`;
-                            videoPlayer.src = data.animation.winVideo; // Örn: /caracter/move/Bear/Bear.mp4
+                            // --- 2. AŞAMA: ZAFER VİDEOSU (8 SN) ---
+                            winBanner.style.display = 'block';
+                            battleTopText.innerText = "ZAFER SENİN!";
+                            videoPlayer.src = data.animation.winVideo;
                             videoPlayer.play();
-                            
-                            // İkinci video da bitince profile yönlendir
+
+                            // Arka planda ödülü işle
+                            await fetch('/battle-complete', { method: 'POST' });
+
                             videoPlayer.onended = () => {
-                                setTimeout(() => { location.href = '/profil'; }, 1000);
+                                isBattleActive = false; // Savaş güvenle bitti
+                                location.href = '/profil';
                             };
                         } else {
-                            // Kaybederse
-                            statusMsg.innerHTML = `<span style="color:#FF0000">KAYBETTİN!</span>`;
+                            // Kaybetme Durumu
+                            battleTopText.innerText = "MAĞLUP OLDUN!";
+                            battleTopText.style.color = "#ff0000";
                             setTimeout(() => { location.href = '/profil'; }, 3000);
                         }
                     };
-                } else {
-                    alert(data.msg || "Savaş hatası!");
                 }
             } catch (err) {
-                console.error(err);
-                alert("Bağlantı hatası!");
+                alert("Savaş başlatılamadı!");
             }
         }
 
-        // --- Arena Mantığı ve Socket İşlemleri ---
-        socket.emit('join-arena', { id: userId, nickname: nickname });
+        // 2. ERKEN ÇIKIŞ CEZA SİSTEMİ
+        window.addEventListener('beforeunload', (e) => {
+            if (isBattleActive) {
+                // Tarayıcı kapanırken sunucuya "ceza kes" sinyali gönderir
+                navigator.sendBeacon('/battle-punish');
+            }
+        });
 
+        // 3. GERİ SAYIM SİSTEMİ
         let timeLeft = 18;
         const countdown = setInterval(() => {
             timeLeft--;
-            const timerEl = document.getElementById('timer');
-            if(timerEl) timerEl.innerText = timeLeft;
-
+            document.getElementById('timer').innerText = timeLeft;
             if(timeLeft <= 0) {
                 clearInterval(countdown);
-                document.getElementById('status-text').innerText = "RAKİP BULUNAMADI - BOT AKTİF";
                 document.getElementById('timer').style.display = 'none';
-                document.getElementById('bot-card').style.display = 'flex';
+                document.getElementById('search-msg').style.display = 'none';
+                document.getElementById('bot-section').classList.remove('d-none');
             }
         }, 1000);
 
-  socket.on('arena-list-update', (players) => {
-    const list = document.getElementById('player-list');
-    list.innerHTML = '';
-    players.forEach(p => {
-        if(p.id !== userId) {
-            list.innerHTML += `
-                <div class="opponent-card">
-                    <span><b>${p.nickname}</b></span>
-                    <button class="btn btn-success btn-sm" onclick="sendChallenge('${p.nickname}')">MEYDAN OKU</button>
-                </div>`;
-        }
-    });
-});
-
-// Meydan okuma gönder
-function sendChallenge(targetName) {
-    socket.emit('challenge-player', { targetNickname: targetName });
-    alert(targetName + " kullanıcısına meydan okundu. Bekleniyor...");
-}
-
-// Meydan okuma al
-socket.on('challenge-received', (data) => {
-    if(confirm(data.challenger + " sana meydan okudu! Kabul ediyor musun?")) {
-        // Burada savaşı başlatabilirsin
-        alert("Savaş kabul edildi! Hazırlan...");
-    }
-});
-                }
-            });
-        });
+        // Socket üzerinden online durumu (Opsiyonel)
+        socket.emit('join-arena', { nickname: "<%= user.nickname %>" });
     </script>
 </body>
 </html>
-
