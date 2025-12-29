@@ -207,7 +207,50 @@ Wherever you are on the platform, the Arena is just one click away."  </p>
 </ul>
 
 
+<div class="row mt-4 mb-5">
+    <div class="col-12 text-center">
+        <button class="btn-revolution" onclick="showAuth('register')">
+            JOIN THE REVOLUTION
+        </button>
+    </div>
+</div>
 
+<style>
+    .btn-revolution {
+        background: linear-gradient(45deg, #ff003c, #bc13fe, #39FF14, #00f3ff);
+        background-size: 400% 400%;
+        color: white;
+        border: none;
+        padding: 20px 50px;
+        font-size: 1.5rem;
+        font-weight: 900;
+        text-transform: uppercase;
+        letter-spacing: 4px;
+        border-radius: 50px;
+        cursor: pointer;
+        animation: gradientShift 5s ease infinite, pulseGlow 2s infinite;
+        transition: 0.4s;
+        box-shadow: 0 0 20px rgba(57, 255, 20, 0.4);
+    }
+
+    .btn-revolution:hover {
+        transform: scale(1.1) rotate(-1deg);
+        box-shadow: 0 0 50px rgba(0, 243, 255, 0.8);
+        letter-spacing: 6px;
+    }
+
+    @keyframes gradientShift {
+        0% { background-position: 0% 50%; }
+        50% { background-position: 100% 50%; }
+        100% { background-position: 0% 50%; }
+    }
+
+    @keyframes pulseGlow {
+        0% { box-shadow: 0 0 15px rgba(57, 255, 20, 0.4); }
+        50% { box-shadow: 0 0 35px rgba(0, 243, 255, 0.7); }
+        100% { box-shadow: 0 0 15px rgba(57, 255, 20, 0.4); }
+    }
+</style>
 
 
       <div class="row mt-5">
@@ -346,5 +389,6 @@ Wherever you are on the platform, the Arena is just one click away."  </p>
     <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
 </body>
 </html>
+
 
 
