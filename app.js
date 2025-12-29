@@ -294,7 +294,7 @@ app.post('/verify-payment', checkAuth, async (req, res) => {
 });
 
 // --- SOCKET SİSTEMİ (ARENA, CHAT, MEETING & GIFT) ---
-let onlineUsers = {}; 
+
 
 // 2. Arena Eşleşme (Burası Online Rakip Bulmanı Sağlar)
     socket.on('join-arena', async (data) => {
@@ -396,6 +396,7 @@ let onlineUsers = {};
 server.listen(PORT, "0.0.0.0", () => {
     console.log(`BPL SERVER RUNNING ON PORT ${PORT}`);
 });
+
 
 
 
