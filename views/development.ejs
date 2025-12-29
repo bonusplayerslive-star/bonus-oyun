@@ -4,18 +4,21 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>BPL - Geliştirme Merkezi</title>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css">
     <style>
         body { background-color: #050505; color: #39FF14; font-family: 'Courier New', Courier, monospace; }
-        .dev-container { max-width: 600px; margin: 50px auto; padding: 20px; border: 2px solid #39FF14; box-shadow: 0 0 15px rgba(57, 255, 20, 0.3); border-radius: 15px; }
-        .stat-card { background: rgba(57, 255, 20, 0.05); border: 1px solid #222; padding: 15px; margin-bottom: 15px; display: flex; justify-content: space-between; align-items: center; border-radius: 10px; }
-        .stat-info h3 { margin: 0; color: #FFFF00; }
-        .stat-info p { margin: 5px 0; font-size: 0.9em; color: #888; }
-        .btn-upgrade { background: transparent; border: 1px solid #39FF14; color: #39FF14; padding: 10px 20px; cursor: pointer; transition: 0.3s; border-radius: 5px; font-weight: bold; }
+        .dev-container { max-width: 600px; margin: 50px auto; padding: 20px; border: 2px solid #39FF14; box-shadow: 0 0 15px rgba(57, 255, 20, 0.3); border-radius: 15px; background: rgba(0,0,0,0.9); }
+        .stat-card { background: rgba(57, 255, 20, 0.05); border: 1px solid #222; padding: 15px; margin-bottom: 15px; display: flex; justify-content: space-between; align-items: center; border-radius: 10px; transition: 0.3s; }
+        .stat-card:hover { border-color: #39FF14; background: rgba(57, 255, 20, 0.1); }
+        .stat-info h3 { margin: 0; color: #FFFF00; font-size: 1.1rem; }
+        .stat-info p { margin: 5px 0; font-size: 0.85em; color: #888; }
+        .btn-upgrade { background: transparent; border: 1px solid #39FF14; color: #39FF14; padding: 10px 20px; cursor: pointer; transition: 0.3s; border-radius: 5px; font-weight: bold; font-family: 'Courier New'; }
         .btn-upgrade:hover { background: #39FF14; color: #000; box-shadow: 0 0 10px #39FF14; }
-        .balance-box { text-align: center; font-size: 1.2em; margin-bottom: 20px; border-bottom: 1px solid #333; padding-bottom: 15px; color: #FFFF00; }
-        .back-btn { display: block; text-align: center; margin-top: 20px; color: #ff4444; text-decoration: none; font-weight: bold; }
-        .back-btn:hover { text-decoration: underline; }
-        .active-animal { color: #39FF14; font-weight: bold; text-transform: uppercase; }
+        .balance-box { text-align: center; font-size: 1.3em; margin-bottom: 20px; border-bottom: 1px solid #333; padding-bottom: 15px; color: #FFFF00; font-weight: bold; }
+        .back-btn { display: block; text-align: center; margin-top: 20px; color: #ff4444; text-decoration: none; font-weight: bold; font-size: 0.9rem; }
+        .back-btn:hover { color: #fff; text-shadow: 0 0 5px #ff4444; }
+        .active-animal { color: #39FF14; font-weight: bold; text-transform: uppercase; border: 1px solid #39FF14; padding: 2px 8px; border-radius: 4px; }
+        h1 { text-shadow: 0 0 10px rgba(57, 255, 20, 0.5); }
     </style>
 </head>
 <body>
@@ -23,15 +26,17 @@
     <div class="dev-container">
         <h1 style="text-align: center; letter-spacing: 3px;">GELİŞTİRME MERKEZİ</h1>
         
-        <p style="text-align: center;">Şu an Geliştirilen: <span id="active-animal-name" class="active-animal">Yükleniyor...</span></p>
+        <p style="text-align: center; margin-bottom: 25px;">
+            <i class="fas fa-microchip me-2"></i>Şu an Geliştirilen: <span id="active-animal-name" class="active-animal">Yükleniyor...</span>
+        </p>
 
         <div class="balance-box">
-            Mevcut Bakiye: <span id="current-bpl"><%= user.bpl %></span> BPL
+            <i class="fas fa-coins me-2"></i>Mevcut Bakiye: <span id="current-bpl"><%= user.bpl.toLocaleString() %></span> BPL
         </div>
 
         <div class="stat-card">
             <div class="stat-info">
-                <h3>HP (CAN)</h3>
+                <h3><i class="fas fa-heart me-2"></i>HP (CAN)</h3>
                 <p>+10 Can Puanı Ekler</p>
             </div>
             <div>
@@ -42,7 +47,7 @@
 
         <div class="stat-card">
             <div class="stat-info">
-                <h3>SALDIRI</h3>
+                <h3><i class="fas fa-swords me-2"></i>SALDIRI</h3>
                 <p>+5 Hasar Gücü Ekler</p>
             </div>
             <div>
@@ -53,7 +58,7 @@
 
         <div class="stat-card">
             <div class="stat-info">
-                <h3>SAVUNMA</h3>
+                <h3><i class="fas fa-shield-alt me-2"></i>SAVUNMA</h3>
                 <p>Gelen Hasarı -5 Azaltır</p>
             </div>
             <div>
@@ -62,9 +67,20 @@
             </div>
         </div>
 
+        <div class="stat-card" style="border: 1px solid #00d2ff;">
+            <div class="stat-info">
+                <h3 style="color: #00d2ff;"><i class="fas fa-bolt me-2"></i>KRİTİK ŞANS</h3>
+                <p>2 Kat Hasar Şansını %5 Artırır</p>
+            </div>
+            <div>
+                <span style="margin-right: 10px; color: #FFFF00;">25 BPL</span>
+                <button class="btn-upgrade" style="border-color: #00d2ff; color: #00d2ff;" onclick="upgrade('crit', 25)">YÜKSELT</button>
+            </div>
+        </div>
+
         <div class="stat-card" style="border: 1px solid #FFFF00;">
             <div class="stat-info">
-                <h3 style="color: #FFFF00;">ANLIK GÜÇ</h3>
+                <h3 style="color: #FFFF00;"><i class="fas fa-fire me-2"></i>ANLIK GÜÇ</h3>
                 <p>Sıradaki Savaş İçin +20 ATK!</p>
             </div>
             <div>
@@ -73,51 +89,48 @@
             </div>
         </div>
 
-        <a href="/profil" class="back-btn">PROFİLE GERİ DÖN</a>
+        <a href="/profil" class="back-btn"><i class="fas fa-arrow-left me-2"></i>KONTROL PANELİNE DÖN</a>
     </div>
 
     <script>
         const userId = "<%= user._id %>";
-        
-        // 1. DÜZELTME: URL'den ?animal=Kartal gibi parametreyi alıyoruz
         const urlParams = new URLSearchParams(window.location.search);
-        const animalName = urlParams.get('animal') || "<%= user.inventory && user.inventory.length > 0 ? user.inventory[0] : 'Varsayılan' %>";
+        // Eğer URL'de hayvan yoksa envanterdeki ilk hayvanı seç
+        const animalName = urlParams.get('animal') || "<%= user.inventory && user.inventory.length > 0 ? user.inventory[0].name : 'Hayvan Yok' %>";
         
-        // Ekranda hangi hayvanın seçili olduğunu göster
         document.getElementById('active-animal-name').innerText = animalName;
 
         async function upgrade(type, cost) {
-            if (!confirm(`${animalName} karakteri için ${cost} BPL harcanacak. Onaylıyor musunuz?`)) return;
+            if (animalName === 'Hayvan Yok') {
+                alert("Önce marketten bir hayvan satın almalısın!");
+                return;
+            }
+
+            if (!confirm(`${animalName} için ${cost} BPL harcanacak. Onaylıyor musun?`)) return;
 
             try {
                 const response = await fetch('/upgrade-stat', {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
                     body: JSON.stringify({
-                        userId: userId,
                         animalName: animalName,
                         statType: type,
                         cost: cost
                     })
                 });
 
-                // 2. DÜZELTME: JSON hatasını (Unexpected token <) önlemek için response kontrolü
-                const contentType = response.headers.get("content-type");
-                if (!contentType || !contentType.includes("application/json")) {
-                    throw new TypeError("Sunucudan geçersiz yanıt (404/500) geldi. app.js rotasını kontrol edin!");
-                }
-
                 const result = await response.json();
 
                 if (result.status === 'success') {
+                    // Cüzdanı ve UI'yı güncelle
                     document.getElementById('current-bpl').innerText = result.newBalance;
-                    alert("Geliştirme Başarılı! Değerler güncellendi.");
+                    alert("Sistem Güncellendi: " + result.msg);
                 } else {
-                    alert("İşlem Başarısız: " + result.msg);
+                    alert("Hata: " + result.msg);
                 }
             } catch (err) {
-                console.error("Hata Detayı:", err);
-                alert("Bağlantı Hatası! Sunucu şu an bu işlemi (upgrade-stat) tanımıyor.");
+                console.error("Hata:", err);
+                alert("Sunucuyla bağlantı kurulamadı!");
             }
         }
     </script>
@@ -126,8 +139,7 @@
     <script>
         const socket = io(); 
         socket.on('update-active-count', (count) => {
-            const playerEl = document.getElementById('active-players');
-            if(playerEl) playerEl.innerText = count + " OYUNCU";
+            console.log("Aktif Kumandan Sayısı:", count);
         });
     </script>
 </body>
