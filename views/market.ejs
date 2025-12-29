@@ -6,134 +6,114 @@
     <title>BPL ULTIMATE MARKET</title>
     <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css">
-    <link href="https://fonts.googleapis.com/css2?family=Orbitron:wght@400;700;900&display=swap" rel="stylesheet">
     <style>
-        :root { --neon-green: #39FF14; --dark-bg: #050505; }
-        body { background-color: var(--dark-bg); color: #fff; font-family: 'Orbitron', sans-serif; }
-        .navbar-bpl { background: rgba(0,0,0,0.95); border-bottom: 2px solid var(--neon-green); padding: 15px; }
-        .balance-box { background: rgba(57, 255, 20, 0.1); border: 1px solid var(--neon-green); padding: 5px 15px; border-radius: 50px; }
-        .animal-card { background: #111; border-radius: 20px; overflow: hidden; border: 1px solid #222; transition: 0.4s; height: 100%; position: relative; }
-        .animal-card:hover { border-color: var(--neon-green); transform: translateY(-10px); box-shadow: 0 0 20px rgba(57, 255, 20, 0.2); }
-        .card-img-wrapper { position: relative; height: 220px; background: #000; overflow: hidden; }
-        .animal-img { width: 100%; height: 100%; object-fit: cover; transition: 0.5s; }
-        .animal-card:hover .animal-img { transform: scale(1.1); }
-        .rarity-tag { position: absolute; top: 10px; left: 10px; padding: 4px 12px; border-radius: 5px; font-size: 0.7rem; font-weight: bold; z-index: 10; text-transform: uppercase; }
-        .legendary { background: linear-gradient(45deg, #ff8c00, #ff0000); color: white; }
-        .wild { background: linear-gradient(45deg, #00d4ff, #0055ff); color: white; }
-        .btn-buy-action { background: transparent; border: 2px solid var(--neon-green); color: var(--neon-green); font-weight: bold; border-radius: 10px; padding: 10px; width: 100%; transition: 0.3s; font-family: 'Orbitron', sans-serif; }
-        .btn-buy-action:hover:not(:disabled) { background: var(--neon-green); color: #000; box-shadow: 0 0 20px var(--neon-green); }
-        .btn-buy-action:disabled { border-color: #444; color: #444; cursor: not-allowed; opacity: 0.6; }
-        .inv-info { font-size: 0.8rem; color: #888; margin-top: 10px; }
+        :root { --neon-green: #39FF14; --dark-bg: #0a0a0a; --card-bg: #111; }
+        body { background: var(--dark-bg); color: white; font-family: 'Rajdhani', sans-serif; }
+        
+        .market-header {
+            background: rgba(0,0,0,0.9);
+            border-bottom: 2px solid var(--neon-green);
+            padding: 15px 0;
+            margin-bottom: 30px;
+        }
+
+        .animal-card {
+            background: var(--card-bg);
+            border-radius: 15px;
+            padding: 20px;
+            text-align: center;
+            transition: transform 0.3s;
+            margin-bottom: 20px;
+            border: 1px solid #333;
+        }
+
+        .animal-card:hover { transform: translateY(-10px); border-color: var(--neon-green); }
+
+        .animal-img {
+            width: 100%;
+            height: 250px;
+            object-fit: cover;
+            border-radius: 10px;
+            margin-bottom: 15px;
+            /* Resimler burada dinamikleşecek */
+        }
+
+        .price-tag { color: #FFD700; font-weight: bold; font-size: 1.2rem; }
+        .btn-buy {
+            background: transparent;
+            border: 1px solid var(--neon-green);
+            color: var(--neon-green);
+            width: 100%;
+            padding: 10px;
+            font-weight: bold;
+            transition: 0.3s;
+        }
+        .btn-buy:hover { background: var(--neon-green); color: black; }
+        .btn-owned { background: #333; color: #777; border: none; cursor: not-allowed; }
     </style>
 </head>
 <body>
 
-<nav class="navbar navbar-bpl sticky-top">
+<header class="market-header">
     <div class="container d-flex justify-content-between align-items-center">
-        <a class="navbar-brand d-flex align-items-center" href="/profil" style="text-decoration: none;">
-            <img src="/caracter/logo/logo.jpeg" style="width: 45px; border-radius: 8px; margin-right: 12px;" onerror="this.src='/caracter/page/welcome.jpg'">
-            <span style="color: var(--neon-green); font-weight: 800;">BPL MARKET</span>
-        </a>
+        <h2 style="color: var(--neon-green);"><i class="fas fa-shopping-cart"></i> BPL MARKET</h2>
         <div class="d-flex align-items-center">
-            <div class="balance-box me-3">
-                <i class="fas fa-coins text-warning"></i> 
-                <span class="ms-1 fw-bold"><%= user.bpl.toLocaleString() %> BPL</span>
+            <div class="me-3 px-3 py-1" style="background: rgba(57, 255, 20, 0.1); border: 1px solid var(--neon-green); border-radius: 20px;">
+                <span style="color: #FFD700;"><i class="fas fa-coins"></i> <%= user.bpl %> BPL</span>
             </div>
             <a href="/profil" class="btn btn-outline-light btn-sm">Profil</a>
         </div>
     </div>
-</nav>
+</header>
 
-<div class="container py-5">
-    <div class="text-center mb-5">
-        <h2 class="text-uppercase fw-bold" style="letter-spacing: 3px; color: var(--neon-green);">Karakter Mağazası</h2>
-        <div class="inv-info">
-            Envanter Kapasitesi: 
-            <span class="fw-bold <%= user.inventory.length >= 3 ? 'text-danger' : 'text-success' %>">
-                <%= user.inventory.length %> / 3
-            </span>
-            <br>
-            <small>(Maksimum 3 karakter alabilirsiniz)</small>
-        </div>
-    </div>
-
-    <div class="row g-4">
+<div class="container">
+    <div class="row">
         <% animals.forEach(animal => { %>
-            <div class="col-md-3">
+            <div class="col-md-3 col-sm-6">
                 <div class="animal-card">
-                    <div class="rarity-tag <%= animal.price >= 5000 ? 'legendary' : 'wild' %>">
-                        <%= animal.price >= 5000 ? 'EFSANEVİ' : 'VAHŞİ' %>
-                    </div>
+                    <img src="<%= animal.img %>" class="animal-img" alt="<%= animal.name %>">
                     
-                    <div class="card-img-wrapper">
-                        <img src="<%= animal.img %>" class="animal-img" onerror="this.src='/caracter/profile/Bear.jpg'">
-                    </div>
+                    <h4><%= animal.name.toUpperCase() %></h4>
+                    <p class="price-tag"><%= animal.price %> BPL</p>
 
-                    <div class="p-3 text-center">
-                        <h5 class="fw-bold text-uppercase" style="color: #fff;"><%= animal.name %></h5>
-                        <p class="text-warning fw-bold mb-3"><%= animal.price.toLocaleString() %> BPL</p>
+                    <% 
+                        // Kullanıcının bu hayvana zaten sahip olup olmadığını kontrol et
+                        const isOwned = user.inventory.some(item => item.name === animal.name);
+                    %>
 
-                        <% 
-                            const isOwned = user.inventory.some(i => i.name.toLowerCase() === animal.name.toLowerCase());
-                            const isFull = user.inventory.length >= 3;
-                        %>
-
-                        <button onclick="buyAnimal('<%= animal.id %>', '<%= animal.name %>')" 
-                                class="btn-buy-action" 
-                                <%= (isOwned || isFull) ? 'disabled' : '' %>>
-                            <% if(isOwned) { %>
-                                SAHİPSİN
-                            <% } else if(isFull) { %>
-                                ÇANTA DOLU
-                            <% } else { %>
-                                SATIN AL <% } %>
-                        </button>
-                    </div>
+                    <% if (isOwned) { %>
+                        <button class="btn btn-owned" disabled>SAHİPSİN</button>
+                    <% } else { %>
+                        <button onclick="buyAnimal('<%= animal.id %>')" id="btn-<%= animal.id %>" class="btn btn-buy">SATIN AL</button>
+                    <% } %>
                 </div>
             </div>
-        <% }) %>
+        <% }); %>
     </div>
 </div>
 
+<script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
 <script>
-    async function buyAnimal(id, name) {
-        if(!confirm(name + ' karakterini satın almak istiyor musun?')) return;
-
-        try {
-            const response = await fetch('/buy-animal', {
-                method: 'POST',
-                headers: { 
-                    'Content-Type': 'application/json',
-                    'Accept': 'application/json' 
-                },
-                body: JSON.stringify({ animalId: parseInt(id) })
-            });
-
-            // Yanıtın JSON olup olmadığını kontrol et
-            const contentType = response.headers.get("content-type");
-            if (!contentType || !contentType.includes("application/json")) {
-                throw new Error("Sunucudan beklenen yanıt gelmedi (Sunucu Hatası 500). Lütfen app.js dosyasını kontrol edin.");
-            }
-            
-            const data = await response.json();
-            
-            if(data.status === 'success') {
-                alert('Tebrikler! ' + name + ' orduna katıldı.');
-                window.location.reload();
-            } else {
-                alert('Hata: ' + data.msg);
-            }
-        } catch (err) {
-            console.error("Fetch hatası:", err);
-            alert(err.message || 'İşlem sırasında bir hata oluştu.');
+    async function buyAnimal(id) {
+        const res = await fetch('/buy-animal', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ animalId: id })
+        });
+        
+        const data = await res.json();
+        
+        if (data.status === 'success') {
+            Swal.fire({
+                title: 'Tebrikler!',
+                text: data.msg,
+                icon: 'success',
+                confirmButtonColor: '#39FF14'
+            }).then(() => location.reload()); // Sayfayı yenile ki bakiye ve buton güncellensin
+        } else {
+            Swal.fire('Hata', data.msg, 'error');
         }
     }
-</script>
-
-<script src="/socket.io/socket.io.js"></script>
-<script>
-    const socket = io();
-    socket.emit('register-user', { id: "<%= user._id %>", nickname: "<%= user.nickname %>" });
 </script>
 
 </body>
