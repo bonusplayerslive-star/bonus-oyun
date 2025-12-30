@@ -120,16 +120,26 @@ app.get('/chat', checkAuth, async (req, res) => {
 app.get('/meeting', checkAuth, async (req, res) => {
     try {
         const user = await User.findById(req.session.userId);
-        const roomId = "BPL-VIP-KONSEY"; 
-        res.render('meeting', { 
-            user: user, 
-            roomId: roomId 
-        });
+        
+        // Giriş ücreti kontrolü (Örn: 50 BPL)
+        if (user.bpl < 50) {
+            return res.render('profil', { 
+                user, 
+                error: 'Konseye giriş için en az 50 BPL gereklidir!' 
+            });
+        }
+
+        // Ücreti tahsil et (İsteğe bağlı, her girişte düşmesini istiyorsanız)
+        user.bpl -= 50;
+        await user.save();
+
+        const roomId = "BPL-VIP-KONSEY"; // Sabit oda veya dinamik yapılabilir
+        res.render('meeting', { user, roomId });
     } catch (err) {
+        console.error("Meeting Hatası:", err);
         res.redirect('/profil');
     }
 });
-
 // --- 6. AUTH VE İŞLEM ROTALARI ---
 
 app.post('/register', async (req, res) => {
@@ -300,11 +310,28 @@ io.on('connection', (socket) => {
         } catch (e) { console.error(e); }
     });
 
-    // [VIP ODAYA KATILIM] - HATA BURADAYDI, ŞİMDİ DOĞRU YERDE
-    socket.on('join-meeting', (roomId) => {
-        socket.join(roomId);
-        console.log(`VIP Odaya Giriş: ${socket.nickname} -> ${roomId}`);
+    // --- SOCKET.IO KAPSAMI (app.js içinde io.on bloğunun içi) ---
+io.on('connection', (socket) => {
+    // Önceki kayıt logic'leri burada kalmalı...
+
+    socket.on('join-meeting', (data) => {
+        // Loglardaki hatayı engellemek için socket'in tanımlı olduğundan emin oluyoruz
+        if (data && data.roomId) {
+            socket.join(data.roomId);
+            socket.nickname = data.nickname; // Sokete nickname atıyoruz
+            
+            // Odadaki diğerlerine bildirim gönder
+            io.to(data.roomId).emit('new-message', { 
+                sender: "SİSTEM", 
+                text: `🔥 ${data.nickname} konseye katıldı!` 
+            });
+            
+            console.log(`VIP Odaya Giriş: ${data.nickname} -> ${data.roomId}`);
+        }
     });
+
+    // VIP Savaş ve Hediye sinyalleri de bu io.on bloğu içinde olmalı...
+});
 
     // [VIP HEDİYE SİSTEMİ]
     socket.on('send-gift-vip', async (data) => {
@@ -356,5 +383,6 @@ io.on('connection', (socket) => {
 server.listen(PORT, "0.0.0.0", () => {
     console.log(`BPL ECOSYSTEM AKTİF: PORT ${PORT}`);
 });
+
 
 
