@@ -379,7 +379,58 @@ io.on('connection', (socket) => {
             socket.emit('gift-result', { status: 'success', message: 'Hediye gönderildi!' });
         } catch (e) { console.error(e); }
     });
+// --- VIP KONSEY (MEETING) SİSTEMİ ---
+    
+    // Odaya Katılım
+    socket.on('join-room', (roomId) => {
+        socket.join(roomId);
+    });
 
+    // VIP Hediye Gönderme
+    socket.on('send-gift-vip', async (data) => {
+        try {
+            const sender = await User.findById(data.senderId);
+            const receiver = await User.findOne({ nickname: data.targetNick });
+
+            if (sender && receiver && sender.bpl >= 5000) {
+                const tax = data.tax / 100;
+                const netAmount = Math.floor(data.amount * (1 - tax));
+                
+                sender.bpl -= data.amount;
+                receiver.bpl += netAmount;
+
+                await sender.save();
+                await receiver.save();
+
+                io.to(data.room).emit('new-message', { 
+                    sender: "SİSTEM", 
+                    text: `🎁 ${sender.nickname} -> ${receiver.nickname}: ${data.amount} BPL gönderildi!` 
+                });
+                socket.emit('gift-result', { status: 'success', message: 'İşlem Başarılı!' });
+            } else {
+                socket.emit('gift-result', { status: 'error', message: 'Bakiye yetersiz veya kullanıcı bulunamadı!' });
+            }
+        } catch (e) { console.error(e); }
+    });
+
+    // VIP Arena (Savaş) Tetikleyici
+    socket.on('start-vip-battle', async (data) => {
+        const p1 = await User.findOne({ nickname: data.p1 });
+        if (p1 && p1.bpl >= 200) {
+            p1.bpl -= 200;
+            await p1.save();
+            
+            const animal = (p1.selectedAnimal || "eagle").toLowerCase();
+            const isWin = Math.random() > 0.5;
+            const winnerName = isWin ? data.p1 : data.p2;
+
+            io.to(data.room).emit('battle-video-play', {
+                winner: winnerName,
+                moveVideo: `/caracter/move/${animal}/${animal}1.mp4`,
+                video: `/caracter/move/${animal}/${animal}.mp4`
+            });
+        }
+    });
     // VIP Savaş Başlatma
     socket.on('start-vip-battle', async (data) => {
         const p1 = await User.findOne({ nickname: data.p1 });
@@ -408,6 +459,7 @@ io.on('connection', (socket) => {
 server.listen(PORT, "0.0.0.0", () => {
     console.log(`BPL ECOSYSTEM AKTİF: PORT ${PORT}`);
 });
+
 
 
 
