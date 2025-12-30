@@ -1,138 +1,134 @@
-<!DOCTYPE html>
-<html lang="tr">
-<head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>BPL - Geliştirme Merkezi</title>
-    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css">
-    <style>
-        body { background-color: #050505; color: #39FF14; font-family: 'Courier New', Courier, monospace; }
-        .dev-container { max-width: 650px; margin: 20px auto; padding: 20px; border: 1px solid #1a1a1a; border-radius: 20px; background: rgba(0,0,0,0.98); box-shadow: 0 0 30px rgba(0,0,0,1); }
-        
-        /* Karakter Seçim Alanı */
-        .char-selector { display: flex; justify-content: center; gap: 15px; margin-bottom: 25px; padding: 10px; border-bottom: 1px solid #222; }
-        .char-card { 
-            width: 100px; text-align: center; cursor: pointer; border: 2px solid #222; border-radius: 12px; padding: 8px; transition: 0.3s; opacity: 0.5; filter: grayscale(1);
-        }
-        .char-card.active { 
-            opacity: 1; filter: grayscale(0); border-color: #39FF14; background: rgba(57, 255, 20, 0.05); box-shadow: 0 0 15px rgba(57, 255, 20, 0.2); 
-        }
-        .char-card img { width: 60px; height: 60px; border-radius: 50%; object-fit: cover; margin-bottom: 5px; border: 1px solid #333; }
-        .char-card span { display: block; font-size: 0.75rem; font-weight: bold; color: #fff; }
+<%- include('header') %>
 
-        .balance-box { text-align: center; font-size: 1.1rem; color: #FFFF00; margin-bottom: 20px; }
-        
-        /* Geliştirme Satırları */
-        .stat-row { 
-            background: rgba(255,255,255,0.02); border: 1px solid #1a1a1a; padding: 12px 20px; margin-bottom: 10px; 
-            display: flex; justify-content: space-between; align-items: center; border-radius: 10px; transition: 0.2s;
-        }
-        .stat-row:hover { background: rgba(57, 255, 20, 0.03); border-color: #333; }
-        .stat-label h3 { margin: 0; font-size: 0.95rem; color: #39FF14; }
-        .stat-label p { margin: 2px 0 0; font-size: 0.7rem; color: #666; }
-        
-        .btn-up { 
-            background: transparent; border: 1px solid #39FF14; color: #39FF14; padding: 7px 15px; 
-            cursor: pointer; border-radius: 6px; font-size: 0.8rem; font-weight: bold; transition: 0.3s;
-        }
-        .btn-up:hover { background: #39FF14; color: #000; box-shadow: 0 0 10px #39FF14; }
-        
-        .back-link { display: block; text-align: center; margin-top: 20px; color: #444; text-decoration: none; font-size: 0.8rem; }
-        .back-link:hover { color: #fff; }
-    </style>
-</head>
-<body>
+<style>
+    .upgrade-card {
+        background: rgba(20, 20, 20, 0.95);
+        border: 1px solid #28a745;
+        border-radius: 15px;
+        transition: transform 0.3s;
+        margin-bottom: 20px;
+    }
+    .upgrade-card:hover {
+        transform: translateY(-5px);
+        box-shadow: 0 0 20px rgba(40, 167, 69, 0.2);
+    }
+    .stat-label {
+        font-size: 0.8rem;
+        color: #aaa;
+        margin-bottom: 2px;
+    }
+    .progress {
+        height: 8px;
+        background-color: #333;
+        margin-bottom: 15px;
+    }
+    .char-img {
+        width: 100px;
+        height: 100px;
+        object-fit: cover;
+        border: 2px solid #28a745;
+        border-radius: 50%;
+    }
+    .btn-upgrade {
+        font-size: 0.75rem;
+        font-weight: bold;
+        letter-spacing: 1px;
+    }
+</style>
 
-    <div class="dev-container">
-        <h2 style="text-align:center; letter-spacing: 2px; color: #39FF14;">BPL UPGRADE SYSTEM</h2>
-
-        <div class="char-selector">
-            <% if (user.inventory && user.inventory.length > 0) { %>
-                <% user.inventory.forEach((item, index) => { %>
-                    <div class="char-card <%= index === 0 ? 'active' : '' %>" onclick="selectChar('<%= item.name %>', this)">
-                        <img src="<%= item.img %>" alt="char">
-                        <span><%= item.name.toUpperCase() %></span>
-                    </div>
-                <% }) %>
-            <% } else { %>
-                <p style="color: #ff4444; font-size: 0.8rem;">Karakter Bulunamadı!</p>
-            <% } %>
+<div class="container mt-5">
+    <div class="text-center mb-5">
+        <h1 class="text-success fw-bold">BPL GELİŞTİRME MERKEZİ</h1>
+        <p class="text-white-50">Karakterlerini güçlendir ve arenada rakipsiz ol!</p>
+        <div class="badge bg-dark border border-warning p-2 text-warning" style="font-size: 1.2rem;">
+            CÜZDAN: <span id="balanceDisplay"><%= user.bpl %></span> BPL
         </div>
-
-        <div class="balance-box">
-            <i class="fas fa-wallet"></i> KASA: <span id="bpl-val"><%= user.bpl.toLocaleString() %></span> BPL
-        </div>
-
-        <div class="stat-row">
-            <div class="stat-label">
-                <h3>HP (CAN)</h3>
-                <p>Dayanıklılığı +10 artırır</p>
-            </div>
-            <div>
-                <span style="color: #FFFF00; font-size: 0.8rem; margin-right: 10px;">50 BPL</span>
-                <button class="btn-up" onclick="applyUpgrade('hp', 50)">YÜKSELT</button>
-            </div>
-        </div>
-
-        <div class="stat-row">
-            <div class="stat-label">
-                <h3>ATK (GÜÇ)</h3>
-                <p>Saldırı hasarını +5 artırır</p>
-            </div>
-            <div>
-                <span style="color: #FFFF00; font-size: 0.8rem; margin-right: 10px;">40 BPL</span>
-                <button class="btn-up" onclick="applyUpgrade('atk', 40)">YÜKSELT</button>
-            </div>
-        </div>
-
-        <div class="stat-row" style="border-left: 3px solid #00d2ff;">
-            <div class="stat-label">
-                <h3>DEF (ZIRH)</h3>
-                <p>Alınan hasarı -5 azaltır</p>
-            </div>
-            <div>
-                <span style="color: #FFFF00; font-size: 0.8rem; margin-right: 10px;">35 BPL</span>
-                <button class="btn-up" style="border-color: #00d2ff; color: #00d2ff;" onclick="applyUpgrade('def', 35)">YÜKSELT</button>
-            </div>
-        </div>
-
-        <a href="/profil" class="back-link"><i class="fas fa-chevron-left"></i> PANELE DÖN</a>
     </div>
 
-    <script>
-        // Sayfa başında ilk karakteri seçili ata
-        let activeChar = "<%= user.inventory && user.inventory.length > 0 ? user.inventory[0].name : '' %>";
+    <div class="row">
+        <% if (user.inventory && user.inventory.length > 0) { %>
+            <% user.inventory.forEach(animal => { %>
+                <div class="col-md-6 col-lg-4">
+                    <div class="upgrade-card p-4">
+                        <div class="text-center mb-3">
+                            <img src="/caracter/profile/<%= animal.name %>.jpg" class="char-img mb-2" alt="<%= animal.name %>">
+                            <h3 class="text-white"><%= animal.name.toUpperCase() %></h3>
+                            <span class="badge bg-success">SEVİYE 1</span>
+                        </div>
 
-        function selectChar(name, el) {
-            activeChar = name;
-            document.querySelectorAll('.char-card').forEach(c => c.classList.remove('active'));
-            el.classList.add('active');
+                        <div class="stat-box">
+                            <div class="d-flex justify-content-between stat-label">
+                                <span>SAĞLIK (HP)</span>
+                                <span><%= animal.stats.hp %></span>
+                            </div>
+                            <div class="progress">
+                                <div class="progress-bar bg-danger" style="width: <%= (animal.stats.hp / 500) * 100 %>%"></div>
+                            </div>
+                            <button class="btn btn-outline-danger w-100 btn-upgrade mb-3" onclick="upgradeStat('<%= animal.name %>', 'hp', 50)">
+                                HP YÜKSELT <span class="float-end">50 BPL</span>
+                            </button>
+                        </div>
+
+                        <div class="stat-box">
+                            <div class="d-flex justify-content-between stat-label">
+                                <span>SALDIRI (ATK)</span>
+                                <span><%= animal.stats.atk %></span>
+                            </div>
+                            <div class="progress">
+                                <div class="progress-bar bg-warning" style="width: <%= (animal.stats.atk / 200) * 100 %>%"></div>
+                            </div>
+                            <button class="btn btn-outline-warning w-100 btn-upgrade mb-3" onclick="upgradeStat('<%= animal.name %>', 'atk', 40)">
+                                ATK YÜKSELT <span class="float-end">40 BPL</span>
+                            </button>
+                        </div>
+
+                        <div class="stat-box">
+                            <div class="d-flex justify-content-between stat-label">
+                                <span>SAVUNMA (DEF)</span>
+                                <span><%= animal.stats.def %></span>
+                            </div>
+                            <div class="progress">
+                                <div class="progress-bar bg-info" style="width: <%= (animal.stats.def / 200) * 100 %>%"></div>
+                            </div>
+                            <button class="btn btn-outline-info w-100 btn-upgrade" onclick="upgradeStat('<%= animal.name %>', 'def', 35)">
+                                DEF YÜKSELT <span class="float-end">35 BPL</span>
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            <% }) %>
+        <% } else { %>
+            <div class="col-12 text-center text-white">
+                <p>Henüz bir karakteriniz yok. Marketten bir tane edinin!</p>
+                <a href="/market" class="btn btn-success">MARKETE GİT</a>
+            </div>
+        <% } %>
+    </div>
+</div>
+
+<script>
+function upgradeStat(animalName, statType, cost) {
+    if(!confirm(animalName + ' için ' + statType.toUpperCase() + ' geliştirmek istediğine emin misin?')) return;
+
+    fetch('/upgrade-stat', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ animalName, statType, cost })
+    })
+    .then(res => res.json())
+    .then(data => {
+        if (data.status === 'success') {
+            alert('🚀 ' + data.msg);
+            location.reload(); // İstatistiklerin güncellenmesi için sayfayı yeniler
+        } else {
+            alert('❌ Hata: ' + data.msg);
         }
+    })
+    .catch(err => {
+        console.error('Sistem hatası:', err);
+        alert('Geliştirme sırasında bir hata oluştu.');
+    });
+}
+</script>
 
-        async function applyUpgrade(type, cost) {
-            if (!activeChar) return alert("Geliştirilecek karakter seçilmedi!");
-            if (!confirm(`${activeChar} geliştirilsin mi?`)) return;
-
-            try {
-                const res = await fetch('/upgrade-stat', {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ animalName: activeChar, statType: type, cost: cost })
-                });
-
-                const data = await res.json();
-
-                if (data.status === 'success') {
-                    document.getElementById('bpl-val').innerText = data.newBalance.toLocaleString();
-                    // Sunucudan gelen 'msg' artık 'undefined' olmayacak
-                    alert("SİSTEM MESAJI: " + data.msg);
-                } else {
-                    alert("HATA: " + data.msg);
-                }
-            } catch (e) {
-                alert("Bağlantı hatası!");
-            }
-        }
-    </script>
-</body>
-</html>
+<%- include('footer') %>
