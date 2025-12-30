@@ -121,20 +121,27 @@ app.get('/meeting', checkAuth, async (req, res) => {
     try {
         const user = await User.findById(req.session.userId);
         
-        // Giriş ücreti kontrolü (Örn: 50 BPL)
-        if (user.bpl < 50) {
+        // Kullanıcı kontrolü
+        if (!user) return res.redirect('/login');
+
+        // Giriş Ücreti (Örneğin 50 BPL)
+        const entryFee = 50;
+        if (user.bpl < entryFee) {
             return res.render('profil', { 
                 user, 
-                error: 'Konseye giriş için en az 50 BPL gereklidir!' 
+                error: 'Konseye giriş için yeterli BPL yok!' 
             });
         }
 
-        // Ücreti tahsil et (İsteğe bağlı, her girişte düşmesini istiyorsanız)
-        user.bpl -= 50;
+        // Bakiye düş ve kaydet
+        user.bpl -= entryFee;
         await user.save();
 
-        const roomId = "BPL-VIP-KONSEY"; // Sabit oda veya dinamik yapılabilir
-        res.render('meeting', { user, roomId });
+        const roomId = "BPL-VIP-KONSEY";
+        res.render('meeting', { 
+            user: user, 
+            roomId: roomId 
+        });
     } catch (err) {
         console.error("Meeting Hatası:", err);
         res.redirect('/profil');
@@ -309,46 +316,88 @@ io.on('connection', (socket) => {
             }
         } catch (e) { console.error(e); }
     });
-
-    // --- SOCKET.IO KAPSAMI (app.js içinde io.on bloğunun içi) ---
+// --- 10. SOCKET.IO SİSTEMİ (TÜM MANTIK TEK BİR BLOK İÇİNDE) ---
 io.on('connection', (socket) => {
-    // Önceki kayıt logic'leri burada kalmalı...
-
-    socket.on('join-meeting', (data) => {
-        // Loglardaki hatayı engellemek için socket'in tanımlı olduğundan emin oluyoruz
-        if (data && data.roomId) {
-            socket.join(data.roomId);
-            socket.nickname = data.nickname; // Sokete nickname atıyoruz
-            
-            // Odadaki diğerlerine bildirim gönder
-            io.to(data.roomId).emit('new-message', { 
-                sender: "SİSTEM", 
-                text: `🔥 ${data.nickname} konseye katıldı!` 
-            });
-            
-            console.log(`VIP Odaya Giriş: ${data.nickname} -> ${data.roomId}`);
+    
+    // [KULLANICI KAYDI]
+    socket.on('register-user', (data) => {
+        if (data && data.nickname) {
+            socket.userId = data.id;
+            socket.nickname = data.nickname;
+            socket.join('Global');
+            console.log(`${socket.nickname} bağlandı.`);
         }
     });
 
-    // VIP Savaş ve Hediye sinyalleri de bu io.on bloğu içinde olmalı...
-});
+    // [GLOBAL CHAT]
+    socket.on('chat-message', (data) => {
+        if (data.text && data.text.trim() !== "") {
+            const targetRoom = data.room || 'Global';
+            io.to(targetRoom).emit('new-message', { 
+                sender: socket.nickname || "Kumandan", 
+                text: data.text 
+            });
+        }
+    });
+
+    // [BPL TRANSFERİ]
+    socket.on('transfer-bpl', async (data) => {
+        try {
+            const sender = await User.findById(socket.userId);
+            const receiver = await User.findOne({ nickname: data.to });
+            if (sender && receiver && sender.bpl >= 6000) {
+                const amount = Math.min(data.amount, 1000);
+                const tax = Math.floor(amount * 0.25);
+                sender.bpl -= amount;
+                receiver.bpl += (amount - tax);
+                await sender.save(); await receiver.save();
+                socket.emit('gift-result', { newBalance: sender.bpl, message: 'Başarıyla gönderildi!' });
+            }
+        } catch (e) { console.error(e); }
+    });
+
+    // [VIP ODAYA KATILIM]
+    socket.on('join-meeting', (data) => {
+        // Data objesi veya direkt roomId gelme durumuna göre kontrol
+        const roomId = (typeof data === 'string') ? data : data.roomId;
+        if (roomId) {
+            socket.join(roomId);
+            console.log(`VIP Odaya Giriş: ${socket.nickname || 'Bilinmeyen'} -> ${roomId}`);
+            
+            io.to(roomId).emit('new-message', { 
+                sender: "SİSTEM", 
+                text: `🔥 ${socket.nickname || 'Bir üye'} konseye katıldı!` 
+            });
+        }
+    });
 
     // [VIP HEDİYE SİSTEMİ]
     socket.on('send-gift-vip', async (data) => {
         try {
-            const sender = await User.findById(data.senderId);
+            const senderId = data.senderId || socket.userId;
+            const sender = await User.findById(senderId);
             const receiver = await User.findOne({ nickname: data.targetNick });
+            
             if (sender && receiver && sender.bpl >= 5000) {
-                const tax = data.tax / 100;
-                const netAmount = Math.floor(data.amount * (1 - tax));
+                const taxPercent = data.tax / 100;
+                const netAmount = Math.floor(data.amount * (1 - taxPercent));
+                
                 sender.bpl -= data.amount;
                 receiver.bpl += netAmount;
-                await sender.save(); await receiver.save();
+                
+                await sender.save(); 
+                await receiver.save();
+                
                 io.to(data.room).emit('new-message', { 
                     sender: "SİSTEM", 
                     text: `🎁 ${sender.nickname} -> ${receiver.nickname}: ${data.amount} BPL gönderildi!` 
                 });
-                socket.emit('gift-result', { status: 'success', message: 'İşlem Başarılı!' });
+                
+                socket.emit('gift-result', { 
+                    status: 'success', 
+                    message: 'İşlem Başarılı!', 
+                    newBalance: sender.bpl 
+                });
             }
         } catch (e) { console.error(e); }
     });
@@ -358,11 +407,14 @@ io.on('connection', (socket) => {
         try {
             const p1 = await User.findOne({ nickname: data.p1 });
             const p2 = await User.findOne({ nickname: data.p2 });
+            
             if (p1 && p1.bpl >= 200) {
                 p1.bpl -= 200;
                 await p1.save();
+                
                 const winner = Math.random() > 0.5 ? p1 : p2;
                 const animal = (p1.selectedAnimal || "eagle").toLowerCase();
+                
                 io.to(data.room).emit('battle-video-play', {
                     winner: winner.nickname,
                     moveVideo: `/caracter/move/${animal}/${animal}1.mp4`,
@@ -377,12 +429,13 @@ io.on('connection', (socket) => {
         console.log('Bir kumandan ayrıldı.'); 
     });
 
-}); // io.on('connection') sonu - TÜM SOKETLER BU PARANTEZİN İÇİNDE KALDI
+}); // <--- TÜM SOKETLER BU PARANTEZİN İÇİNDE KALMAK ZORUNDA
 
 // --- 11. SUNUCU BAŞLATMA ---
 server.listen(PORT, "0.0.0.0", () => {
     console.log(`BPL ECOSYSTEM AKTİF: PORT ${PORT}`);
 });
+
 
 
 
