@@ -1,100 +1,159 @@
-const express = require('express');
-const mongoose = require('mongoose');
-const session = require('express-session');
-const bodyParser = require('body-parser');
-const path = require('path');
-const crypto = require('crypto');
+// --- 1. MODÜLLER VE AYARLAR ---
 require('dotenv').config();
+const express = require('express');
+const bodyParser = require('body-parser');
+const http = require('http');
+const socketIo = require('socket.io');
+const session = require('express-session');
+const mongoose = require('mongoose');
+const nodemailer = require('nodemailer');
+const path = require('path');
+const axios = require('axios');
 
-const app = express();
-
-// --- 🛡️ Güvenli Şifreleme (bcryptjs Gerektirmez) ---
-const hashPassword = (p) => p ? crypto.scryptSync(p, 'bonus-salt-123', 64).toString('hex') : '';
-const comparePassword = (p, h) => p && h ? crypto.scryptSync(p, 'bonus-salt-123', 64).toString('hex') === h : false;
-
-// --- ⚙️ Middleware ---
-app.use(bodyParser.urlencoded({ extended: true }));
-app.use(express.json());
-app.use(express.static(path.join(__dirname, 'public')));
-app.set('view engine', 'ejs');
-
-app.use(session({
-    secret: process.env.SESSION_SECRET || 'gizli_bonus',
-    resave: false,
-    saveUninitialized: false,
-    cookie: { maxAge: 1000 * 60 * 60 * 24 }
-}));
-
-// --- 🍃 MongoDB Bağlantısı ---
-mongoose.connect(process.env.MONGO_URI)
-    .then(() => console.log('Sistem Aktif: MongoDB Bağlantısı Başarılı'))
-    .catch(err => console.error('Bağlantı Hatası:', err));
-
-// --- 📂 8 Modelin Tamamı Dahil Edildi ---
+// --- 2. VERİTABANI VE MODELLER ---
+const connectDB = require('./db');
 const User = require('./models/User');
-const ArenaLog = require('./models/ArenaLogs');
-const Income = require('./models/Income');
 const Log = require('./models/Log');
 const Payment = require('./models/Payment');
-const Punishment = require('./models/Punishment');
-const Victory = require('./models/Victory');
-const Withdrawal = require('./models/Withdrawal');
 
-// --- 🚀 Rotalar (Routes) ---
+connectDB();
 
-app.get('/', (req, res) => res.render('index', { user: req.session.user || null }));
+const app = express();
+const server = http.createServer(app);
+const io = socketIo(server);
+const PORT = process.env.PORT || 10000;
 
-// KAYIT OL (400 Hatası Çözümü)
+// --- 3. MIDDLEWARE ---
+app.set('view engine', 'ejs');
+app.set('views', path.join(__dirname, 'views'));
+app.use(express.static(path.join(__dirname, 'public')));
+app.use(bodyParser.json());
+app.use(bodyParser.urlencoded({ extended: true }));
+app.set('trust proxy', 1);
+
+app.use(session({
+    secret: 'bpl_ozel_anahtar',
+    resave: false,
+    saveUninitialized: false,
+    cookie: { secure: false, maxAge: 24 * 60 * 60 * 1000 }
+}));
+
+const checkAuth = (req, res, next) => {
+    if (req.session.userId) next(); else res.redirect('/');
+};
+
+const MARKET_ANIMALS = [
+    { id: 1, name: 'Tiger', price: 1000, img: '/caracter/profile/tiger.jpg' },
+    { id: 2, name: 'Lion', price: 1000, img: '/caracter/profile/lion.jpg' },
+    { id: 3, name: 'Eagle', price: 1000, img: '/caracter/profile/eagle.jpg' }
+];
+
+const eliteBots = [
+    { nickname: "X-Terminator", animal: "Tiger" },
+    { nickname: "Shadow-Ghost", animal: "Lion" }
+];
+
+const last20Victories = [];
+
+// --- 4. ROTALAR (AUTH & ANA SAYFA) ---
+
+app.get('/', (req, res) => {
+    res.render('index', { user: req.session.userId || null });
+});
+
 app.post('/register', async (req, res) => {
+    const { nickname, email, password } = req.body;
     try {
-        // Formundaki 'name' etiketlerine göre veriyi çekiyoruz
-        const username = req.body.username || req.body.operator_nickname; 
-        const email = req.body.email || req.body.email_address;
-        const password = req.body.password || req.body.secure_password;
-
-        if (!username || !email || !password) {
-            return res.status(400).send(`Eksik veri! Gelenler: Username: ${username}, Email: ${email}`);
-        }
+        const existingUser = await User.findOne({ email });
+        if (existingUser) return res.send('<script>alert("Bu e-posta kayıtlı!"); window.location.href="/";</script>');
 
         const newUser = new User({
-            username,
+            nickname,
             email,
-            password: hashPassword(password),
-            bpl: 100
+            password,
+            bpl: 2500,
+            inventory: []
         });
 
         await newUser.save();
-        res.redirect('/');
-    } catch (error) {
-        res.status(500).send("Sunucu hatası: " + error.message);
+        await new Log({ type: 'REGISTER', content: `Yeni kullanıcı: ${nickname}`, userEmail: email }).save();
+        res.send('<script>alert("Kayıt başarılı! Giriş yapabilirsin."); window.location.href="/";</script>');
+    } catch (err) {
+        res.status(500).send("Kayıt hatası!");
     }
 });
 
 app.post('/login', async (req, res) => {
     const { email, password } = req.body;
-    const user = await User.findOne({ email });
-    if (user && comparePassword(password, user.password)) {
-        req.session.user = user;
+    const user = await User.findOne({ email, password });
+    if (user) {
+        req.session.userId = user._id;
         res.redirect('/profil');
     } else {
-        res.send('Hatalı bilgiler! <a href="/">Geri Dön</a>');
+        res.send('<script>alert("Hatalı giriş!"); window.location.href="/";</script>');
     }
 });
 
-app.get('/profil', async (req, res) => {
-    if (!req.session.user) return res.redirect('/');
-    const user = await User.findById(req.session.user._id);
+app.get('/profil', checkAuth, async (req, res) => {
+    const user = await User.findById(req.session.userId);
     res.render('profil', { user });
 });
 
-app.get('/arena', (req, res) => res.render('arena', { user: req.session.user }));
-app.get('/market', (req, res) => res.render('market', { user: req.session.user }));
-app.get('/wallet', (req, res) => res.render('wallet', { user: req.session.user }));
+// --- 5. ARENA VE MARKET SİSTEMİ ---
+
+app.post('/attack-bot', checkAuth, async (req, res) => {
+    try {
+        const user = await User.findById(req.session.userId);
+        const bot = eliteBots[Math.floor(Math.random() * eliteBots.length)];
+        const animalName = (req.query.animal || "tiger").toLowerCase();
+        const isWin = Math.random() > 0.5;
+
+        if (isWin) {
+            user.bpl += 200;
+            last20Victories.unshift({ winner: user.nickname, opponent: bot.nickname, reward: 200, time: new Date().toLocaleTimeString() });
+            if(last20Victories.length > 20) last20Victories.pop();
+            
+            io.emit('new-message', { sender: "ARENA", text: `🏆 ${user.nickname} kazandı!`, isBattleWin: true, winnerNick: user.nickname });
+        } else {
+            if (user.bpl >= 200) user.bpl -= 200;
+        }
+
+        await user.save();
+        res.json({ status: 'success', isWin, newBalance: user.bpl, opponent: bot.nickname });
+    } catch (err) { res.status(500).json({ status: 'error' }); }
+});
+
+// --- 6. SOCKET.IO (CHAT & TRANSFER) ---
+io.on('connection', (socket) => {
+    socket.on('register-user', ({ id, nickname }) => {
+        socket.userId = id;
+        socket.nickname = nickname;
+        socket.join('Global');
+    });
+
+    socket.on('chat-message', (data) => {
+        io.to('Global').emit('new-message', { sender: socket.nickname, text: data.text });
+    });
+
+    socket.on('tebrik-et', async (data) => {
+        const sender = await User.findById(socket.userId);
+        const receiver = await User.findOne({ nickname: data.winnerNick });
+        if (sender && receiver && sender.bpl >= 5000) {
+            sender.bpl -= 500;
+            receiver.bpl += 410; // %18 kesinti (90 BPL yakıldı)
+            await sender.save();
+            await receiver.save();
+            await new Log({ type: 'BPL_BURN', content: `Tebrik yakımı: 90 BPL`, userEmail: sender.email }).save();
+            io.to('Global').emit('new-message', { sender: "SİSTEM", text: `💎 ${sender.nickname}, ${receiver.nickname}'ı tebrik etti!` });
+        }
+    });
+});
 
 app.get('/logout', (req, res) => {
     req.session.destroy();
     res.redirect('/');
 });
 
-const PORT = process.env.PORT || 10000;
-app.listen(PORT, () => console.log(`🚀 Port ${PORT} üzerinde sistem hazır!`));
+server.listen(PORT, "0.0.0.0", () => {
+    console.log(`BPL ECOSYSTEM RUNNING ON PORT ${PORT}`);
+});
