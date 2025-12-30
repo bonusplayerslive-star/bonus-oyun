@@ -264,7 +264,7 @@ app.post('/verify-payment', checkAuth, async (req, res) => {
     } catch (err) { res.status(500).json({ status: 'error' }); }
 });
 
-// --- 10. SOCKET.IO SİSTEMİ ---
+// --- 10. SOCKET.IO SİSTEMİ (TEK VE TEMİZ BLOK) ---
 io.on('connection', (socket) => {
     
     // Kullanıcı odaya kayıt olur
@@ -319,7 +319,11 @@ io.on('connection', (socket) => {
         } catch (e) { console.error("Tebrik hatası:", e); }
     });
 
-}); // io.on BİTİŞİ (Sadece 1 tane yeterli!)
+    socket.on('disconnect', () => {
+        console.log('Bir kullanıcı ayrıldı.');
+    });
+
+}); // io.on BİTİŞİ - SADECE BİR TANE!
 
 // --- 11. SUNUCU BAŞLATMA ---
 server.listen(PORT, "0.0.0.0", () => {
