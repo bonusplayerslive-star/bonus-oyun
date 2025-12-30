@@ -6,7 +6,17 @@ const http = require('http');
 const socketIo = require('socket.io');
 const session = require('express-session');
 const path = require('path');
-const bcrypt = require('bcryptjs');// Render uyumluluğu için
+const crypto = require('crypto');
+
+// Şifreleme Fonksiyonları (bcrypt yerine)
+const hashPassword = (password) => {
+    return crypto.scryptSync(password, 'salt-key', 64).toString('hex');
+};
+
+const comparePassword = (inputPassword, storedHash) => {
+    const hash = crypto.scryptSync(inputPassword, 'salt-key', 64).toString('hex');
+    return hash === storedHash;
+};
 const mongoose = require('mongoose');
 
 // Veritabanı Bağlantısı
@@ -136,4 +146,5 @@ io.on('connection', (socket) => {
 });
 
 server.listen(PORT, "0.0.0.0", () => console.log(`Sistem Aktif: ${PORT}`));
+
 
