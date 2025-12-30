@@ -80,6 +80,32 @@
     <p class="animal-price"><%= animal.price %> BPL</p>
     </div>
 
+<%- include('header') %>
+<div class="container mt-5">
+    <h2 class="text-center text-success mb-4">KARAKTER PAZARI</h2>
+    <div class="row">
+        <% animals.forEach(animal => { %>
+            <div class="col-md-3 mb-4">
+                <div class="card bg-dark text-white border-success">
+                    <img src="<%= animal.img %>" class="card-img-top" alt="<%= animal.name %>">
+                    <div class="card-body text-center">
+                        <h5 class="card-title"><%= animal.name %></h5>
+                        <p class="text-warning fw-bold"><%= animal.price %> BPL</p>
+                        <button class="btn btn-outline-success w-100 buy-btn" 
+                                data-id="<%= animal.id %>" 
+                                data-name="<%= animal.name %>" 
+                                data-price="<%= animal.price %>">SATIN AL</button>
+                    </div>
+                </div>
+            </div>
+        <% }) %>
+    </div>
+</div>
+<script>
+    // Satın alma mantığı buraya (fetch /buy-animal)
+</script>
+<%- include('footer') %>
+
                     <% 
                         // Kullanıcının bu hayvana zaten sahip olup olmadığını kontrol et
                         const isOwned = user.inventory.some(item => item.name === animal.name);
@@ -122,4 +148,5 @@
 
 </body>
 </html>
+
 
