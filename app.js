@@ -307,15 +307,20 @@ io.on('connection', (socket) => {
                 socket.emit('gift-result', { newBalance: sender.bpl, message: 'Gönderildi!' });
             }
         } catch (e) { console.error(e); }
-   
-    });
-});
-    });
+
 // CHAT BURADA OLMALI:
     socket.on('chat-message', (data) => {
         io.to('Global').emit('new-message', { 
             sender: socket.nickname, 
             text: data.text 
+        });
+    });
+
+        
+    });
+});
+    });
+
         });
     });
 
@@ -329,4 +334,5 @@ io.on('connection', (socket) => {
 server.listen(PORT, "0.0.0.0", () => {
     console.log(`BPL ECOSYSTEM OPERATIONAL ON PORT ${PORT}`);
 });
+
 
