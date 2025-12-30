@@ -78,27 +78,6 @@ const transporter = nodemailer.createTransport({
 
 // --- 5. ANA SAYFA VE MENÜ ROTALARI ---
 
-// Beşgen Masa (Meeting) Sayfasına Giriş
-app.get('/meeting', checkAuth, async (req, res) => {
-    try {
-        const user = await User.findById(req.session.userId);
-        // Tüm VIP kullanıcılar aynı odaya (room) girsin
-        res.render('meeting', { 
-            user: user, 
-            roomId: "BPL_VIP_CONSEY" 
-        });
-    } catch (err) {
-        res.redirect('/profil');
-    }
-});
-
-
-
-
-
-
-
-
 app.get('/', (req, res) => {
     res.render('index', { user: req.session.userId || null });
 });
@@ -134,18 +113,14 @@ app.get('/development', checkAuth, async (req, res) => {
 
 app.get('/chat', checkAuth, async (req, res) => {
     const user = await User.findById(req.session.userId);
-    res.render('chat', { user }); // views/chat.ejs dosyanızın olması gerekir
+    res.render('chat', { user });
 });
-
-
 
 // --- BEŞGEN KONSEY (MEETING) ROTASI ---
 app.get('/meeting', checkAuth, async (req, res) => {
     try {
         const user = await User.findById(req.session.userId);
-        // Herkes aynı VIP odaya girsin veya bir roomId oluşturulsun
         const roomId = "BPL-VIP-KONSEY"; 
-        
         res.render('meeting', { 
             user: user, 
             roomId: roomId 
@@ -155,12 +130,6 @@ app.get('/meeting', checkAuth, async (req, res) => {
     }
 });
 
-
-
-
-
-
-
 // --- 6. AUTH VE İŞLEM ROTALARI ---
 
 app.post('/register', async (req, res) => {
@@ -168,7 +137,6 @@ app.post('/register', async (req, res) => {
     try {
         const existingUser = await User.findOne({ email });
         if (existingUser) return res.send('<script>alert("E-posta kayıtlı!"); window.location.href="/";</script>');
-
         const newUser = new User({ nickname, email, password, bpl: 2500, inventory: [] });
         await newUser.save();
         res.send('<script>alert("Başarılı!"); window.location.href="/";</script>');
@@ -198,11 +166,9 @@ app.post('/buy-animal', checkAuth, async (req, res) => {
         const { animalId } = req.body;
         const user = await User.findById(req.session.userId);
         const animal = MARKET_ANIMALS.find(a => a.id == animalId);
-
         if (!animal || user.bpl < animal.price || user.inventory.length >= 3) {
             return res.json({ status: 'error', msg: 'Şartlar sağlanmadı!' });
         }
-
         user.bpl -= animal.price;
         user.inventory.push({ name: animal.name, img: animal.img, level: 1, stats: { hp: 100, atk: 20, def: 10 } });
         await user.save();
@@ -216,11 +182,9 @@ app.post('/upgrade-stat', checkAuth, async (req, res) => {
         const user = await User.findById(req.session.userId);
         const idx = user.inventory.findIndex(a => a.name === animalName);
         if (idx === -1 || user.bpl < cost) return res.json({ status: 'error', msg: 'Hata!' });
-
         const animal = user.inventory[idx];
         if(statType === 'hp') animal.stats.hp += 10;
         else if(statType === 'atk') animal.stats.atk += 5;
-
         user.bpl -= cost;
         user.markModified('inventory');
         await user.save();
@@ -228,38 +192,23 @@ app.post('/upgrade-stat', checkAuth, async (req, res) => {
     } catch (err) { res.status(500).json({ status: 'error' }); }
 });
 
-// --- 8. ARENA VE SAVAŞ MANTIĞI (KESİN ÇÖZÜM) ---
+// --- 8. ARENA VE SAVAŞ MANTIĞI ---
 app.post('/attack-bot', checkAuth, async (req, res) => {
     try {
         const user = await User.findById(req.session.userId);
-        
-        // 1. Bakiye Kontrolü (200 BPL giriş ücreti)
         if (!user || user.bpl < 200) {
             return res.json({ status: 'error', msg: 'Savaşa girmek için 200 BPL gerekli!' });
         }
-
-        // 2. Hayvan İsmi Ayarı (Gelen veriyi küçük harfe çevirip temizler)
         let animalName = (req.body.animal || "eagle").toLowerCase().trim();
-        
-        // 3. Şans Faktörü (%50 Kazanç / %50 Kayıp)
         const isWin = Math.random() > 0.5;
-
         if (isWin) {
-            user.bpl += 200; // Kazanç
+            user.bpl += 200;
             const winMsg = `🏆 ${user.nickname}, Arena'da ${animalName} ile büyük bir zafer kazandı!`;
-            
-            // Global Lobide Duyur
-            io.to('Global').emit('new-message', {
-                sender: "ARENA_SISTEM",
-                text: winMsg
-            });
+            io.to('Global').emit('new-message', { sender: "ARENA_SISTEM", text: winMsg });
         } else {
-            user.bpl -= 200; // Kayıp
+            user.bpl -= 200;
         }
-
         await user.save();
-
-        // 4. Videoları ve Sonucu Gönder
         res.json({
             status: 'success',
             animation: {
@@ -269,59 +218,54 @@ app.post('/attack-bot', checkAuth, async (req, res) => {
             },
             newBalance: user.bpl
         });
-
     } catch (err) {
-        console.error("Arena Hatası:", err);
-        res.status(500).json({ status: 'error', msg: 'Sunucu hatası oluştu!' });
+        res.status(500).json({ status: 'error', msg: 'Sunucu hatası!' });
     }
 });
-// --- 9. ÖDEME VE CÜZDAN DOĞRULAMA (BSCScan) ---
 
+// --- 9. ÖDEME VE CÜZDAN DOĞRULAMA ---
 app.post('/verify-payment', checkAuth, async (req, res) => {
     const { txid, usd, bpl } = req.body;
     try {
         const checkDuplicate = await Payment.findOne({ txid });
         if (checkDuplicate) return res.json({ status: 'error', msg: 'Zaten kullanılmış!' });
-
         const apiKey = process.env.BSCSCAN_API_KEY;
         const companyWallet = process.env.WALLET_ADDRESS.toLowerCase();
         const usdtContract = process.env.CONTRACT_ADDRESS.toLowerCase();
-        
         const url = `https://api.bscscan.com/api?module=proxy&action=eth_getTransactionReceipt&txhash=${txid}&apikey=${apiKey}`;
         const response = await axios.get(url);
         const receipt = response.data.result;
-
         if (!receipt || receipt.status !== "0x1") return res.json({ status: 'error', msg: 'Geçersiz İşlem!' });
-
         let validTransfer = false;
         receipt.logs.forEach(log => {
             const isUSDT = log.address.toLowerCase() === usdtContract;
             const toCompany = log.topics[2] && log.topics[2].toLowerCase().includes(companyWallet.replace('0x', ''));
             if (isUSDT && toCompany) validTransfer = true;
         });
-
         if (validTransfer) {
             const user = await User.findById(req.session.userId);
             user.bpl += parseInt(bpl);
             await user.save();
             await new Payment({ userId: user._id, txid, amountUSD: usd, amountBPL: bpl, status: 'COMPLETED' }).save();
             res.json({ status: 'success', msg: 'BPL Yüklendi!' });
-        } else {
-            res.json({ status: 'error', msg: 'Veri uyuşmuyor!' });
-        }
+        } else { res.json({ status: 'error', msg: 'Veri uyuşmuyor!' }); }
     } catch (err) { res.status(500).json({ status: 'error' }); }
 });
 
-// --- 10. SOCKET.IO SİSTEMİ (TEK BLOK) ---
+// --- 10. SOCKET.IO SİSTEMİ (TÜM MANTIK TEK BİR BLOK İÇİNDE) ---
 io.on('connection', (socket) => {
+    
+    // [KULLANICI KAYDI]
     socket.on('register-user', (data) => {
         if (data && data.nickname) {
             socket.userId = data.id;
             socket.nickname = data.nickname;
             socket.join('Global');
+            console.log(`${socket.nickname} bağlandı.`);
         }
     });
 
+    // [GLOBAL CHAT]
     socket.on('chat-message', (data) => {
         if (data.text && data.text.trim() !== "") {
             io.to('Global').emit('new-message', { 
@@ -331,6 +275,7 @@ io.on('connection', (socket) => {
         }
     });
 
+    // [BPL TRANSFERİ]
     socket.on('transfer-bpl', async (data) => {
         try {
             const sender = await User.findById(socket.userId);
@@ -346,120 +291,59 @@ io.on('connection', (socket) => {
         } catch (e) { console.error(e); }
     });
 
-    socket.on('disconnect', () => { console.log('Ayrıldı.'); });
-});
-
-
-// --- VIP KONSEY SOKET MANTIĞI ---
+    // [VIP ODAYA KATILIM] - HATA BURADAYDI, ŞİMDİ DOĞRU YERDE
     socket.on('join-meeting', (roomId) => {
         socket.join(roomId);
-        console.log(`Kullanıcı ${socket.userId} VIP odaya katıldı: ${roomId}`);
+        console.log(`VIP Odaya Giriş: ${socket.nickname} -> ${roomId}`);
     });
 
-    // VIP Hediye Gönderme (Vergi ve Bakiye Kontrollü)
+    // [VIP HEDİYE SİSTEMİ]
     socket.on('send-gift-vip', async (data) => {
         try {
             const sender = await User.findById(data.senderId);
             const receiver = await User.findOne({ nickname: data.targetNick });
-
-            if (!sender || !receiver) return socket.emit('gift-result', { message: 'Kullanıcı bulunamadı!' });
-            if (sender.bpl < 5000) return socket.emit('gift-result', { message: 'Min. 5000 BPL gerekir!' });
-
-            const taxAmount = Math.floor(data.amount * (data.tax / 100));
-            sender.bpl -= data.amount;
-            receiver.bpl += (data.amount - taxAmount);
-
-            await sender.save();
-            await receiver.save();
-
-            io.to(data.room).emit('new-message', { 
-                sender: "SİSTEM", 
-                text: `🔥 ${sender.nickname}, ${receiver.nickname} adlı kullanıcıya ${data.amount} BPL hediye gönderdi!` 
-            });
-            socket.emit('gift-result', { status: 'success', message: 'Hediye gönderildi!' });
-        } catch (e) { console.error(e); }
-    });
-// --- VIP KONSEY (MEETING) SİSTEMİ ---
-    
-    // Odaya Katılım
-    socket.on('join-room', (roomId) => {
-        socket.join(roomId);
-    });
-
-    // VIP Hediye Gönderme
-    socket.on('send-gift-vip', async (data) => {
-        try {
-            const sender = await User.findById(data.senderId);
-            const receiver = await User.findOne({ nickname: data.targetNick });
-
             if (sender && receiver && sender.bpl >= 5000) {
                 const tax = data.tax / 100;
                 const netAmount = Math.floor(data.amount * (1 - tax));
-                
                 sender.bpl -= data.amount;
                 receiver.bpl += netAmount;
-
-                await sender.save();
-                await receiver.save();
-
+                await sender.save(); await receiver.save();
                 io.to(data.room).emit('new-message', { 
                     sender: "SİSTEM", 
                     text: `🎁 ${sender.nickname} -> ${receiver.nickname}: ${data.amount} BPL gönderildi!` 
                 });
                 socket.emit('gift-result', { status: 'success', message: 'İşlem Başarılı!' });
-            } else {
-                socket.emit('gift-result', { status: 'error', message: 'Bakiye yetersiz veya kullanıcı bulunamadı!' });
             }
         } catch (e) { console.error(e); }
     });
 
-    // VIP Arena (Savaş) Tetikleyici
+    // [VIP ARENA SAVAŞI]
     socket.on('start-vip-battle', async (data) => {
-        const p1 = await User.findOne({ nickname: data.p1 });
-        if (p1 && p1.bpl >= 200) {
-            p1.bpl -= 200;
-            await p1.save();
-            
-            const animal = (p1.selectedAnimal || "eagle").toLowerCase();
-            const isWin = Math.random() > 0.5;
-            const winnerName = isWin ? data.p1 : data.p2;
-
-            io.to(data.room).emit('battle-video-play', {
-                winner: winnerName,
-                moveVideo: `/caracter/move/${animal}/${animal}1.mp4`,
-                video: `/caracter/move/${animal}/${animal}.mp4`
-            });
-        }
-    });
-    // VIP Savaş Başlatma
-    socket.on('start-vip-battle', async (data) => {
-        const p1 = await User.findOne({ nickname: data.p1 });
-        const p2 = await User.findOne({ nickname: data.p2 });
-
-        if (p1 && p2 && p1.bpl >= 200) {
-            p1.bpl -= 200;
-            await p1.save();
-
-            // Rastgele kazanan belirle
-            const winner = Math.random() > 0.5 ? p1 : p2;
-            const animal = (p1.selectedAnimal || "eagle").toLowerCase();
-
-            io.to(data.room).emit('battle-video-play', {
-                winner: winner.nickname,
-                moveVideo: `/caracter/move/${animal}/${animal}1.mp4`,
-                video: `/caracter/move/${animal}/${animal}.mp4`
-            });
-        }
+        try {
+            const p1 = await User.findOne({ nickname: data.p1 });
+            const p2 = await User.findOne({ nickname: data.p2 });
+            if (p1 && p1.bpl >= 200) {
+                p1.bpl -= 200;
+                await p1.save();
+                const winner = Math.random() > 0.5 ? p1 : p2;
+                const animal = (p1.selectedAnimal || "eagle").toLowerCase();
+                io.to(data.room).emit('battle-video-play', {
+                    winner: winner.nickname,
+                    moveVideo: `/caracter/move/${animal}/${animal}1.mp4`,
+                    video: `/caracter/move/${animal}/${animal}.mp4`
+                });
+            }
+        } catch (e) { console.error(e); }
     });
 
+    // [AYRILMA]
+    socket.on('disconnect', () => { 
+        console.log('Bir kumandan ayrıldı.'); 
+    });
 
-
+}); // io.on('connection') sonu - TÜM SOKETLER BU PARANTEZİN İÇİNDE KALDI
 
 // --- 11. SUNUCU BAŞLATMA ---
 server.listen(PORT, "0.0.0.0", () => {
     console.log(`BPL ECOSYSTEM AKTİF: PORT ${PORT}`);
 });
-
-
-
-
