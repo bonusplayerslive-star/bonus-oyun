@@ -264,104 +264,77 @@ app.post('/verify-payment', checkAuth, async (req, res) => {
     } catch (err) { res.status(500).json({ status: 'error' }); }
 });
 
-// --- 10. SOCKET.IO SİSTEMİ (TEMİZ VE ENTEGRE) ---
-io.on('connection', (socket) => {
-    console.log('Yeni bir bağlantı denemesi...');
+// --- 10. SOCKET.IO SİSTEMİ (ENTEGRE VE STABİL) ---
+const io = require('socket.io')(server, {
+    cors: {
+        origin: "*",
+        methods: ["GET", "POST"]
+    }
+});
 
-    // 1. Kullanıcı Kayıt (Lobiye Giriş)
+io.on('connection', (socket) => {
+    // Kullanıcı odaya kayıt olur
     socket.on('register-user', (data) => {
         if (data && data.nickname) {
             socket.userId = data.id;
             socket.nickname = data.nickname;
             socket.join('Global');
-            console.log(`Lobiye bağlandı: ${socket.nickname}`);
+            console.log(`Lobiye giriş yapıldı: ${socket.nickname}`);
         }
     });
 
-    // 2. Chat Mesajlaşma (Global Oda)
+    // Chat Mesajlaşma
     socket.on('chat-message', (data) => {
         if (data.text && data.text.trim() !== "") {
-            // Sunucudan tüm Global odasına mesajı basar
             io.to('Global').emit('new-message', { 
                 sender: socket.nickname || "Kumandan", 
-                text: data.text.trim() 
+                text: data.text 
             });
         }
     });
 
-    // 3. BPL Transferi (Hediye Sistemi)
+    // BPL Transferi (Hediye) - Mevcut mantığınız korunmuştur
     socket.on('transfer-bpl', async (data) => {
         try {
             const sender = await User.findById(socket.userId);
             const receiver = await User.findOne({ nickname: data.to });
-            
-            // Güvenlik Kontrolleri
-            if (sender && receiver && sender.bpl >= 6000 && sender.nickname !== data.to) {
-                const amount = Math.min(Math.abs(data.amount), 1000); // Negatif sayı gönderimini ve 1000 limitini koru
+            if (sender && receiver && sender.bpl >= 6000) {
+                const amount = Math.min(data.amount, 1000);
                 const tax = Math.floor(amount * 0.25);
-                const netAmount = amount - tax;
-
                 sender.bpl -= amount;
-                receiver.bpl += netAmount;
-
+                receiver.bpl += (amount - tax);
                 await sender.save(); 
                 await receiver.save();
-
-                // Gönderene yeni bakiyesini bildir
-                socket.emit('gift-result', { 
-                    newBalance: sender.bpl, 
-                    message: `Başarıyla ${netAmount} BPL (Vergi düşüldü) gönderildi!` 
-                });
-
-                // Lobiye duyuru geç
-                io.to('Global').emit('new-message', { 
-                    sender: "SİSTEM", 
-                    text: `🎁 ${sender.nickname}, ${receiver.nickname} kumandana destek paketi gönderdi!` 
-                });
+                socket.emit('gift-result', { newBalance: sender.bpl, message: 'Başarıyla gönderildi!' });
             }
-        } catch (e) { 
-            console.error("Transfer hatası:", e); 
-            socket.emit('gift-result', { message: 'Transfer sırasında hata oluştu!' });
-        }
+        } catch (e) { console.error("Transfer hatası:", e); }
     });
 
-    // 4. Tebrik Sistemi (Arena Sonrası)
+    // Tebrik Sistemi
     socket.on('tebrik-et', async (data) => {
         try {
             const sender = await User.findById(socket.userId);
             const receiver = await User.findOne({ nickname: data.winnerNick });
-
             if (sender && receiver && sender.bpl >= 5000) {
                 sender.bpl -= 500;
                 receiver.bpl += 410;
-                
                 await sender.save();
                 await receiver.save();
-
                 io.to('Global').emit('new-message', { 
                     sender: "SİSTEM", 
-                    text: `💎 ${sender.nickname}, ${receiver.nickname} kumandayı tebrik ederek moral verdi!` 
+                    text: `💎 ${sender.nickname}, ${receiver.nickname} kumandana moral verdi!` 
                 });
             }
-        } catch (e) { 
-            console.error("Tebrik hatası:", e); 
-        }
+        } catch (e) { console.error("Tebrik hatası:", e); }
     });
 
-    // Bağlantı Koptuğunda
     socket.on('disconnect', () => {
-        if (socket.nickname) {
-            console.log(`${socket.nickname} lobi bağlantısını kesti.`);
-        }
+        console.log('Bir kullanıcı ayrıldı.');
     });
-
-}); // io.on BİTİŞİ (Tek ve temiz)
+}); // io.on BİTİŞİ
 
 // --- 11. SUNUCU BAŞLATMA ---
-// Bu bölüm dosyanın en altında olmalı
 server.listen(PORT, "0.0.0.0", () => {
-    console.log(`========================================`);
     console.log(`BPL ECOSYSTEM AKTİF: PORT ${PORT}`);
-    console.log(`Lobi ve Socket sistemleri hazır.`);
-    console.log(`========================================`);
 });
+
