@@ -696,11 +696,7 @@ socket.on('tebrik-et', async (data) => {
     }
 });
 
-    if (isWin) {
-        user.bpl += 75; // Zafer ödülü
-        await user.save();
-        
-        // Zafer Kaydı
+       // Zafer Kaydı
         last20Victories.unshift({
             winner: user.nickname,
             opponent: bot.nickname,
@@ -887,6 +883,7 @@ server.listen(PORT, "0.0.0.0", () => {
     =========================================
     `);
 });
+
 
 
 
