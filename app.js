@@ -717,51 +717,51 @@ socket.on('tebrik-et', async (data) => {
 app.post('/attack-bot', checkAuth, async (req, res) => {
     try {
         const user = await User.findById(req.session.userId);
-        const entryFee = 200; // Savaş giriş bedeli
-        const reward = 400;   // Toplam ödül (Giriş dahil)
-
-        if (user.bpl < entryFee) {
-            return res.json({ status: 'error', msg: 'Yetersiz bakiye! 200 BPL gerekli.' });
-        }
+        if (!user) return res.json({ status: 'error', msg: 'Kullanıcı bulunamadı!' });
 
         const bot = eliteBots[Math.floor(Math.random() * eliteBots.length)];
-        const isWin = Math.random() > 0.4; // %60 Kazanma Şansı
-
-        user.bpl -= entryFee; // Önce ücreti alıyoruz (Risk)
+        const isWin = Math.random() > 0.5; // %50 Şans
+        const animalName = req.query.animal ? req.query.animal.toLowerCase() : "eagle";
 
         if (isWin) {
-            user.bpl += reward; 
+            // Kazanan masrafsız +200 alır
+            user.bpl += 200;
             
-            // Son 20 Zafer Listesine Ekle (Reklam Alanı)
             last20Victories.unshift({
                 winner: user.nickname,
                 opponent: bot.nickname,
-                reward: (reward - entryFee), // Net kazanç
+                reward: 200,
                 time: new Date().toLocaleTimeString('tr-TR')
             });
+            if(last20Victories.length > 20) last20Victories.pop();
 
-            // Chat'e otomatik kutlama mesajı düşer (Dilersen)
             io.emit('new-message', {
-                sender: "ARENA_DUYURU",
-                text: `🏆 ${user.nickname}, ${bot.nickname} karşısında kan döktü ve ${reward - entryFee} BPL kazandı!`,
-                isSystem: true
+                sender: "ARENA_SISTEM",
+                text: `🏆 ${user.nickname}, ${bot.nickname} karşısında zafer kazandı!`,
+                winnerNick: user.nickname,
+                isBattleWin: true 
             });
+        } else {
+            // Kaybeden 200 öder
+            if (user.bpl >= 200) user.bpl -= 200;
         }
 
-        await user.save();
-        if(last20Victories.length > 20) last20Victories.pop();
+        await user.save(); // Hata buradaydı, artık async fonksiyonun içinde.
 
         res.json({
             status: 'success',
+            opponent: bot.nickname,
             animation: {
-                actionVideo: `/caracter/move/${req.query.animal.toLowerCase()}/${req.query.animal.toLowerCase()}1.mp4`,
-                winVideo: `/caracter/move/${req.query.animal.toLowerCase()}/${req.query.animal.toLowerCase()}.mp4`,
+                actionVideo: `/caracter/move/${animalName}/${animalName}1.mp4`,
+                winVideo: `/caracter/move/${animalName}/${animalName}.mp4`,
                 isWin: isWin
-            }
+            },
+            newBalance: user.bpl
         });
 
     } catch (err) {
-        res.status(500).json({ status: 'error', msg: 'Arena bağlantı hatası.' });
+        console.error("Arena Hatası:", err);
+        res.status(500).json({ status: 'error', msg: 'Sunucu hatası oluştu!' });
     }
 });
 
@@ -820,28 +820,41 @@ app.post('/attack-bot', checkAuth, async (req, res) => {
     }
 });
 
-// --- ELİT TEBRİK SİSTEMİ (Socket.io) ---
-socket.on('tebrik-et', async (data) => {
-    const sender = await User.findById(socket.userId);
-    const receiver = await User.findOne({ nickname: data.winnerNick });
+// --- TEBRİK SİSTEMİ (SOCKET.IO) ---
+io.on('connection', (socket) => {
+    socket.on('tebrik-et', async (data) => {
+        try {
+            const sender = await User.findById(socket.userId);
+            const receiver = await User.findOne({ nickname: data.winnerNick });
 
-    // Şart: Gönderen kişinin en az 5.000 BPL bakiyesi olmalı
-    if (sender.bpl < 5000) {
-        return socket.emit('error-msg', 'Tebrik için en az 5.000 BPL bakiyen olmalı!');
-    }
+            if (!sender || !receiver) return;
+            if (sender.bpl < 5000) return socket.emit('error-msg', 'En az 5.000 BPL gerekli!');
 
-    const brutHediye = 500; // Gönderilen ham miktar
-    const kesintiOrani = 0.18; // %18 Kesinti
-    const kesintiMiktari = brutHediye * kesintiOrani; // 90 BPL yakılır
-    const netHediye = brutHediye - kesintiMiktari; // 410 BPL alıcıya gider
+            const brutHediye = 500;
+            const kesinti = brutHediye * 0.18; // 90 BPL yakım
+            const netHediye = brutHediye - kesinti;
 
-    if (sender.bpl >= brutHediye) {
-        sender.bpl -= brutHediye;
-        receiver.bpl += netHediye;
+            if (sender.bpl >= brutHediye) {
+                sender.bpl -= brutHediye;
+                receiver.bpl += netHediye;
 
-        await sender.save();
-        await receiver.save();
+                await sender.save();
+                await receiver.save();
 
+                await new Log({
+                    type: 'BPL_BURN',
+                    content: `Tebrik yakımı: ${kesinti} BPL`,
+                    userEmail: sender.email
+                }).save();
+
+                io.to('Global').emit('new-message', {
+                    sender: "SİSTEM",
+                    text: `💎 ${sender.nickname}, ${receiver.nickname} kumandana 410 BPL ateşledi!`
+                });
+            }
+        } catch (e) { console.error("Tebrik hatası:", e); }
+    });
+});
         // Yakım Kaydı
         await new Log({
             type: 'BPL_BURN',
@@ -874,6 +887,7 @@ server.listen(PORT, "0.0.0.0", () => {
     =========================================
     `);
 });
+
 
 
 
