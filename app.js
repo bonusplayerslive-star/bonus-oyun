@@ -111,6 +111,15 @@ app.get('/development', checkAuth, async (req, res) => {
     res.render('development', { user });
 });
 
+app.get('/chat', checkAuth, async (req, res) => {
+    const user = await User.findById(req.session.userId);
+    res.render('chat', { user }); // views/chat.ejs dosyanızın olması gerekir
+});
+
+
+
+
+
 // --- 6. AUTH VE İŞLEM ROTALARI ---
 
 app.post('/register', async (req, res) => {
@@ -298,10 +307,26 @@ io.on('connection', (socket) => {
                 socket.emit('gift-result', { newBalance: sender.bpl, message: 'Gönderildi!' });
             }
         } catch (e) { console.error(e); }
+   
     });
+});
+    });
+// CHAT BURADA OLMALI:
+    socket.on('chat-message', (data) => {
+        io.to('Global').emit('new-message', { 
+            sender: socket.nickname, 
+            text: data.text 
+        });
+    });
+
+
+
+
+
 });
 
 // --- 11. BAŞLATMA ---
 server.listen(PORT, "0.0.0.0", () => {
     console.log(`BPL ECOSYSTEM OPERATIONAL ON PORT ${PORT}`);
 });
+
