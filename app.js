@@ -709,58 +709,6 @@ socket.on('tebrik-et', async (data) => {
     res.json(result);
 });
 
-// --- ARENA SAVAŞ VE ÖDÜL SİSTEMİ ---
-app.post('/attack-bot', checkAuth, async (req, res) => {
-    try {
-        const user = await User.findById(req.session.userId);
-        if (!user) return res.json({ status: 'error', msg: 'Kullanıcı bulunamadı!' });
-
-        const bot = eliteBots[Math.floor(Math.random() * eliteBots.length)];
-        const isWin = Math.random() > 0.5; // %50 Şans
-        const animalName = req.query.animal ? req.query.animal.toLowerCase() : "eagle";
-
-        if (isWin) {
-            // Kazanan masrafsız +200 alır
-            user.bpl += 200;
-            
-            last20Victories.unshift({
-                winner: user.nickname,
-                opponent: bot.nickname,
-                reward: 200,
-                time: new Date().toLocaleTimeString('tr-TR')
-            });
-            if(last20Victories.length > 20) last20Victories.pop();
-
-            io.emit('new-message', {
-                sender: "ARENA_SISTEM",
-                text: `🏆 ${user.nickname}, ${bot.nickname} karşısında zafer kazandı!`,
-                winnerNick: user.nickname,
-                isBattleWin: true 
-            });
-        } else {
-            // Kaybeden 200 öder
-            if (user.bpl >= 200) user.bpl -= 200;
-        }
-
-        await user.save(); // Hata buradaydı, artık async fonksiyonun içinde.
-
-        res.json({
-            status: 'success',
-            opponent: bot.nickname,
-            animation: {
-                actionVideo: `/caracter/move/${animalName}/${animalName}1.mp4`,
-                winVideo: `/caracter/move/${animalName}/${animalName}.mp4`,
-                isWin: isWin
-            },
-            newBalance: user.bpl
-        });
-
-    } catch (err) {
-        console.error("Arena Hatası:", err);
-        res.status(500).json({ status: 'error', msg: 'Sunucu hatası oluştu!' });
-    }
-});
-
 
 
 // --- ARENA SAVAŞI: BOTU YENEN ÜCRET ÖDEMEZ ---
@@ -883,6 +831,7 @@ server.listen(PORT, "0.0.0.0", () => {
     =========================================
     `);
 });
+
 
 
 
