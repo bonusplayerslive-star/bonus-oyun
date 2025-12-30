@@ -1,4 +1,3 @@
-// --- 1. MODÜLLER VE AYARLAR ---
 require('dotenv').config();
 const express = require('express');
 const bodyParser = require('body-parser');
@@ -6,10 +5,10 @@ const http = require('http');
 const socketIo = require('socket.io');
 const session = require('express-session');
 const path = require('path');
+const bcrypt = require('bcryptjs');
 
 const connectDB = require('./db');
 const User = require('./models/User');
-const Payment = require('./models/Payment');
 
 connectDB();
 
@@ -18,7 +17,7 @@ const server = http.createServer(app);
 const io = socketIo(server);
 const PORT = process.env.PORT || 10000;
 
-// --- 2. SABİT VERİLER (Klasör adlarıyla birebir aynı olmalı) ---
+// --- MARKET VERİLERİ (Görsel 210a9b.png'ye göre tam liste) ---
 const MARKET_ANIMALS = [
     { id: 1, name: 'Bear', price: 1000, img: '/caracter/profile/Bear.jpg' },
     { id: 2, name: 'Crocodile', price: 1000, img: '/caracter/profile/Crocodile.jpg' },
@@ -32,24 +31,57 @@ const MARKET_ANIMALS = [
     { id: 10, name: 'Tiger', price: 5000, img: '/caracter/profile/Tiger.jpg' }
 ];
 
-// --- 3. MIDDLEWARE ---
+// --- MIDDLEWARE ---
 app.set('view engine', 'ejs');
 app.use(express.static(path.join(__dirname, 'public')));
 app.use(bodyParser.json());
 app.use(bodyParser.urlencoded({ extended: true }));
 app.use(session({
-    secret: 'bpl_secret_key_2024',
+    secret: 'bpl_mega_secret_2025',
     resave: false,
     saveUninitialized: false,
     cookie: { secure: false, maxAge: 24 * 60 * 60 * 1000 }
 }));
 
-// Giriş kontrolü
 const checkAuth = (req, res, next) => {
-    if (req.session.userId) next(); else res.redirect('/');
+    if (req.session.userId) return next();
+    res.redirect('/');
 };
 
-// --- 4. SAYFA YÖNLENDİRMELERİ (GET) ---
+// --- AUTH ROTALARI (image_2f1e40.png hatasını çözen kısım) ---
+app.post('/register', async (req, res) => {
+    try {
+        const { nickname, password } = req.body;
+        const hashedPassword = await bcrypt.hash(password, 10);
+        const newUser = new User({ 
+            nickname, 
+            password: hashedPassword, 
+            bpl: 1000, // Başlangıç hediyesi
+            inventory: [{ name: 'Eagle', stats: { hp: 100, atk: 20, def: 10 } }] 
+        });
+        await newUser.save();
+        res.redirect('/');
+    } catch (e) { res.send("Kayıt hatası: " + e.message); }
+});
+
+app.post('/login', async (req, res) => {
+    try {
+        const { nickname, password } = req.body;
+        const user = await User.findOne({ nickname });
+        if (user && await bcrypt.compare(password, user.password)) {
+            req.session.userId = user._id;
+            return res.redirect('/profil');
+        }
+        res.send("Hatalı giriş bilgileri!");
+    } catch (e) { res.send("Giriş hatası!"); }
+});
+
+app.get('/logout', (req, res) => {
+    req.session.destroy();
+    res.redirect('/');
+});
+
+// --- SAYFA ROTALARI ---
 app.get('/', (req, res) => res.render('index', { user: req.session.userId || null }));
 
 app.get('/profil', checkAuth, async (req, res) => {
@@ -62,128 +94,94 @@ app.get('/market', checkAuth, async (req, res) => {
     res.render('market', { user, animals: MARKET_ANIMALS });
 });
 
-app.get('/arena', checkAuth, async (req, res) => {
-    const user = await User.findById(req.session.userId);
-    // İlk hayvanı seçili getir, yoksa "Eagle" varsay
-    const selected = user.inventory && user.inventory.length > 0 ? user.inventory[0].name : "Eagle";
-    res.render('arena', { user, selectedAnimal: selected });
-});
-
 app.get('/development', checkAuth, async (req, res) => {
     const user = await User.findById(req.session.userId);
     res.render('development', { user });
 });
 
-app.get('/wallet', checkAuth, async (req, res) => {
+app.get('/arena', checkAuth, async (req, res) => {
     const user = await User.findById(req.session.userId);
-    res.render('wallet', { user });
+    const selected = user.inventory.length > 0 ? user.inventory[0].name : "Eagle";
+    res.render('arena', { user, selectedAnimal: selected });
 });
 
-app.get('/meeting', checkAuth, async (req, res) => {
-    try {
-        const user = await User.findById(req.session.userId);
-        if (user.bpl < 50) return res.render('profil', { user, error: 'Konsey girişi 50 BPL!' });
-        user.bpl -= 50; await user.save();
-        res.render('meeting', { user, roomId: "BPL-VIP-KONSEY" });
-    } catch (e) { res.redirect('/profil'); }
-});
-
-// --- 5. OYUN VE İŞLEM MANTIĞI (POST) ---
-
-// Arena Savaşı (Bot)
+// --- OYUN MANTIĞI: ARENA (HEDİYE & CEZA SİSTEMİ) ---
 app.post('/attack-bot', checkAuth, async (req, res) => {
     try {
         const user = await User.findById(req.session.userId);
-        if (!user || user.bpl < 200) return res.json({ status: 'error', msg: 'Yetersiz BPL! (Min: 200)' });
-        
-        const animalName = req.body.animal || "Eagle"; 
-        const isWin = Math.random() > 0.45; // %55 şans
+        if (user.bpl < 100) return res.json({ status: 'error', msg: 'Savaş için en az 100 BPL gerekli!' });
 
-        user.bpl += isWin ? 200 : -200;
-        await user.save();
+        const animalName = req.body.animal || "Eagle";
+        const randomSeed = Math.random();
+        let reward = 0;
+        let message = "";
+        let isWin = false;
 
-        if (isWin) {
-            io.to('Global').emit('new-message', { 
-                sender: "ARENA", 
-                text: `🏆 ${user.nickname} botu mağlup etti ve 200 BPL kazandı!` 
-            });
+        if (randomSeed > 0.5) { // %50 KAZANMA
+            isWin = true;
+            reward = 250; 
+            if (randomSeed > 0.9) { // %10 KRİTİK HEDİYE
+                reward = 1000;
+                message = "🔥 KRİTİK VURUŞ! 1000 BPL KAZANDIN!";
+            } else {
+                message = "🏆 Zafer! 250 BPL kazandın.";
+            }
+        } else { // %50 KAYBETME (CEZA)
+            isWin = false;
+            reward = -150;
+            message = "💀 Mağlubiyet! 150 BPL kaybettin.";
         }
+
+        user.bpl += reward;
+        await user.save();
 
         res.json({
             status: 'success',
-            animation: { 
-                actionVideo: `/caracter/move/${animalName}/${animalName}1.mp4`, 
-                winVideo: `/caracter/move/${animalName}/${animalName}.mp4`, 
-                isWin 
+            msg: message,
+            animation: {
+                actionVideo: `/caracter/move/${animalName}/${animalName}1.mp4`,
+                winVideo: `/caracter/move/${animalName}/${animalName}.mp4`,
+                isWin
             },
             newBalance: user.bpl
         });
-    } catch (err) { res.status(500).json({ status: 'error', msg: 'Savaş başlatılamadı.' }); }
+    } catch (e) { res.status(500).json({ status: 'error' }); }
 });
 
-// Karakter Geliştirme (Upgrade)
+// --- GELİŞTİRME SİSTEMİ (image_1fa9bd.png hatasını çözen kısım) ---
 app.post('/upgrade-stat', checkAuth, async (req, res) => {
     const { animalName, statType, cost } = req.body;
     try {
         const user = await User.findById(req.session.userId);
         const animal = user.inventory.find(a => a.name === animalName);
         
-        if (!animal || user.bpl < cost) {
-            return res.json({ status: 'error', msg: 'Bakiye yetersiz veya karakter bulunamadı.' });
-        }
+        if (!animal || user.bpl < cost) return res.json({ status: 'error', msg: 'Yetersiz bakiye!' });
 
-        // İstatistik artırımı
-        if(statType === 'hp') animal.stats.hp += 10;
-        else if(statType === 'atk') animal.stats.atk += 5;
-        else if(statType === 'def') animal.stats.def = (animal.stats.def || 0) + 5;
+        if (statType === 'hp') animal.stats.hp += 15;
+        else if (statType === 'atk') animal.stats.atk += 8;
+        else if (statType === 'def') animal.stats.def += 5;
 
         user.bpl -= cost;
-        user.markModified('inventory'); // Array içindeki değişiklikleri Mongoose'a bildir
+        user.markModified('inventory');
         await user.save();
-        
-        res.json({ status: 'success', msg: `${statType.toUpperCase()} başarıyla artırıldı!`, newBalance: user.bpl });
-    } catch (e) { res.json({ status: 'error', msg: 'Geliştirme hatası.' }); }
+
+        res.json({ status: 'success', msg: 'Sistem Güncellendi!', newBalance: user.bpl });
+    } catch (e) { res.json({ status: 'error', msg: 'Sunucu hatası.' }); }
 });
 
-// --- 6. SOCKET.IO SİSTEMİ ---
+// --- SOCKET.IO ---
 io.on('connection', (socket) => {
-    console.log('Bir kullanıcı bağlandı:', socket.id);
-
     socket.on('register-user', (data) => {
-        if(data && data.id) {
-            socket.userId = data.id;
-            socket.nickname = data.nickname;
-            socket.join('Global');
-        }
+        socket.userId = data.id;
+        socket.nickname = data.nickname;
+        socket.join('Global');
     });
 
     socket.on('chat-message', (data) => {
-        io.to(data.room || 'Global').emit('new-message', { 
-            sender: socket.nickname || "Misafir", 
-            text: data.text 
-        });
-    });
-
-    socket.on('join-meeting', (roomId) => {
-        socket.join(roomId);
-        io.to(roomId).emit('new-message', { 
-            sender: "SİSTEM", 
-            text: `🔥 ${socket.nickname || 'Bir üye'} konseye katıldı.` 
-        });
-    });
-
-    socket.on('disconnect', () => {
-        console.log('Kullanıcı ayrıldı.');
+        io.to('Global').emit('new-message', { sender: socket.nickname, text: data.text });
     });
 });
 
-// --- 7. SUNUCU BAŞLATMA ---
 server.listen(PORT, "0.0.0.0", () => {
-    console.log(`
-    =========================================
-    🚀 BPL ECOSYSTEM AKTİF
-    📡 PORT: ${PORT}
-    🔗 MOD: Üretim (Production)
-    =========================================
-    `);
+    console.log(`BPL ECOSYSTEM AKTIF: ${PORT}`);
 });
