@@ -1,3 +1,4 @@
+// --- 1. MODÜLLER VE GÜVENLİK ---
 require('dotenv').config();
 const express = require('express');
 const bodyParser = require('body-parser');
@@ -6,18 +7,26 @@ const socketIo = require('socket.io');
 const session = require('express-session');
 const path = require('path');
 const bcrypt = require('bcryptjs');
+const mongoose = require('mongoose');
 
+// Veritabanı Bağlantısı
 const connectDB = require('./db');
-const User = require('./models/User');
-
 connectDB();
+
+// Modeller (Görsel image_2f2d08.png'deki tam liste)
+const User = require('./models/User');
+const Payment = require('./models/Payment');
+const ArenaLogs = require('./models/ArenaLogs');
+const Victory = require('./models/Victory');
+const Punishment = require('./models/Punishment');
+const Income = require('./models/Income');
 
 const app = express();
 const server = http.createServer(app);
 const io = socketIo(server);
 const PORT = process.env.PORT || 10000;
 
-// --- MARKET VERİLERİ (Görsel 210a9b.png'ye göre tam liste) ---
+// --- 2. MARKET VERİLERİ (Büyük/Küçük Harf Duyarlı) ---
 const MARKET_ANIMALS = [
     { id: 1, name: 'Bear', price: 1000, img: '/caracter/profile/Bear.jpg' },
     { id: 2, name: 'Crocodile', price: 1000, img: '/caracter/profile/Crocodile.jpg' },
@@ -31,24 +40,25 @@ const MARKET_ANIMALS = [
     { id: 10, name: 'Tiger', price: 5000, img: '/caracter/profile/Tiger.jpg' }
 ];
 
-// --- MIDDLEWARE ---
+// --- 3. MIDDLEWARE AYARLARI ---
 app.set('view engine', 'ejs');
 app.use(express.static(path.join(__dirname, 'public')));
 app.use(bodyParser.json());
 app.use(bodyParser.urlencoded({ extended: true }));
 app.use(session({
-    secret: 'bpl_mega_secret_2025',
+    secret: 'bpl_mega_ecosystem_2025_secret',
     resave: false,
     saveUninitialized: false,
     cookie: { secure: false, maxAge: 24 * 60 * 60 * 1000 }
 }));
 
+// Giriş Kontrolü
 const checkAuth = (req, res, next) => {
     if (req.session.userId) return next();
     res.redirect('/');
 };
 
-// --- AUTH ROTALARI (image_2f1e40.png hatasını çözen kısım) ---
+// --- 4. AUTH & KAYIT SİSTEMİ (Cannot POST /login Çözümü) ---
 app.post('/register', async (req, res) => {
     try {
         const { nickname, password } = req.body;
@@ -56,12 +66,12 @@ app.post('/register', async (req, res) => {
         const newUser = new User({ 
             nickname, 
             password: hashedPassword, 
-            bpl: 1000, // Başlangıç hediyesi
-            inventory: [{ name: 'Eagle', stats: { hp: 100, atk: 20, def: 10 } }] 
+            bpl: 1000, // Hoşgeldin bonusu
+            inventory: [{ name: 'Eagle', stats: { hp: 100, atk: 20, def: 10 }, level: 1 }] 
         });
         await newUser.save();
         res.redirect('/');
-    } catch (e) { res.send("Kayıt hatası: " + e.message); }
+    } catch (e) { res.status(500).send("Kayıt sırasında hata oluştu: " + e.message); }
 });
 
 app.post('/login', async (req, res) => {
@@ -72,8 +82,8 @@ app.post('/login', async (req, res) => {
             req.session.userId = user._id;
             return res.redirect('/profil');
         }
-        res.send("Hatalı giriş bilgileri!");
-    } catch (e) { res.send("Giriş hatası!"); }
+        res.send("<script>alert('Hatalı bilgiler!'); window.location='/';</script>");
+    } catch (e) { res.status(500).send("Giriş hatası!"); }
 });
 
 app.get('/logout', (req, res) => {
@@ -81,7 +91,7 @@ app.get('/logout', (req, res) => {
     res.redirect('/');
 });
 
-// --- SAYFA ROTALARI ---
+// --- 5. SAYFA YÖNLENDİRMELERİ ---
 app.get('/', (req, res) => res.render('index', { user: req.session.userId || null }));
 
 app.get('/profil', checkAuth, async (req, res) => {
@@ -94,94 +104,126 @@ app.get('/market', checkAuth, async (req, res) => {
     res.render('market', { user, animals: MARKET_ANIMALS });
 });
 
-app.get('/development', checkAuth, async (req, res) => {
-    const user = await User.findById(req.session.userId);
-    res.render('development', { user });
-});
-
 app.get('/arena', checkAuth, async (req, res) => {
     const user = await User.findById(req.session.userId);
     const selected = user.inventory.length > 0 ? user.inventory[0].name : "Eagle";
     res.render('arena', { user, selectedAnimal: selected });
 });
 
-// --- OYUN MANTIĞI: ARENA (HEDİYE & CEZA SİSTEMİ) ---
+app.get('/development', checkAuth, async (req, res) => {
+    const user = await User.findById(req.session.userId);
+    res.render('development', { user });
+});
+
+app.get('/wallet', checkAuth, async (req, res) => {
+    const user = await User.findById(req.session.userId);
+    res.render('wallet', { user });
+});
+
+// Beşgen Masa (Meeting) Sayfası ve Rotaları
+app.get('/meeting', checkAuth, async (req, res) => {
+    const user = await User.findById(req.session.userId);
+    res.render('meeting', { user, roomId: "BPL-CENTRAL" });
+});
+
+app.post('/create-meeting', checkAuth, (req, res) => {
+    // Toplantı odası oluşturma mantığı buraya gelir
+    res.redirect('/meeting');
+});
+
+// --- 6. GELİŞMİŞ OYUN MANTIĞI (HEDİYE & CEZA & LOGLAMA) ---
+
 app.post('/attack-bot', checkAuth, async (req, res) => {
     try {
         const user = await User.findById(req.session.userId);
-        if (user.bpl < 100) return res.json({ status: 'error', msg: 'Savaş için en az 100 BPL gerekli!' });
+        if (user.bpl < 150) return res.json({ status: 'error', msg: 'Savaş maliyeti 150 BPL!' });
 
-        const animalName = req.body.animal || "Eagle";
-        const randomSeed = Math.random();
-        let reward = 0;
-        let message = "";
-        let isWin = false;
+        const animalName = req.body.animal;
+        const randomVal = Math.random();
+        let isWin = randomVal > 0.45; // %55 kazanma şansı
+        let amount = isWin ? 300 : -150;
+        let message = isWin ? "Zafer! 300 BPL kazandın." : "Mağlubiyet! 150 BPL kaybettin.";
 
-        if (randomSeed > 0.5) { // %50 KAZANMA
-            isWin = true;
-            reward = 250; 
-            if (randomSeed > 0.9) { // %10 KRİTİK HEDİYE
-                reward = 1000;
-                message = "🔥 KRİTİK VURUŞ! 1000 BPL KAZANDIN!";
-            } else {
-                message = "🏆 Zafer! 250 BPL kazandın.";
-            }
-        } else { // %50 KAYBETME (CEZA)
-            isWin = false;
-            reward = -150;
-            message = "💀 Mağlubiyet! 150 BPL kaybettin.";
+        // Kritik Hediye Sistemi
+        if (isWin && randomVal > 0.92) {
+            amount = 1500;
+            message = "🔥 EFSANEVİ ZAFER! 1500 BPL HEDİYE KAZANDIN!";
+            await Victory.create({ userId: user._id, amount: 1500, type: 'Legendary' });
+        } else if (!isWin) {
+            await Punishment.create({ userId: user._id, amount: 150, reason: 'Arena Loss' });
         }
 
-        user.bpl += reward;
+        user.bpl += amount;
         await user.save();
+
+        // Arena Log Kaydı
+        await ArenaLogs.create({ userId: user._id, animal: animalName, result: isWin ? 'Win' : 'Loss', change: amount });
 
         res.json({
             status: 'success',
             msg: message,
+            newBalance: user.bpl,
             animation: {
                 actionVideo: `/caracter/move/${animalName}/${animalName}1.mp4`,
                 winVideo: `/caracter/move/${animalName}/${animalName}.mp4`,
                 isWin
-            },
-            newBalance: user.bpl
+            }
         });
-    } catch (e) { res.status(500).json({ status: 'error' }); }
+    } catch (e) { res.status(500).json({ status: 'error', msg: 'Sistem hatası.' }); }
 });
 
-// --- GELİŞTİRME SİSTEMİ (image_1fa9bd.png hatasını çözen kısım) ---
+// Karakter Geliştirme (Upgrade)
 app.post('/upgrade-stat', checkAuth, async (req, res) => {
     const { animalName, statType, cost } = req.body;
     try {
         const user = await User.findById(req.session.userId);
         const animal = user.inventory.find(a => a.name === animalName);
-        
-        if (!animal || user.bpl < cost) return res.json({ status: 'error', msg: 'Yetersiz bakiye!' });
 
-        if (statType === 'hp') animal.stats.hp += 15;
-        else if (statType === 'atk') animal.stats.atk += 8;
+        if (!animal || user.bpl < cost) return res.json({ status: 'error', msg: 'Bakiye veya Karakter geçersiz.' });
+
+        if (statType === 'hp') animal.stats.hp += 20;
+        else if (statType === 'atk') animal.stats.atk += 10;
         else if (statType === 'def') animal.stats.def += 5;
 
         user.bpl -= cost;
         user.markModified('inventory');
         await user.save();
 
-        res.json({ status: 'success', msg: 'Sistem Güncellendi!', newBalance: user.bpl });
-    } catch (e) { res.json({ status: 'error', msg: 'Sunucu hatası.' }); }
+        res.json({ status: 'success', msg: `${statType.toUpperCase()} Seviyesi Yükseltildi!`, newBalance: user.bpl });
+    } catch (e) { res.json({ status: 'error', msg: 'Geliştirme başarısız.' }); }
 });
 
-// --- SOCKET.IO ---
+// --- 7. SOCKET.IO GERÇEK ZAMANLI SİSTEMLER ---
 io.on('connection', (socket) => {
-    socket.on('register-user', (data) => {
-        socket.userId = data.id;
+    console.log('Kullanıcı Bağlandı:', socket.id);
+
+    socket.on('register-session', (data) => {
         socket.nickname = data.nickname;
-        socket.join('Global');
+        socket.join('GlobalRoom');
     });
 
     socket.on('chat-message', (data) => {
-        io.to('Global').emit('new-message', { sender: socket.nickname, text: data.text });
+        io.to('GlobalRoom').emit('new-message', {
+            sender: socket.nickname || 'Anonim',
+            text: data.text,
+            time: new Date().toLocaleTimeString()
+        });
+    });
+
+    socket.on('disconnect', () => {
+        console.log('Kullanıcı Ayrıldı.');
     });
 });
 
+// --- 8. SUNUCU BAŞLATMA ---
 server.listen(PORT, "0.0.0.0", () => {
-    console.log(`BPL ECOSYSTEM AKTIF: ${PORT}`);
+    console.log(`
+    ██████╗ ██████╗ ██╗     
+    ██╔══██╗██╔══██╗██║     
+    ██████╔╝██████╔╝██║     
+    ██╔══██╗██╔═══╝ ██║     
+    ██████╔╝██║     ███████╗
+    ╚═════╝ ╚═╝     ╚══════╝
+    BPL ECOSYSTEM AKTİF: http://localhost:${PORT}
+    `);
 });
