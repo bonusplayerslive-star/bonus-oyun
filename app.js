@@ -425,10 +425,34 @@ app.post('/sell-character', checkAuth, async (req, res) => {
     const companyWallet = process.env.WALLET_ADDRESS.toLowerCase();
     const usdtContract = process.env.CONTRACT_ADDRESS.toLowerCase();
 
+  // --- ÖDEME ONAY ROTASI ---
+app.post('/verify-payment', checkAuth, async (req, res) => { // Buradaki 'async' kelimesi logdaki hatayı çözer
+    const { txid } = req.body; // txid verisini alıyoruz
+
     try {
         // 1. TxID daha önce kullanılmış mı? (Mükerrer ödeme kontrolü)
-        const checkDuplicate = await Payment.findOne({ txid: txid });
+        const checkDuplicate = await Payment.findOne({ txid: txid }); // Artık burada hata vermez
         if (checkDuplicate) return res.json({ status: 'error', msg: 'Bu işlem daha önce onaylanmış!' });
+
+        // 2. BSCScan API sorgusu
+        const apiKey = process.env.BSCSCAN_API_KEY;
+        const url = `https://api.bscscan.com/api?module=proxy&action=eth_getTransactionReceipt&txhash=${txid}&apikey=${apiKey}`;
+        
+        const response = await axios.get(url);
+        const receipt = response.data.result;
+
+        if (!receipt || receipt.status !== "0x1") {
+            return res.json({ status: 'error', msg: 'İşlem henüz onaylanmamış veya geçersiz.' });
+        }
+
+        // ... kodun devamı (log analizi vb.) buraya gelecek ...
+        res.json({ status: 'success', msg: 'Ödeme başarıyla doğrulandı!' });
+
+    } catch (err) {
+        console.error("Ödeme Doğrulama Hatası:", err);
+        res.status(500).json({ status: 'error', msg: 'Sunucu hatası oluştu.' });
+    }
+}); // Fonksiyonu burada kapatıyoruz
 
         // 2. BSCScan API sorgusu
         const url = `https://api.bscscan.com/api?module=proxy&action=eth_getTransactionReceipt&txhash=${txid}&apikey=${apiKey}`;
@@ -893,6 +917,7 @@ server.listen(PORT, "0.0.0.0", () => {
     =========================================
     `);
 });
+
 
 
 
