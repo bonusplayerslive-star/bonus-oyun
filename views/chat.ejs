@@ -16,7 +16,6 @@
         .msg { margin-bottom: 12px; font-size: 0.95rem; line-height: 1.4; border-bottom: 1px solid rgba(57, 255, 20, 0.05); padding-bottom: 5px; }
         .msg b { color: #FFFF00; cursor: pointer; text-decoration: underline; }
         
-        /* Kullanıcı Menüsü (Modal alternatifi hızlı panel) */
         #userActionPanel { 
             display: none; position: fixed; bottom: 80px; left: 50%; transform: translateX(-50%);
             width: 90%; max-width: 350px; background: rgba(0,0,0,0.95); border: 2px solid var(--neon-blue);
@@ -50,32 +49,36 @@
 </div>
 
 <div class="input-area">
-    <div class="input-group">
-        <input type="text" id="messageInput" class="form-control bg-dark text-white border-success" placeholder="Mesaj at...">
-        <button onclick="sendMessage()" class="btn btn-success"><i class="fas fa-paper-plane"></i></button>
-    </div>
+    <form id="chatForm" onsubmit="return false;">
+        <div class="input-group">
+            <input type="text" id="messageInput" class="form-control bg-dark text-white border-success" placeholder="Mesaj at..." autocomplete="off">
+            <button onclick="sendMessage()" class="btn btn-success"><i class="fas fa-paper-plane"></i></button>
+        </div>
+    </form>
 </div>
 
 <script src="/socket.io/socket.io.js"></script>
 <script>
     const socket = io();
     const myNick = "<%= user.nickname %>";
-    const myBpl = <%= user.bpl %>;
+    const userId = "<%= user._id %>";
+    let myBpl = <%= user.bpl %>;
     let selectedUser = "";
 
-    socket.emit('join-chat', { room: 'Global', nick: myNick });
+    // 1. ADIM: Sunucuya kim olduğumuzu kaydet (register-user)
+    socket.emit('register-user', { id: userId, nickname: myNick });
 
+    // Kullanıcı Menüsünü Aç
     function openUserMenu(nick) {
-        if(nick === myNick) return;
+        if(nick === myNick || nick === "SİSTEM" || nick === "ARENA_SISTEM") return;
         selectedUser = nick;
         document.getElementById('selectedUserLabel').innerText = nick;
         document.getElementById('userActionPanel').style.display = 'block';
         
-        // +6000 BPL Kontrolü
         const giftBtn = document.getElementById('giftBtn');
         if(myBpl < 6000) {
             giftBtn.disabled = true;
-            giftBtn.innerText = "HEDİYE (MİNUMUM 6000 BPL GEREKLİ)";
+            giftBtn.innerText = "HEDİYE (MİN 6000 BPL GEREKLİ)";
         } else {
             giftBtn.disabled = false;
             giftBtn.innerText = "🎁 HEDİYE GÖNDER (-%25 VERGİ)";
@@ -87,38 +90,60 @@
 
     function closePanel() { document.getElementById('userActionPanel').style.display = 'none'; }
 
+    // Hediye Gönder
     function sendBplGift(nick) {
         const amount = prompt(`${nick} için miktar (Max 1000):`);
-        if(amount > 0 && amount <= 1000) {
+        if(amount && amount > 0 && amount <= 1000) {
             socket.emit('transfer-bpl', { to: nick, amount: parseInt(amount) });
             closePanel();
         }
     }
 
+    // Meydan Oku
     function challengeToFight(nick) {
         socket.emit('send-challenge', { target: nick });
         alert(nick + " meydan okuma gönderildi!");
         closePanel();
     }
 
+    // Mesaj Gönder
     function sendMessage() {
         const input = document.getElementById('messageInput');
-        if(input.value.trim()) {
-            socket.emit('chat-message', { text: input.value, room: 'Global' });
+        const text = input.value.trim();
+        if(text) {
+            socket.emit('chat-message', { text: text });
             input.value = "";
         }
     }
 
+    // Enter tuşu ile mesaj gönder
+    document.getElementById('messageInput').addEventListener('keypress', (e) => {
+        if (e.key === 'Enter') sendMessage();
+    });
+
+    // Yeni Mesaj Geldiğinde
     socket.on('new-message', (data) => {
+        const box = document.getElementById('chatMessages');
         const div = document.createElement('div');
         div.className = "msg";
+        
+        // Gönderen ismine tıklayınca menü açılması için
         div.innerHTML = `<b onclick="openUserMenu('${data.sender}')">${data.sender}:</b> ${data.text}`;
-        const box = document.getElementById('chatMessages');
+        
         box.appendChild(div);
         box.scrollTop = box.scrollHeight;
     });
 
-    // KAVGAYA ÇAĞRI ALINDIĞINDA (Android-iOS Köprüsü)
+    // Transfer Sonucu
+    socket.on('gift-result', (data) => {
+        alert(data.message);
+        if(data.newBalance) {
+            myBpl = data.newBalance;
+            document.getElementById('myBpl').innerText = myBpl;
+        }
+    });
+
+    // Meydan Okuma Alındığında
     socket.on('challenge-received', (data) => {
         if(confirm(`${data.from} seni ARENA'DA parçalamak istiyor! Kabul mü?`)) {
             window.location.href = "/arena?opponent=" + data.from;
