@@ -187,34 +187,40 @@ app.post('/upgrade-stat', checkAuth, async (req, res) => {
     } catch (err) { res.status(500).json({ status: 'error' }); }
 });
 
-// --- 8. ARENA VE SAVAŞ MANTIĞI ---
+// --- 8. ARENA VE SAVAŞ MANTIĞI (KESİN ÇÖZÜM) ---
 app.post('/attack-bot', checkAuth, async (req, res) => {
     try {
         const user = await User.findById(req.session.userId);
-        if (user.bpl < 200) return res.json({ status: 'error', msg: 'Bakiye Yetersiz (200 BPL Gerekli)' });
+        
+        // 1. Bakiye Kontrolü (200 BPL giriş ücreti)
+        if (!user || user.bpl < 200) {
+            return res.json({ status: 'error', msg: 'Savaşa girmek için 200 BPL gerekli!' });
+        }
 
-        const bot = eliteBots[Math.floor(Math.random() * eliteBots.length)];
-        const animalName = (req.query.animal || "Eagle").toLowerCase();
+        // 2. Hayvan İsmi Ayarı (Gelen veriyi küçük harfe çevirip temizler)
+        let animalName = (req.body.animal || "eagle").toLowerCase().trim();
+        
+        // 3. Şans Faktörü (%50 Kazanç / %50 Kayıp)
         const isWin = Math.random() > 0.5;
 
         if (isWin) {
-            user.bpl += 200;
-            const victoryEntry = { winner: user.nickname, opponent: bot.nickname, reward: 200, time: new Date().toLocaleTimeString() };
-            last20Victories.unshift(victoryEntry);
-            if (last20Victories.length > 20) last20Victories.pop();
-
+            user.bpl += 200; // Kazanç
+            const winMsg = `🏆 ${user.nickname}, Arena'da ${animalName} ile büyük bir zafer kazandı!`;
+            
+            // Global Lobide Duyur
             io.to('Global').emit('new-message', {
                 sender: "ARENA_SISTEM",
-                text: `🏆 ${user.nickname}, ${bot.nickname} botunu Arena'da ezdi geçti!`
+                text: winMsg
             });
         } else {
-            user.bpl -= 200;
+            user.bpl -= 200; // Kayıp
         }
 
         await user.save();
+
+        // 4. Videoları ve Sonucu Gönder
         res.json({
             status: 'success',
-            opponent: bot.nickname,
             animation: {
                 actionVideo: `/caracter/move/${animalName}/${animalName}1.mp4`,
                 winVideo: `/caracter/move/${animalName}/${animalName}.mp4`,
@@ -222,9 +228,12 @@ app.post('/attack-bot', checkAuth, async (req, res) => {
             },
             newBalance: user.bpl
         });
-    } catch (err) { res.status(500).json({ status: 'error' }); }
-});
 
+    } catch (err) {
+        console.error("Arena Hatası:", err);
+        res.status(500).json({ status: 'error', msg: 'Sunucu hatası oluştu!' });
+    }
+});
 // --- 9. ÖDEME VE CÜZDAN DOĞRULAMA (BSCScan) ---
 
 app.post('/verify-payment', checkAuth, async (req, res) => {
@@ -303,3 +312,4 @@ io.on('connection', (socket) => {
 server.listen(PORT, "0.0.0.0", () => {
     console.log(`BPL ECOSYSTEM AKTİF: PORT ${PORT}`);
 });
+
