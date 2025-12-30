@@ -159,7 +159,7 @@ app.get('/logout', (req, res) => {
     res.redirect('/');
 });
 
-// --- 7. MARKET VE GELİŞTİRME SİSTEMİ ---
+// --- 7. MARKET VE GELİŞTİRME SİSTEMİ (GÜNCEL) ---
 app.post('/upgrade-stat', checkAuth, async (req, res) => {
     const { animalName, statType, cost } = req.body;
     try {
@@ -167,39 +167,37 @@ app.post('/upgrade-stat', checkAuth, async (req, res) => {
         const idx = user.inventory.findIndex(a => a.name === animalName);
         
         if (idx === -1) return res.json({ status: 'error', msg: 'Hayvan bulunamadı!' });
-        if (user.bpl < cost) return res.json({ status: 'error', msg: 'Yetersiz bakiye!' });
+        if (user.bpl < cost) return res.json({ status: 'error', msg: 'Bakiye yetersiz!' });
 
         const animal = user.inventory[idx];
         let message = "";
 
-        // Geliştirme Mantığı
+        // Geliştirme Mantığı ve Mesaj Tanımlama
         if(statType === 'hp') {
             animal.stats.hp += 10;
-            message = "Can (HP) +10 artırıldı!";
+            message = "Can (HP) +10 artırıldı.";
         } else if(statType === 'atk') {
             animal.stats.atk += 5;
-            message = "Saldırı (ATK) +5 artırıldı!";
+            message = "Saldırı (ATK) +5 artırıldı.";
         } else if(statType === 'def') {
             animal.stats.def = (animal.stats.def || 0) + 5;
-            message = "Savunma (DEF) +5 artırıldı!";
-        } else {
-            message = "Geliştirme başarıyla tamamlandı!";
+            message = "Savunma (DEF) +5 artırıldı.";
+        } else if(statType === 'crit') {
+            message = "Kritik Şans geliştirildi.";
         }
 
         user.bpl -= cost;
         user.markModified('inventory');
         await user.save();
 
-        // Buradaki 'msg' alanı EJS'deki 'result.msg' kısmına gider
+        // Yanıtın içine 'msg' ekledik
         res.json({ 
             status: 'success', 
             msg: message, 
             newBalance: user.bpl 
         });
-
     } catch (err) { 
-        console.error(err);
-        res.status(500).json({ status: 'error', msg: 'Sunucu hatası!' }); 
+        res.status(500).json({ status: 'error', msg: 'Sistem hatası!' }); 
     }
 });
 
@@ -358,4 +356,5 @@ io.on('connection', (socket) => {
 server.listen(PORT, "0.0.0.0", () => {
     console.log(`BPL ECOSYSTEM AKTİF: PORT ${PORT}`);
 });
+
 
