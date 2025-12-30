@@ -6,7 +6,7 @@ const http = require('http');
 const socketIo = require('socket.io');
 const session = require('express-session');
 const path = require('path');
-const bcrypt = require('bcryptjs'); // Render uyumluluğu için
+const bcrypt = require('bcryptjs');// Render uyumluluğu için
 const mongoose = require('mongoose');
 
 // Veritabanı Bağlantısı
@@ -136,3 +136,4 @@ io.on('connection', (socket) => {
 });
 
 server.listen(PORT, "0.0.0.0", () => console.log(`Sistem Aktif: ${PORT}`));
+
