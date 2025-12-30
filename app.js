@@ -118,6 +118,26 @@ app.get('/chat', checkAuth, async (req, res) => {
 
 
 
+// --- BEŞGEN KONSEY (MEETING) ROTASI ---
+app.get('/meeting', checkAuth, async (req, res) => {
+    try {
+        const user = await User.findById(req.session.userId);
+        // Herkes aynı VIP odaya girsin veya bir roomId oluşturulsun
+        const roomId = "BPL-VIP-KONSEY"; 
+        
+        res.render('meeting', { 
+            user: user, 
+            roomId: roomId 
+        });
+    } catch (err) {
+        res.redirect('/profil');
+    }
+});
+
+
+
+
+
 
 
 // --- 6. AUTH VE İŞLEM ROTALARI ---
@@ -308,8 +328,64 @@ io.on('connection', (socket) => {
     socket.on('disconnect', () => { console.log('Ayrıldı.'); });
 });
 
+
+// --- VIP KONSEY SOKET MANTIĞI ---
+    socket.on('join-meeting', (roomId) => {
+        socket.join(roomId);
+        console.log(`Kullanıcı ${socket.userId} VIP odaya katıldı: ${roomId}`);
+    });
+
+    // VIP Hediye Gönderme (Vergi ve Bakiye Kontrollü)
+    socket.on('send-gift-vip', async (data) => {
+        try {
+            const sender = await User.findById(data.senderId);
+            const receiver = await User.findOne({ nickname: data.targetNick });
+
+            if (!sender || !receiver) return socket.emit('gift-result', { message: 'Kullanıcı bulunamadı!' });
+            if (sender.bpl < 5000) return socket.emit('gift-result', { message: 'Min. 5000 BPL gerekir!' });
+
+            const taxAmount = Math.floor(data.amount * (data.tax / 100));
+            sender.bpl -= data.amount;
+            receiver.bpl += (data.amount - taxAmount);
+
+            await sender.save();
+            await receiver.save();
+
+            io.to(data.room).emit('new-message', { 
+                sender: "SİSTEM", 
+                text: `🔥 ${sender.nickname}, ${receiver.nickname} adlı kullanıcıya ${data.amount} BPL hediye gönderdi!` 
+            });
+            socket.emit('gift-result', { status: 'success', message: 'Hediye gönderildi!' });
+        } catch (e) { console.error(e); }
+    });
+
+    // VIP Savaş Başlatma
+    socket.on('start-vip-battle', async (data) => {
+        const p1 = await User.findOne({ nickname: data.p1 });
+        const p2 = await User.findOne({ nickname: data.p2 });
+
+        if (p1 && p2 && p1.bpl >= 200) {
+            p1.bpl -= 200;
+            await p1.save();
+
+            // Rastgele kazanan belirle
+            const winner = Math.random() > 0.5 ? p1 : p2;
+            const animal = (p1.selectedAnimal || "eagle").toLowerCase();
+
+            io.to(data.room).emit('battle-video-play', {
+                winner: winner.nickname,
+                moveVideo: `/caracter/move/${animal}/${animal}1.mp4`,
+                video: `/caracter/move/${animal}/${animal}.mp4`
+            });
+        }
+    });
+
+
+
+
 // --- 11. SUNUCU BAŞLATMA ---
 server.listen(PORT, "0.0.0.0", () => {
     console.log(`BPL ECOSYSTEM AKTİF: PORT ${PORT}`);
 });
+
 
