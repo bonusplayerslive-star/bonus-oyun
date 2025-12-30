@@ -8,9 +8,17 @@ require('dotenv').config();
 
 const app = express();
 
-// --- 🛡️ Güvenli Şifreleme (Render Dostu) ---
-const hashPassword = (password) => crypto.scryptSync(password, 'bonus-salt-key-123', 64).toString('hex');
-const comparePassword = (inputPassword, storedHash) => crypto.scryptSync(inputPassword, 'bonus-salt-key-123', 64).toString('hex') === storedHash;
+// --- 🛡️ Hata Vermeyen Şifreleme Fonksiyonları ---
+const hashPassword = (password) => {
+    if (!password) return '';
+    return crypto.scryptSync(password, 'bonus-salt-key-123', 64).toString('hex');
+};
+
+const comparePassword = (inputPassword, storedHash) => {
+    if (!inputPassword || !storedHash) return false;
+    const hash = crypto.scryptSync(inputPassword, 'bonus-salt-key-123', 64).toString('hex');
+    return hash === storedHash;
+};
 
 // --- ⚙️ Middleware & Görünüm Ayarları ---
 app.use(bodyParser.urlencoded({ extended: true }));
@@ -28,10 +36,10 @@ app.use(session({
 
 // --- 🍃 MongoDB Bağlantısı ---
 mongoose.connect(process.env.MONGO_URI)
-    .then(() => console.log('Sistem Aktif: MongoDB Bağlantısı Başarılı'))
+    .then(() => console.log('MongoDB Bağlantısı Başarılı'))
     .catch(err => console.error('Bağlantı Hatası:', err));
 
-// --- 📂 Tüm Modelleri Bağlama (Görseldeki Liste) ---
+// --- 📂 8 Farklı Modelin Tamamı ---
 const User = require('./models/User');
 const ArenaLog = require('./models/ArenaLogs');
 const Income = require('./models/Income');
@@ -41,68 +49,79 @@ const Punishment = require('./models/Punishment');
 const Victory = require('./models/Victory');
 const Withdrawal = require('./models/Withdrawal');
 
-// --- 🚀 Uygulama Rotaları (Routes) ---
+// --- 🚀 Rotalar (Routes) ---
 
-// 1. Ana Sayfa & Giriş Paneli
+// 1. Ana Sayfa (index.ejs)
 app.get('/', (req, res) => res.render('index', { user: req.session.user || null }));
 
-// 2. Profil (Kullanıcı Verisi & Karakterler)
-app.get('/profil', async (req, res) => {
-    if (!req.session.user) return res.redirect('/');
-    const userData = await User.findById(req.session.user._id);
-    const userLogs = await Log.find({ userId: userData._id }).limit(5); // Son aktiviteler
-    res.render('profil', { user: userData, logs: userLogs });
-});
-
-// 3. Arena (Savaş Kayıtları İle Birlikte)
-app.get('/arena', async (req, res) => {
-    if (!req.session.user) return res.redirect('/');
-    const logs = await ArenaLog.find().sort({ createdAt: -1 }).limit(10);
-    const victories = await Victory.find({ userId: req.session.user._id });
-    res.render('arena', { user: req.session.user, logs, victories });
-});
-
-// 4. Market & Gelirler (Income)
-app.get('/market', async (req, res) => {
-    if (!req.session.user) return res.redirect('/');
-    const incomes = await Income.find(); 
-    res.render('market', { user: req.session.user, incomes });
-});
-
-// 5. Cüzdan, Ödemeler & Çekimler (Payment & Withdrawal)
-app.get('/wallet', async (req, res) => {
-    if (!req.session.user) return res.redirect('/');
-    const payments = await Payment.find({ userId: req.session.user._id });
-    const withdrawals = await Withdrawal.find({ userId: req.session.user._id });
-    res.render('wallet', { user: req.session.user, payments, withdrawals });
-});
-
-// 6. Ceza Kontrolü (Punishment)
-app.get('/status', async (req, res) => {
-    if (!req.session.user) return res.redirect('/');
-    const punishment = await Punishment.findOne({ userId: req.session.user._id, active: true });
-    res.json(punishment || { message: "Temiz" });
-});
-
-// 7. Kayıt & Giriş Mantığı
+// 2. Kayıt İşlemi (Hata Onarıldı)
 app.post('/register', async (req, res) => {
-    const { username, email, password } = req.body;
-    const newUser = new User({ username, email, password: hashPassword(password), bpl: 100 });
-    await newUser.save();
-    res.redirect('/');
-});
+    try {
+        const { username, email, password } = req.body;
+        if (!username || !email || !password) return res.status(400).send("Tüm alanları doldurun.");
 
-app.post('/login', async (req, res) => {
-    const { email, password } = req.body;
-    const user = await User.findOne({ email });
-    if (user && comparePassword(password, user.password)) {
-        req.session.user = user;
-        res.redirect('/profil');
-    } else {
-        res.send('Hatalı bilgiler!');
+        const hashedPassword = hashPassword(password);
+        const newUser = new User({
+            username,
+            email,
+            password: hashedPassword,
+            bpl: 100,
+            caracters: [] // Boş bir karakter dizisiyle başla
+        });
+
+        await newUser.save();
+        res.redirect('/');
+    } catch (error) {
+        console.error("Register Hatası:", error);
+        res.status(500).send("Kayıt sırasında hata oluştu. Lütfen bilgileri kontrol edin.");
     }
 });
 
+// 3. Giriş İşlemi
+app.post('/login', async (req, res) => {
+    try {
+        const { email, password } = req.body;
+        const user = await User.findOne({ email });
+
+        if (user && comparePassword(password, user.password)) {
+            req.session.user = user;
+            res.redirect('/profil');
+        } else {
+            res.send('Hatalı bilgiler! <a href="/">Geri Dön</a>');
+        }
+    } catch (error) {
+        res.status(500).send("Giriş hatası.");
+    }
+});
+
+// 4. Profil Sayfası (Karakter Resimleri Dahil)
+app.get('/profil', async (req, res) => {
+    if (!req.session.user) return res.redirect('/');
+    const userData = await User.findById(req.session.user._id);
+    const logs = await Log.find({ userId: userData._id }).sort({ createdAt: -1 }).limit(5);
+    res.render('profil', { user: userData, logs });
+});
+
+// 5. Arena, Market, Wallet (Tüm Görünümler)
+app.get('/arena', async (req, res) => {
+    if (!req.session.user) return res.redirect('/');
+    const logs = await ArenaLog.find().sort({ createdAt: -1 }).limit(10);
+    res.render('arena', { user: req.session.user, logs });
+});
+
+app.get('/market', async (req, res) => {
+    if (!req.session.user) return res.redirect('/');
+    const items = await Income.find(); 
+    res.render('market', { user: req.session.user, items });
+});
+
+app.get('/wallet', async (req, res) => {
+    if (!req.session.user) return res.redirect('/');
+    const history = await Payment.find({ userId: req.session.user._id });
+    res.render('wallet', { user: req.session.user, history });
+});
+
+// 6. Çıkış
 app.get('/logout', (req, res) => {
     req.session.destroy();
     res.redirect('/');
@@ -110,4 +129,4 @@ app.get('/logout', (req, res) => {
 
 // --- 🌐 Port Ayarı ---
 const PORT = process.env.PORT || 10000;
-app.listen(PORT, () => console.log(`🚀 Sistem Aktif: Port ${PORT}`));
+app.listen(PORT, () => console.log(`🚀 Bombayı Patlattık: Port ${PORT}`));
