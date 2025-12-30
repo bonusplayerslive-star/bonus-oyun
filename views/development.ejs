@@ -7,113 +7,114 @@
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css">
     <style>
         body { background-color: #050505; color: #39FF14; font-family: 'Courier New', Courier, monospace; }
-        .dev-container { max-width: 600px; margin: 50px auto; padding: 20px; border: 2px solid #39FF14; box-shadow: 0 0 15px rgba(57, 255, 20, 0.3); border-radius: 15px; background: rgba(0,0,0,0.9); }
-        .stat-card { background: rgba(57, 255, 20, 0.05); border: 1px solid #222; padding: 15px; margin-bottom: 15px; display: flex; justify-content: space-between; align-items: center; border-radius: 10px; transition: 0.3s; }
-        .stat-card:hover { border-color: #39FF14; background: rgba(57, 255, 20, 0.1); }
-        .stat-info h3 { margin: 0; color: #FFFF00; font-size: 1.1rem; }
-        .stat-info p { margin: 5px 0; font-size: 0.85em; color: #888; }
-        .btn-upgrade { background: transparent; border: 1px solid #39FF14; color: #39FF14; padding: 10px 20px; cursor: pointer; transition: 0.3s; border-radius: 5px; font-weight: bold; font-family: 'Courier New'; }
-        .btn-upgrade:hover { background: #39FF14; color: #000; box-shadow: 0 0 10px #39FF14; }
-        .balance-box { text-align: center; font-size: 1.3em; margin-bottom: 20px; border-bottom: 1px solid #333; padding-bottom: 15px; color: #FFFF00; font-weight: bold; }
-        .back-btn { display: block; text-align: center; margin-top: 20px; color: #ff4444; text-decoration: none; font-weight: bold; font-size: 0.9rem; }
-        .back-btn:hover { color: #fff; text-shadow: 0 0 5px #ff4444; }
-        .active-animal { color: #39FF14; font-weight: bold; text-transform: uppercase; border: 1px solid #39FF14; padding: 2px 8px; border-radius: 4px; }
-        h1 { text-shadow: 0 0 10px rgba(57, 255, 20, 0.5); }
+        .dev-container { max-width: 700px; margin: 30px auto; padding: 20px; border: 1px solid #333; border-radius: 15px; background: rgba(0,0,0,0.95); }
+        
+        /* Hayvan Seçim Kartları */
+        .inventory-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 10px; margin-bottom: 25px; }
+        .animal-card { 
+            border: 2px solid #222; padding: 10px; text-align: center; border-radius: 10px; cursor: pointer; transition: 0.3s;
+            filter: grayscale(100%); opacity: 0.6;
+        }
+        .animal-card.active { border-color: #39FF14; filter: grayscale(0%); opacity: 1; box-shadow: 0 0 10px rgba(57,255,20,0.4); background: rgba(57,255,20,0.05); }
+        .animal-card img { width: 60px; height: 60px; border-radius: 50%; object-fit: cover; border: 1px solid #333; }
+        .animal-card p { margin: 5px 0 0; font-size: 0.8rem; font-weight: bold; }
+
+        .stat-card { background: rgba(255,255,255,0.02); border: 1px solid #222; padding: 12px 20px; margin-bottom: 12px; display: flex; justify-content: space-between; align-items: center; border-radius: 8px; }
+        .stat-info h3 { margin: 0; color: #FFFF00; font-size: 1rem; }
+        .stat-info p { margin: 3px 0; font-size: 0.75rem; color: #777; }
+        
+        .btn-upgrade { background: transparent; border: 1px solid #39FF14; color: #39FF14; padding: 8px 15px; cursor: pointer; transition: 0.2s; border-radius: 4px; font-weight: bold; }
+        .btn-upgrade:hover { background: #39FF14; color: #000; }
+        
+        .balance-box { text-align: center; font-size: 1.2rem; margin-bottom: 20px; color: #FFFF00; padding: 10px; border-bottom: 1px solid #222; }
+        .back-btn { display: block; text-align: center; margin-top: 20px; color: #888; text-decoration: none; font-size: 0.8rem; }
     </style>
 </head>
 <body>
 
     <div class="dev-container">
-        <h1 style="text-align: center; letter-spacing: 3px;">GELİŞTİRME MERKEZİ</h1>
-        
-        <p style="text-align: center; margin-bottom: 25px;">
-            <i class="fas fa-microchip me-2"></i>Şu an Geliştirilen: <span id="active-animal-name" class="active-animal">Yükleniyor...</span>
-        </p>
+        <h2 style="text-align: center; color: #39FF14; text-shadow: 0 0 5px #39FF14;">GELİŞTİRME LABORATUVARI</h2>
+
+        <div class="inventory-grid">
+            <% if (user.inventory && user.inventory.length > 0) { %>
+                <% user.inventory.forEach((item, index) => { %>
+                    <div class="animal-card <%= index === 0 ? 'active' : '' %>" onclick="selectAnimal('<%= item.name %>', this)">
+                        <img src="<%= item.img %>" alt="<%= item.name %>">
+                        <p><%= item.name %></p>
+                        <small style="color: #888;">LVL <%= item.level %></small>
+                    </div>
+                <% }) %>
+            <% } else { %>
+                <p style="grid-column: span 3; text-align: center; color: #ff4444;">Henüz hayvanın yok!</p>
+            <% } %>
+        </div>
 
         <div class="balance-box">
-            <i class="fas fa-coins me-2"></i>Mevcut Bakiye: <span id="current-bpl"><%= user.bpl.toLocaleString() %></span> BPL
+            Bakiye: <span id="current-bpl"><%= user.bpl.toLocaleString() %></span> BPL
         </div>
 
         <div class="stat-card">
             <div class="stat-info">
-                <h3><i class="fas fa-heart me-2"></i>HP (CAN)</h3>
-                <p>+10 Can Puanı Ekler</p>
+                <h3><i class="fas fa-heart"></i> HP (CAN)</h3>
+                <p>Dayanıklılığı +10 artırır.</p>
             </div>
             <div>
-                <span style="margin-right: 10px; color: #FFFF00;">50 BPL</span>
+                <span style="color: #FFFF00; margin-right: 10px;">50 BPL</span>
                 <button class="btn-upgrade" onclick="upgrade('hp', 50)">YÜKSELT</button>
             </div>
         </div>
 
         <div class="stat-card">
             <div class="stat-info">
-                <h3><i class="fas fa-swords me-2"></i>SALDIRI</h3>
-                <p>+5 Hasar Gücü Ekler</p>
+                <h3><i class="fas fa-swords"></i> SALDIRI (ATK)</h3>
+                <p>Vuruş gücünü +5 artırır.</p>
             </div>
             <div>
-                <span style="margin-right: 10px; color: #FFFF00;">40 BPL</span>
+                <span style="color: #FFFF00; margin-right: 10px;">40 BPL</span>
                 <button class="btn-upgrade" onclick="upgrade('atk', 40)">YÜKSELT</button>
             </div>
         </div>
 
         <div class="stat-card">
             <div class="stat-info">
-                <h3><i class="fas fa-shield-alt me-2"></i>SAVUNMA</h3>
-                <p>Gelen Hasarı -5 Azaltır</p>
+                <h3><i class="fas fa-shield-alt"></i> SAVUNMA (DEF)</h3>
+                <p>Gelen hasarı azaltır.</p>
             </div>
             <div>
-                <span style="margin-right: 10px; color: #FFFF00;">35 BPL</span>
+                <span style="color: #FFFF00; margin-right: 10px;">35 BPL</span>
                 <button class="btn-upgrade" onclick="upgrade('def', 35)">YÜKSELT</button>
             </div>
         </div>
 
-        <div class="stat-card" style="border: 1px solid #00d2ff;">
-            <div class="stat-info">
-                <h3 style="color: #00d2ff;"><i class="fas fa-bolt me-2"></i>KRİTİK ŞANS</h3>
-                <p>2 Kat Hasar Şansını %5 Artırır</p>
-            </div>
-            <div>
-                <span style="margin-right: 10px; color: #FFFF00;">25 BPL</span>
-                <button class="btn-upgrade" style="border-color: #00d2ff; color: #00d2ff;" onclick="upgrade('crit', 25)">YÜKSELT</button>
-            </div>
-        </div>
-
-        <div class="stat-card" style="border: 1px solid #FFFF00;">
-            <div class="stat-info">
-                <h3 style="color: #FFFF00;"><i class="fas fa-fire me-2"></i>ANLIK GÜÇ</h3>
-                <p>Sıradaki Savaş İçin +20 ATK!</p>
-            </div>
-            <div>
-                <span style="margin-right: 10px; color: #FFFF00;">15 BPL</span>
-                <button class="btn-upgrade" style="border-color: #FFFF00; color: #FFFF00;" onclick="upgrade('battleMode', 15)">AKTİF ET</button>
-            </div>
-        </div>
-
-        <a href="/profil" class="back-btn"><i class="fas fa-arrow-left me-2"></i>KONTROL PANELİNE DÖN</a>
+        <a href="/profil" class="back-btn"><i class="fas fa-arrow-left"></i> ÜSSE DÖN</a>
     </div>
 
     <script>
-        const userId = "<%= user._id %>";
-        const urlParams = new URLSearchParams(window.location.search);
-        // Eğer URL'de hayvan yoksa envanterdeki ilk hayvanı seç
-        const animalName = urlParams.get('animal') || "<%= user.inventory && user.inventory.length > 0 ? user.inventory[0].name : 'Hayvan Yok' %>";
-        
-        document.getElementById('active-animal-name').innerText = animalName;
+        // Sayfa açıldığında ilk hayvanı seçili yap
+        let selectedAnimal = "<%= user.inventory && user.inventory.length > 0 ? user.inventory[0].name : '' %>";
+
+        function selectAnimal(name, element) {
+            selectedAnimal = name;
+            // Tüm kartlardan active class'ını sil
+            document.querySelectorAll('.animal-card').forEach(card => card.classList.remove('active'));
+            // Tıklanana ekle
+            element.classList.add('active');
+        }
 
         async function upgrade(type, cost) {
-            if (animalName === 'Hayvan Yok') {
-                alert("Önce marketten bir hayvan satın almalısın!");
+            if (!selectedAnimal) {
+                alert("Önce geliştirilecek bir hayvan seçmelisin!");
                 return;
             }
 
-            if (!confirm(`${animalName} için ${cost} BPL harcanacak. Onaylıyor musun?`)) return;
+            if (!confirm(`${selectedAnimal} için ${cost} BPL harcanacak. Onaylıyor musun?`)) return;
 
             try {
                 const response = await fetch('/upgrade-stat', {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
                     body: JSON.stringify({
-                        animalName: animalName,
+                        animalName: selectedAnimal,
                         statType: type,
                         cost: cost
                     })
@@ -122,25 +123,16 @@
                 const result = await response.json();
 
                 if (result.status === 'success') {
-                    // Cüzdanı ve UI'yı güncelle
-                    document.getElementById('current-bpl').innerText = result.newBalance;
-                    alert("Sistem Güncellendi: " + result.msg);
+                    document.getElementById('current-bpl').innerText = result.newBalance.toLocaleString();
+                    // undefined hatası burada çözüldü: result.msg artık dolu geliyor
+                    alert("ONAYLANDI: " + result.msg);
                 } else {
-                    alert("Hata: " + result.msg);
+                    alert("HATA: " + result.msg);
                 }
             } catch (err) {
-                console.error("Hata:", err);
-                alert("Sunucuyla bağlantı kurulamadı!");
+                alert("Bağlantı hatası!");
             }
         }
-    </script>
-
-    <script src="/socket.io/socket.io.js"></script>
-    <script>
-        const socket = io(); 
-        socket.on('update-active-count', (count) => {
-            console.log("Aktif Kumandan Sayısı:", count);
-        });
     </script>
 </body>
 </html>
