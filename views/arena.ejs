@@ -11,7 +11,6 @@
         :root { --neon-green: #39FF14; --gold: #d4af37; --blood-red: #ff0000; }
         body { background: #000; color: white; font-family: 'Orbitron', sans-serif; overflow-x: hidden; height: 100vh; }
         
-        /* Video Katmanı (Aşkın Kavuştuğu Yer) */
         #video-overlay { 
             display: none; position: fixed; inset: 0; background: rgba(0,0,0,0.98); 
             z-index: 9999; flex-direction: column; align-items: center; justify-content: center;
@@ -27,56 +26,53 @@
             text-shadow: 0 0 30px #000; z-index: 10001; display: none; text-transform: uppercase;
         }
 
-        /* Arena UI */
         .arena-container { padding: 20px; height: 100vh; display: flex; flex-direction: column; }
         .header-title { color: var(--gold); text-align: center; font-family: 'Cinzel', serif; text-shadow: 0 0 15px gold; margin-bottom: 20px; }
         .search-box { border: 2px dashed var(--neon-green); padding: 30px; border-radius: 20px; background: rgba(57, 255, 20, 0.05); margin-bottom: 20px; }
         #timer { font-size: 5rem; color: var(--blood-red); font-weight: 900; text-shadow: 0 0 20px red; }
         .victory-log { background: rgba(15,15,15,0.9); border: 1px solid #333; border-radius: 15px; height: 350px; overflow-y: auto; padding: 15px; }
-        .log-item { border-bottom: 1px solid #222; padding: 10px 0; font-size: 0.85rem; animation: slideIn 0.5s ease-out; }
-        @keyframes slideIn { from { transform: translateX(20px); opacity: 0; } to { transform: translateX(0); opacity: 1; } }
+        .log-item { border-bottom: 1px solid #222; padding: 10px 0; font-size: 0.85rem; }
         .text-neon { color: var(--neon-green); }
-        .btn-arena { background: var(--blood-red); color: white; border: 2px solid var(--gold); font-weight: 900; }
+        .btn-arena { background: var(--blood-red); color: white; border: 2px solid var(--gold); font-weight: 900; text-transform: uppercase; }
     </style>
 </head>
 <body>
 
     <div id="video-overlay">
-        <div id="battle-top-status" class="status-top-text mb-3 h4">BAĞLANTI KURULUYOR...</div>
+        <div id="battle-top-status" class="status-top-text mb-3 h4">SİNYAL ALINIYOR...</div>
         <div class="battle-frame">
             <div id="win-banner" class="win-banner">VICTORY</div>
-            <video id="arena-video" playsinline></video>
-        </div>
-        <div class="mt-4 text-muted small">Savaş tamamlanmadan çıkmak ceza sebebidir!</div>
+            <video id="arena-video" playsinline muted></video> </div>
+        <div class="mt-4 text-muted small">Savaş devam ediyor, bağlantıyı kesmeyin!</div>
     </div>
 
     <div class="container-fluid arena-container">
         <div class="row h-100">
             <div class="col-lg-8 d-flex flex-column justify-content-center">
-                <h1 class="header-title">ARENA HUB</h1>
+                <h1 class="header-title">BPL ARENA HUB</h1>
                 <div class="search-box text-center">
                     <div id="matching-ui">
-                        <h4 id="search-msg" class="text-neon">RAKİP ARANIYOR</h4>
+                        <h4 id="search-msg" class="text-neon">RAKİP ARANIYOR...</h4>
                         <div id="timer">13</div>
-                        <p class="mt-3">Savaşçı Karakterin: <span class="text-warning"><%= selectedAnimal %></span></p>
+                        <p class="mt-3">Savaşçı: <span class="text-warning"><%= selectedAnimal %></span></p>
                     </div>
                     <div id="bot-ui" style="display: none;">
                         <div class="alert alert-dark border-warning">
-                            <h4 class="text-warning"><i class="fas fa-robot"></i> ELITE BOT BULUNDU!</h4>
-                            <p class="small">Sinyal gücü düşük, sistem botuyla yüzleşmeye hazır mısın?</p>
+                            <h4 class="text-warning"><i class="fas fa-robot"></i> ELITE BOT TESPİT EDİLDİ!</h4>
+                            <p>Sistem üzerinden bir rakip atandı. Meydan okumayı kabul ediyor musun?</p>
                         </div>
                         <button class="btn btn-arena btn-lg w-100 py-3" onclick="startBattle()">SAVAŞI BAŞLAT (200 BPL)</button>
                     </div>
                 </div>
                 <div class="text-center">
-                    <a href="/profil" class="text-muted text-decoration-none small"><i class="fas fa-arrow-left"></i> Vazgeç ve Dön</a>
+                    <a href="/profil" class="text-muted text-decoration-none small"><i class="fas fa-arrow-left"></i> Üsse Geri Dön</a>
                 </div>
             </div>
 
             <div class="col-lg-4 mt-4 mt-lg-0">
-                <h5 class="text-warning mb-2"><i class="fas fa-trophy"></i> CANLI ARENA KAYITLARI</h5>
+                <h5 class="text-warning mb-2"><i class="fas fa-trophy"></i> ARENA KAYITLARI</h5>
                 <div class="victory-log" id="victory-list">
-                    <div class="text-center text-muted mt-5">Yükleniyor...</div>
+                    <div class="text-center text-muted mt-5">Sinyal bekleniyor...</div>
                 </div>
             </div>
         </div>
@@ -93,10 +89,12 @@
         let timeLeft = 13;
         let isBattleActive = false;
 
-        // Geri Sayım
+        // Geri Sayım Mekanizması
         const timerInterval = setInterval(() => {
             timeLeft--;
-            document.getElementById('timer').innerText = timeLeft;
+            const timerEl = document.getElementById('timer');
+            if(timerEl) timerEl.innerText = timeLeft;
+            
             if (timeLeft <= 0) {
                 clearInterval(timerInterval);
                 document.getElementById('matching-ui').style.display = 'none';
@@ -104,58 +102,76 @@
             }
         }, 1000);
 
-        // Canlı Zafer Bildirimleri
+        // Globalden gelen zafer mesajlarını listele
         socket.on('new-message', (data) => {
-            if (data.sender === "ARENA_SISTEM") {
-                const list = document.getElementById('victory-list');
-                const html = `
-                    <div class="log-item">
-                        <span class="text-neon fw-bold">🏆 ARENA BİLGİ</span>
-                        <div class="text-white mt-1">${data.text}</div>
-                    </div>`;
+            const list = document.getElementById('victory-list');
+            if (list) {
+                const html = `<div class="log-item"><span class="text-neon">🏆</span> ${data.text}</div>`;
                 list.insertAdjacentHTML('afterbegin', html);
             }
         });
 
         async function startBattle() {
-            const animal = "<%= selectedAnimal %>";
+            const animal = "<%= selectedAnimal %>".trim();
             try {
-                const response = await fetch(`/attack-bot?animal=${animal}`, { method: 'POST' });
+                // Post isteğinde seçili hayvanı gönderiyoruz
+                const response = await fetch('/attack-bot', { 
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ animal: animal })
+                });
+                
                 const data = await response.json();
 
                 if(data.status === 'success') {
                     isBattleActive = true;
                     overlay.style.display = 'flex';
+                    winBanner.style.display = 'none';
                     
-                    // Savaş Başlangıcı
+                    // 1. AŞAMA: SALDIRI VİDEOSU (hayvan1.mp4)
                     videoPlayer.src = data.animation.actionVideo;
-                    battleTopText.innerText = "SALDIRI HAMLESİ YAPILIYOR...";
-                    videoPlayer.play().catch(e => console.log("Video başlatılamadı:", e));
+                    battleTopText.innerText = "SALDIRI GERÇEKLEŞTİRİLİYOR...";
+                    videoPlayer.load();
+                    
+                    videoPlayer.play().catch(e => {
+                        console.error("Video oynatılamadı, etkileşim gerekiyor:", e);
+                        battleTopText.innerText = "VİDEOYU OYNATMAK İÇİN TIKLAYIN";
+                    });
 
                     videoPlayer.onended = () => {
                         if(data.animation.isWin) {
+                            // 2. AŞAMA: ZAFER (Kazanırsa hayvan.mp4 oynat)
                             winBanner.style.display = 'block';
-                            battleTopText.innerText = "ZAFER SENİN!";
+                            battleTopText.innerText = "ZAFER! +200 BPL KAZANDIN";
                             battleTopText.className = "status-top-text mb-3 h4 text-warning";
+                            
                             videoPlayer.src = data.animation.winVideo;
+                            videoPlayer.load();
                             videoPlayer.play();
+                            
                             videoPlayer.onended = () => {
-                                isBattleActive = false;
                                 setTimeout(() => { location.href = '/profil'; }, 2000);
                             };
                         } else {
-                            battleTopText.innerText = "MAĞLUP OLDUN!";
+                            // MAĞLUBİYET DURUMU
+                            battleTopText.innerText = "MAĞLUP OLDUN! -200 BPL";
                             battleTopText.className = "status-top-text mb-3 h4 text-danger";
                             setTimeout(() => { location.href = '/profil'; }, 3000);
                         }
                     };
                 } else {
-                    alert(data.msg);
+                    alert(data.msg || "Bakiye yetersiz!");
                 }
-            } catch (err) { alert("Arena bağlantı hatası!"); }
+            } catch (err) { 
+                console.error("Arena Hatası:", err);
+                alert("Arena sunucusuna bağlanılamadı!"); 
+            }
         }
 
-        window.onbeforeunload = function() { if(isBattleActive) return "Kaçarsan ceza alırsın!"; };
+        // Savaş anında sayfayı kapatmayı engelle
+        window.onbeforeunload = function() { 
+            if(isBattleActive) return "Savaştan kaçmak ceza almanıza neden olabilir!"; 
+        };
     </script>
 </body>
 </html>
