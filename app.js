@@ -5,11 +5,8 @@ const bodyParser = require('body-parser');
 const http = require('http');
 const socketIo = require('socket.io');
 const session = require('express-session');
-const mongoose = require('mongoose');
 const path = require('path');
-const axios = require('axios');
 
-// --- 2. VERİTABANI VE MODELLER ---
 const connectDB = require('./db');
 const User = require('./models/User');
 const Payment = require('./models/Payment');
@@ -21,79 +18,96 @@ const server = http.createServer(app);
 const io = socketIo(server);
 const PORT = process.env.PORT || 10000;
 
-// --- 3. SABİTLER ---
+// --- 2. SABİT VERİLER (Klasör adlarıyla birebir aynı olmalı) ---
 const MARKET_ANIMALS = [
-    { id: 1, name: 'Bear', price: 1000, img: '/caracter/profile/bear.jpg' },
-    { id: 2, name: 'Crocodile', price: 1000, img: '/caracter/profile/crocodile.jpg' },
-    { id: 3, name: 'Eagle', price: 1000, img: '/caracter/profile/eagle.jpg' },
-    { id: 4, name: 'Gorilla', price: 5000, img: '/caracter/profile/gorilla.jpg' },
-    { id: 5, name: 'Kurd', price: 1000, img: '/caracter/profile/kurd.jpg' },
-    { id: 6, name: 'Lion', price: 5000, img: '/caracter/profile/lion.jpg' },
-    { id: 7, name: 'Falcon', price: 1000, img: '/caracter/profile/peregrinefalcon.jpg' },
-    { id: 8, name: 'Rhino', price: 5000, img: '/caracter/profile/rhino.jpg' },
-    { id: 9, name: 'Snake', price: 1000, img: '/caracter/profile/snake.jpg' },
-    { id: 10, name: 'Tiger', price: 5000, img: '/caracter/profile/tiger.jpg' }
+    { id: 1, name: 'Bear', price: 1000, img: '/caracter/profile/Bear.jpg' },
+    { id: 2, name: 'Crocodile', price: 1000, img: '/caracter/profile/Crocodile.jpg' },
+    { id: 3, name: 'Eagle', price: 1000, img: '/caracter/profile/Eagle.jpg' },
+    { id: 4, name: 'Gorilla', price: 5000, img: '/caracter/profile/Gorilla.jpg' },
+    { id: 5, name: 'Kurd', price: 1000, img: '/caracter/profile/Kurd.jpg' },
+    { id: 6, name: 'Lion', price: 5000, img: '/caracter/profile/Lion.jpg' },
+    { id: 7, name: 'Peregrinefalcon', price: 1000, img: '/caracter/profile/Peregrinefalcon.jpg' },
+    { id: 8, name: 'Rhino', price: 5000, img: '/caracter/profile/Rhino.jpg' },
+    { id: 9, name: 'Snake', price: 1000, img: '/caracter/profile/Snake.jpg' },
+    { id: 10, name: 'Tiger', price: 5000, img: '/caracter/profile/Tiger.jpg' }
 ];
 
-// --- 4. MIDDLEWARE ---
+// --- 3. MIDDLEWARE ---
 app.set('view engine', 'ejs');
 app.use(express.static(path.join(__dirname, 'public')));
 app.use(bodyParser.json());
 app.use(bodyParser.urlencoded({ extended: true }));
 app.use(session({
-    secret: 'bpl_ozel_anahtar',
+    secret: 'bpl_secret_key_2024',
     resave: false,
     saveUninitialized: false,
     cookie: { secure: false, maxAge: 24 * 60 * 60 * 1000 }
 }));
 
+// Giriş kontrolü
 const checkAuth = (req, res, next) => {
     if (req.session.userId) next(); else res.redirect('/');
 };
 
-// --- 5. ROTALAR (GET) ---
+// --- 4. SAYFA YÖNLENDİRMELERİ (GET) ---
 app.get('/', (req, res) => res.render('index', { user: req.session.userId || null }));
+
 app.get('/profil', checkAuth, async (req, res) => {
     const user = await User.findById(req.session.userId);
     res.render('profil', { user });
 });
-app.get('/arena', checkAuth, async (req, res) => {
-    const user = await User.findById(req.session.userId);
-    res.render('arena', { user, selectedAnimal: user.inventory[0]?.name || "Eagle" });
-});
+
 app.get('/market', checkAuth, async (req, res) => {
     const user = await User.findById(req.session.userId);
     res.render('market', { user, animals: MARKET_ANIMALS });
 });
+
+app.get('/arena', checkAuth, async (req, res) => {
+    const user = await User.findById(req.session.userId);
+    // İlk hayvanı seçili getir, yoksa "Eagle" varsay
+    const selected = user.inventory && user.inventory.length > 0 ? user.inventory[0].name : "Eagle";
+    res.render('arena', { user, selectedAnimal: selected });
+});
+
+app.get('/development', checkAuth, async (req, res) => {
+    const user = await User.findById(req.session.userId);
+    res.render('development', { user });
+});
+
 app.get('/wallet', checkAuth, async (req, res) => {
     const user = await User.findById(req.session.userId);
     res.render('wallet', { user });
 });
 
-// --- BEŞGEN KONSEY ---
 app.get('/meeting', checkAuth, async (req, res) => {
     try {
         const user = await User.findById(req.session.userId);
-        if (user.bpl < 50) return res.render('profil', { user, error: 'Yetersiz BPL!' });
+        if (user.bpl < 50) return res.render('profil', { user, error: 'Konsey girişi 50 BPL!' });
         user.bpl -= 50; await user.save();
         res.render('meeting', { user, roomId: "BPL-VIP-KONSEY" });
     } catch (e) { res.redirect('/profil'); }
 });
 
-// --- 6. İŞLEM ROTALARI (POST) ---
+// --- 5. OYUN VE İŞLEM MANTIĞI (POST) ---
+
+// Arena Savaşı (Bot)
 app.post('/attack-bot', checkAuth, async (req, res) => {
     try {
         const user = await User.findById(req.session.userId);
-        if (user.bpl < 200) return res.json({ status: 'error', msg: 'Yetersiz BPL!' });
+        if (!user || user.bpl < 200) return res.json({ status: 'error', msg: 'Yetersiz BPL! (Min: 200)' });
         
-        // ÖNEMLİ: Klasör isimleri büyük harf ise .toLowerCase() kullanma!
-        let animalName = req.body.animal || "Eagle"; 
-        const isWin = Math.random() > 0.5;
-        
+        const animalName = req.body.animal || "Eagle"; 
+        const isWin = Math.random() > 0.45; // %55 şans
+
         user.bpl += isWin ? 200 : -200;
         await user.save();
 
-        if (isWin) io.emit('new-message', { sender: "ARENA", text: `🏆 ${user.nickname} kazandı!` });
+        if (isWin) {
+            io.to('Global').emit('new-message', { 
+                sender: "ARENA", 
+                text: `🏆 ${user.nickname} botu mağlup etti ve 200 BPL kazandı!` 
+            });
+        }
 
         res.json({
             status: 'success',
@@ -104,55 +118,72 @@ app.post('/attack-bot', checkAuth, async (req, res) => {
             },
             newBalance: user.bpl
         });
-    } catch (err) { res.status(500).json({ status: 'error' }); }
+    } catch (err) { res.status(500).json({ status: 'error', msg: 'Savaş başlatılamadı.' }); }
 });
 
-// --- ÖDEME DOĞRULAMA (EKSİKTİ, GERİ GELDİ) ---
-app.post('/verify-payment', checkAuth, async (req, res) => {
-    const { txid, bpl } = req.body;
+// Karakter Geliştirme (Upgrade)
+app.post('/upgrade-stat', checkAuth, async (req, res) => {
+    const { animalName, statType, cost } = req.body;
     try {
-        const check = await Payment.findOne({ txid });
-        if (check) return res.json({ status: 'error', msg: 'Bu işlem zaten kaydedilmiş!' });
-        
-        // BSCScan API kontrolü buraya gelecek (process.env.BSCSCAN_API_KEY ile)
         const user = await User.findById(req.session.userId);
-        user.bpl += parseInt(bpl);
+        const animal = user.inventory.find(a => a.name === animalName);
+        
+        if (!animal || user.bpl < cost) {
+            return res.json({ status: 'error', msg: 'Bakiye yetersiz veya karakter bulunamadı.' });
+        }
+
+        // İstatistik artırımı
+        if(statType === 'hp') animal.stats.hp += 10;
+        else if(statType === 'atk') animal.stats.atk += 5;
+        else if(statType === 'def') animal.stats.def = (animal.stats.def || 0) + 5;
+
+        user.bpl -= cost;
+        user.markModified('inventory'); // Array içindeki değişiklikleri Mongoose'a bildir
         await user.save();
-        await new Payment({ userId: user._id, txid, amountBPL: bpl, status: 'COMPLETED' }).save();
-        res.json({ status: 'success', msg: 'Yükleme başarılı!' });
-    } catch (e) { res.json({ status: 'error' }); }
+        
+        res.json({ status: 'success', msg: `${statType.toUpperCase()} başarıyla artırıldı!`, newBalance: user.bpl });
+    } catch (e) { res.json({ status: 'error', msg: 'Geliştirme hatası.' }); }
 });
 
-// --- 10. SOCKET.IO (TÜMÜ İÇERİDE) ---
+// --- 6. SOCKET.IO SİSTEMİ ---
 io.on('connection', (socket) => {
+    console.log('Bir kullanıcı bağlandı:', socket.id);
+
     socket.on('register-user', (data) => {
-        socket.userId = data.id;
-        socket.nickname = data.nickname;
-        socket.join('Global');
+        if(data && data.id) {
+            socket.userId = data.id;
+            socket.nickname = data.nickname;
+            socket.join('Global');
+        }
     });
 
     socket.on('chat-message', (data) => {
-        io.to(data.room || 'Global').emit('new-message', { sender: socket.nickname, text: data.text });
+        io.to(data.room || 'Global').emit('new-message', { 
+            sender: socket.nickname || "Misafir", 
+            text: data.text 
+        });
     });
 
     socket.on('join-meeting', (roomId) => {
         socket.join(roomId);
-        io.to(roomId).emit('new-message', { sender: "SİSTEM", text: `🔥 ${socket.nickname} bağlandı.` });
+        io.to(roomId).emit('new-message', { 
+            sender: "SİSTEM", 
+            text: `🔥 ${socket.nickname || 'Bir üye'} konseye katıldı.` 
+        });
     });
 
-    socket.on('send-gift-vip', async (data) => {
-        const sender = await User.findById(socket.userId);
-        const receiver = await User.findOne({ nickname: data.targetNick });
-        if (sender && receiver && sender.bpl >= data.amount) {
-            sender.bpl -= data.amount;
-            receiver.bpl += Math.floor(data.amount * 0.8); // %20 vergi
-            await sender.save(); await receiver.save();
-            io.to(data.room).emit('new-message', { sender: "SİSTEM", text: `🎁 ${sender.nickname} -> ${receiver.nickname}: ${data.amount} BPL!` });
-            socket.emit('gift-result', { status: 'success', newBalance: sender.bpl });
-        }
+    socket.on('disconnect', () => {
+        console.log('Kullanıcı ayrıldı.');
     });
-
-    socket.on('disconnect', () => console.log('Ayrıldı.'));
 });
 
-server.listen(PORT, "0.0.0.0", () => console.log(`PORT ${PORT} AKTİF`));
+// --- 7. SUNUCU BAŞLATMA ---
+server.listen(PORT, "0.0.0.0", () => {
+    console.log(`
+    =========================================
+    🚀 BPL ECOSYSTEM AKTİF
+    📡 PORT: ${PORT}
+    🔗 MOD: Üretim (Production)
+    =========================================
+    `);
+});
