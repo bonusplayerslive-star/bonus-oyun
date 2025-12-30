@@ -7,129 +7,129 @@
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css">
     <style>
         body { background-color: #050505; color: #39FF14; font-family: 'Courier New', Courier, monospace; }
-        .dev-container { max-width: 700px; margin: 30px auto; padding: 20px; border: 1px solid #333; border-radius: 15px; background: rgba(0,0,0,0.95); }
+        .dev-container { max-width: 650px; margin: 20px auto; padding: 20px; border: 1px solid #1a1a1a; border-radius: 20px; background: rgba(0,0,0,0.98); box-shadow: 0 0 30px rgba(0,0,0,1); }
         
-        /* Hayvan Seçim Kartları */
-        .inventory-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 10px; margin-bottom: 25px; }
-        .animal-card { 
-            border: 2px solid #222; padding: 10px; text-align: center; border-radius: 10px; cursor: pointer; transition: 0.3s;
-            filter: grayscale(100%); opacity: 0.6;
+        /* Karakter Seçim Alanı */
+        .char-selector { display: flex; justify-content: center; gap: 15px; margin-bottom: 25px; padding: 10px; border-bottom: 1px solid #222; }
+        .char-card { 
+            width: 100px; text-align: center; cursor: pointer; border: 2px solid #222; border-radius: 12px; padding: 8px; transition: 0.3s; opacity: 0.5; filter: grayscale(1);
         }
-        .animal-card.active { border-color: #39FF14; filter: grayscale(0%); opacity: 1; box-shadow: 0 0 10px rgba(57,255,20,0.4); background: rgba(57,255,20,0.05); }
-        .animal-card img { width: 60px; height: 60px; border-radius: 50%; object-fit: cover; border: 1px solid #333; }
-        .animal-card p { margin: 5px 0 0; font-size: 0.8rem; font-weight: bold; }
+        .char-card.active { 
+            opacity: 1; filter: grayscale(0); border-color: #39FF14; background: rgba(57, 255, 20, 0.05); box-shadow: 0 0 15px rgba(57, 255, 20, 0.2); 
+        }
+        .char-card img { width: 60px; height: 60px; border-radius: 50%; object-fit: cover; margin-bottom: 5px; border: 1px solid #333; }
+        .char-card span { display: block; font-size: 0.75rem; font-weight: bold; color: #fff; }
 
-        .stat-card { background: rgba(255,255,255,0.02); border: 1px solid #222; padding: 12px 20px; margin-bottom: 12px; display: flex; justify-content: space-between; align-items: center; border-radius: 8px; }
-        .stat-info h3 { margin: 0; color: #FFFF00; font-size: 1rem; }
-        .stat-info p { margin: 3px 0; font-size: 0.75rem; color: #777; }
+        .balance-box { text-align: center; font-size: 1.1rem; color: #FFFF00; margin-bottom: 20px; }
         
-        .btn-upgrade { background: transparent; border: 1px solid #39FF14; color: #39FF14; padding: 8px 15px; cursor: pointer; transition: 0.2s; border-radius: 4px; font-weight: bold; }
-        .btn-upgrade:hover { background: #39FF14; color: #000; }
+        /* Geliştirme Satırları */
+        .stat-row { 
+            background: rgba(255,255,255,0.02); border: 1px solid #1a1a1a; padding: 12px 20px; margin-bottom: 10px; 
+            display: flex; justify-content: space-between; align-items: center; border-radius: 10px; transition: 0.2s;
+        }
+        .stat-row:hover { background: rgba(57, 255, 20, 0.03); border-color: #333; }
+        .stat-label h3 { margin: 0; font-size: 0.95rem; color: #39FF14; }
+        .stat-label p { margin: 2px 0 0; font-size: 0.7rem; color: #666; }
         
-        .balance-box { text-align: center; font-size: 1.2rem; margin-bottom: 20px; color: #FFFF00; padding: 10px; border-bottom: 1px solid #222; }
-        .back-btn { display: block; text-align: center; margin-top: 20px; color: #888; text-decoration: none; font-size: 0.8rem; }
+        .btn-up { 
+            background: transparent; border: 1px solid #39FF14; color: #39FF14; padding: 7px 15px; 
+            cursor: pointer; border-radius: 6px; font-size: 0.8rem; font-weight: bold; transition: 0.3s;
+        }
+        .btn-up:hover { background: #39FF14; color: #000; box-shadow: 0 0 10px #39FF14; }
+        
+        .back-link { display: block; text-align: center; margin-top: 20px; color: #444; text-decoration: none; font-size: 0.8rem; }
+        .back-link:hover { color: #fff; }
     </style>
 </head>
 <body>
 
     <div class="dev-container">
-        <h2 style="text-align: center; color: #39FF14; text-shadow: 0 0 5px #39FF14;">GELİŞTİRME LABORATUVARI</h2>
+        <h2 style="text-align:center; letter-spacing: 2px; color: #39FF14;">BPL UPGRADE SYSTEM</h2>
 
-        <div class="inventory-grid">
+        <div class="char-selector">
             <% if (user.inventory && user.inventory.length > 0) { %>
                 <% user.inventory.forEach((item, index) => { %>
-                    <div class="animal-card <%= index === 0 ? 'active' : '' %>" onclick="selectAnimal('<%= item.name %>', this)">
-                        <img src="<%= item.img %>" alt="<%= item.name %>">
-                        <p><%= item.name %></p>
-                        <small style="color: #888;">LVL <%= item.level %></small>
+                    <div class="char-card <%= index === 0 ? 'active' : '' %>" onclick="selectChar('<%= item.name %>', this)">
+                        <img src="<%= item.img %>" alt="char">
+                        <span><%= item.name.toUpperCase() %></span>
                     </div>
                 <% }) %>
             <% } else { %>
-                <p style="grid-column: span 3; text-align: center; color: #ff4444;">Henüz hayvanın yok!</p>
+                <p style="color: #ff4444; font-size: 0.8rem;">Karakter Bulunamadı!</p>
             <% } %>
         </div>
 
         <div class="balance-box">
-            Bakiye: <span id="current-bpl"><%= user.bpl.toLocaleString() %></span> BPL
+            <i class="fas fa-wallet"></i> KASA: <span id="bpl-val"><%= user.bpl.toLocaleString() %></span> BPL
         </div>
 
-        <div class="stat-card">
-            <div class="stat-info">
-                <h3><i class="fas fa-heart"></i> HP (CAN)</h3>
-                <p>Dayanıklılığı +10 artırır.</p>
+        <div class="stat-row">
+            <div class="stat-label">
+                <h3>HP (CAN)</h3>
+                <p>Dayanıklılığı +10 artırır</p>
             </div>
             <div>
-                <span style="color: #FFFF00; margin-right: 10px;">50 BPL</span>
-                <button class="btn-upgrade" onclick="upgrade('hp', 50)">YÜKSELT</button>
+                <span style="color: #FFFF00; font-size: 0.8rem; margin-right: 10px;">50 BPL</span>
+                <button class="btn-up" onclick="applyUpgrade('hp', 50)">YÜKSELT</button>
             </div>
         </div>
 
-        <div class="stat-card">
-            <div class="stat-info">
-                <h3><i class="fas fa-swords"></i> SALDIRI (ATK)</h3>
-                <p>Vuruş gücünü +5 artırır.</p>
+        <div class="stat-row">
+            <div class="stat-label">
+                <h3>ATK (GÜÇ)</h3>
+                <p>Saldırı hasarını +5 artırır</p>
             </div>
             <div>
-                <span style="color: #FFFF00; margin-right: 10px;">40 BPL</span>
-                <button class="btn-upgrade" onclick="upgrade('atk', 40)">YÜKSELT</button>
+                <span style="color: #FFFF00; font-size: 0.8rem; margin-right: 10px;">40 BPL</span>
+                <button class="btn-up" onclick="applyUpgrade('atk', 40)">YÜKSELT</button>
             </div>
         </div>
 
-        <div class="stat-card">
-            <div class="stat-info">
-                <h3><i class="fas fa-shield-alt"></i> SAVUNMA (DEF)</h3>
-                <p>Gelen hasarı azaltır.</p>
+        <div class="stat-row" style="border-left: 3px solid #00d2ff;">
+            <div class="stat-label">
+                <h3>DEF (ZIRH)</h3>
+                <p>Alınan hasarı -5 azaltır</p>
             </div>
             <div>
-                <span style="color: #FFFF00; margin-right: 10px;">35 BPL</span>
-                <button class="btn-upgrade" onclick="upgrade('def', 35)">YÜKSELT</button>
+                <span style="color: #FFFF00; font-size: 0.8rem; margin-right: 10px;">35 BPL</span>
+                <button class="btn-up" style="border-color: #00d2ff; color: #00d2ff;" onclick="applyUpgrade('def', 35)">YÜKSELT</button>
             </div>
         </div>
 
-        <a href="/profil" class="back-btn"><i class="fas fa-arrow-left"></i> ÜSSE DÖN</a>
+        <a href="/profil" class="back-link"><i class="fas fa-chevron-left"></i> PANELE DÖN</a>
     </div>
 
     <script>
-        // Sayfa açıldığında ilk hayvanı seçili yap
-        let selectedAnimal = "<%= user.inventory && user.inventory.length > 0 ? user.inventory[0].name : '' %>";
+        // Sayfa başında ilk karakteri seçili ata
+        let activeChar = "<%= user.inventory && user.inventory.length > 0 ? user.inventory[0].name : '' %>";
 
-        function selectAnimal(name, element) {
-            selectedAnimal = name;
-            // Tüm kartlardan active class'ını sil
-            document.querySelectorAll('.animal-card').forEach(card => card.classList.remove('active'));
-            // Tıklanana ekle
-            element.classList.add('active');
+        function selectChar(name, el) {
+            activeChar = name;
+            document.querySelectorAll('.char-card').forEach(c => c.classList.remove('active'));
+            el.classList.add('active');
         }
 
-        async function upgrade(type, cost) {
-            if (!selectedAnimal) {
-                alert("Önce geliştirilecek bir hayvan seçmelisin!");
-                return;
-            }
-
-            if (!confirm(`${selectedAnimal} için ${cost} BPL harcanacak. Onaylıyor musun?`)) return;
+        async function applyUpgrade(type, cost) {
+            if (!activeChar) return alert("Geliştirilecek karakter seçilmedi!");
+            if (!confirm(`${activeChar} geliştirilsin mi?`)) return;
 
             try {
-                const response = await fetch('/upgrade-stat', {
+                const res = await fetch('/upgrade-stat', {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({
-                        animalName: selectedAnimal,
-                        statType: type,
-                        cost: cost
-                    })
+                    body: JSON.stringify({ animalName: activeChar, statType: type, cost: cost })
                 });
 
-                const result = await response.json();
+                const data = await res.json();
 
-                if (result.status === 'success') {
-                    document.getElementById('current-bpl').innerText = result.newBalance.toLocaleString();
-                    // undefined hatası burada çözüldü: result.msg artık dolu geliyor
-                    alert("ONAYLANDI: " + result.msg);
+                if (data.status === 'success') {
+                    document.getElementById('bpl-val').innerText = data.newBalance.toLocaleString();
+                    // Sunucudan gelen 'msg' artık 'undefined' olmayacak
+                    alert("SİSTEM MESAJI: " + data.msg);
                 } else {
-                    alert("HATA: " + result.msg);
+                    alert("HATA: " + data.msg);
                 }
-            } catch (err) {
+            } catch (e) {
                 alert("Bağlantı hatası!");
             }
         }
