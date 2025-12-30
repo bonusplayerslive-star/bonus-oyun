@@ -78,6 +78,27 @@ const transporter = nodemailer.createTransport({
 
 // --- 5. ANA SAYFA VE MENÜ ROTALARI ---
 
+// Beşgen Masa (Meeting) Sayfasına Giriş
+app.get('/meeting', checkAuth, async (req, res) => {
+    try {
+        const user = await User.findById(req.session.userId);
+        // Tüm VIP kullanıcılar aynı odaya (room) girsin
+        res.render('meeting', { 
+            user: user, 
+            roomId: "BPL_VIP_CONSEY" 
+        });
+    } catch (err) {
+        res.redirect('/profil');
+    }
+});
+
+
+
+
+
+
+
+
 app.get('/', (req, res) => {
     res.render('index', { user: req.session.userId || null });
 });
@@ -387,5 +408,6 @@ io.on('connection', (socket) => {
 server.listen(PORT, "0.0.0.0", () => {
     console.log(`BPL ECOSYSTEM AKTİF: PORT ${PORT}`);
 });
+
 
 
