@@ -509,12 +509,74 @@ app.post('/open-special-room', checkAuth, async (req, res) => {
     res.json({ status: 'success', roomId });
 });
 
+// --- ARENA SAVAŞ VE ÖDÜL SİSTEMİ ---
+app.post('/attack-bot', checkAuth, async (req, res) => {
+    try {
+        const user = await User.findById(req.session.userId);
+        if (!user) return res.json({ status: 'error', msg: 'Kullanıcı bulunamadı!' });
+
+        const bot = eliteBots[Math.floor(Math.random() * eliteBots.length)];
+        const isWin = Math.random() > 0.5; // %50 Kazanma Şansı
+        const animalName = req.query.animal ? req.query.animal.toLowerCase() : "eagle";
+
+        if (isWin) {
+            // Galibiyette giriş ücreti yok: Net 200 BPL kar!
+            user.bpl += 200; 
+            
+            // Son 20 Zafer Listesini Güncelle
+            last20Victories.unshift({
+                winner: user.nickname,
+                opponent: bot.nickname,
+                reward: 200,
+                time: new Date().toLocaleTimeString('tr-TR')
+            });
+            if(last20Victories.length > 20) last20Victories.pop();
+
+            // Global Duyuru ve Tebrik Butonu
+            io.emit('new-message', {
+                sender: "ARENA_SISTEM",
+                text: `🏆 ${user.nickname}, ${bot.nickname} karşısında ZAFER kazandı!`,
+                winnerNick: user.nickname, 
+                isBattleWin: true 
+            });
+        } else {
+            // Kaybederse 200 BPL kesilir
+            if (user.bpl >= 200) user.bpl -= 200;
+        }
+
+        await user.save(); // 'async' fonksiyon içinde olduğu için hata vermez
+
+        res.json({
+            status: 'success',
+            opponent: bot.nickname,
+            animation: {
+                actionVideo: `/caracter/move/${animalName}/${animalName}1.mp4`,
+                winVideo: `/caracter/move/${animalName}/${animalName}.mp4`,
+                isWin: isWin
+            },
+            newBalance: user.bpl
+        });
+
+    } catch (err) {
+        console.error("Arena Hatası:", err);
+        res.status(500).json({ status: 'error', msg: 'Arena bağlantı hatası!' });
+    }
+});
+
+
+
+
+
+
+
 // Socket.io Hediye ve Savaş Dinamiği
 io.on('connection', (socket) => {
    // Hediye Gönderim Kontrolü
 socket.on('send-gift-vip', async (data) => {
     const { senderId, targetNick, amount, tax } = data;
     const sender = await User.findById(senderId);
+
+    
 
     // 5000 BPL Altı Kontrolü (Fakirler davetle girer ama hediye gönderemez)
     if (!sender || sender.bpl < 5000) {
@@ -831,6 +893,7 @@ server.listen(PORT, "0.0.0.0", () => {
     =========================================
     `);
 });
+
 
 
 
