@@ -160,36 +160,47 @@ app.get('/logout', (req, res) => {
 });
 
 // --- 7. MARKET VE GELİŞTİRME SİSTEMİ ---
-
-app.post('/buy-animal', checkAuth, async (req, res) => {
-    try {
-        const { animalId } = req.body;
-        const user = await User.findById(req.session.userId);
-        const animal = MARKET_ANIMALS.find(a => a.id == animalId);
-        if (!animal || user.bpl < animal.price || user.inventory.length >= 3) {
-            return res.json({ status: 'error', msg: 'Şartlar sağlanmadı!' });
-        }
-        user.bpl -= animal.price;
-        user.inventory.push({ name: animal.name, img: animal.img, level: 1, stats: { hp: 100, atk: 20, def: 10 } });
-        await user.save();
-        res.json({ status: 'success', msg: 'Hayırlı olsun!', newBalance: user.bpl });
-    } catch (err) { res.json({ status: 'error', msg: 'Hata!' }); }
-});
-
 app.post('/upgrade-stat', checkAuth, async (req, res) => {
     const { animalName, statType, cost } = req.body;
     try {
         const user = await User.findById(req.session.userId);
         const idx = user.inventory.findIndex(a => a.name === animalName);
-        if (idx === -1 || user.bpl < cost) return res.json({ status: 'error', msg: 'Hata!' });
+        
+        if (idx === -1) return res.json({ status: 'error', msg: 'Hayvan bulunamadı!' });
+        if (user.bpl < cost) return res.json({ status: 'error', msg: 'Yetersiz bakiye!' });
+
         const animal = user.inventory[idx];
-        if(statType === 'hp') animal.stats.hp += 10;
-        else if(statType === 'atk') animal.stats.atk += 5;
+        let message = "";
+
+        // Geliştirme Mantığı
+        if(statType === 'hp') {
+            animal.stats.hp += 10;
+            message = "Can (HP) +10 artırıldı!";
+        } else if(statType === 'atk') {
+            animal.stats.atk += 5;
+            message = "Saldırı (ATK) +5 artırıldı!";
+        } else if(statType === 'def') {
+            animal.stats.def = (animal.stats.def || 0) + 5;
+            message = "Savunma (DEF) +5 artırıldı!";
+        } else {
+            message = "Geliştirme başarıyla tamamlandı!";
+        }
+
         user.bpl -= cost;
         user.markModified('inventory');
         await user.save();
-        res.json({ status: 'success', newBalance: user.bpl });
-    } catch (err) { res.status(500).json({ status: 'error' }); }
+
+        // Buradaki 'msg' alanı EJS'deki 'result.msg' kısmına gider
+        res.json({ 
+            status: 'success', 
+            msg: message, 
+            newBalance: user.bpl 
+        });
+
+    } catch (err) { 
+        console.error(err);
+        res.status(500).json({ status: 'error', msg: 'Sunucu hatası!' }); 
+    }
 });
 
 // --- 8. ARENA VE SAVAŞ MANTIĞI ---
@@ -347,3 +358,4 @@ io.on('connection', (socket) => {
 server.listen(PORT, "0.0.0.0", () => {
     console.log(`BPL ECOSYSTEM AKTİF: PORT ${PORT}`);
 });
+
