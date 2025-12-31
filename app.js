@@ -4,7 +4,7 @@ const express = require('express');
 const http = require('http');
 const socketIo = require('socket.io');
 const session = require('express-session');
-// DÜZELTME: v6+ için modül çağrısı bu şekilde olmalı
+// KRİTİK DÜZELTME: connect-mongo v6+ için import yapısı
 const MongoStore = require('connect-mongo'); 
 const mongoose = require('mongoose');
 const path = require('path');
@@ -18,7 +18,7 @@ const Victory = require('./models/Victory');
 const Punishment = require('./models/Punishment');
 const ArenaLog = require('./models/ArenaLogs');
 
-connectDB();
+connectDB(); // MongoDB Atlas Bağlantısı
 
 const app = express();
 const server = http.createServer(app);
@@ -32,18 +32,18 @@ app.use(express.static(path.join(__dirname, 'public')));
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
 
-// --- HATAYI BİTİREN OTURUM YÖNETİMİ ---
+// --- HATAYI BİTİREN OTURUM YÖNETİMİ (v6 UYUMLU) ---
 app.use(session({
     secret: process.env.SESSION_SECRET || 'bpl_global_secret_2026',
     resave: false,
     saveUninitialized: false,
     store: MongoStore.create({ 
         mongoUrl: process.env.MONGO_URI,
-        collectionName: 'sessions', // Atlas'ta bu isimle görünecek
-        ttl: 14 * 24 * 60 * 60 // 14 gün
+        collectionName: 'sessions',
+        ttl: 14 * 24 * 60 * 60 
     }),
     cookie: { 
-        secure: false, // Render HTTP (SSL yoksa) için false
+        secure: false, // Render HTTP için false kalmalı
         maxAge: 24 * 60 * 60 * 1000 
     }
 }));
@@ -68,9 +68,9 @@ app.get('/wallet', checkAuth, (req, res) => res.render('wallet'));
 app.get('/chat', checkAuth, (req, res) => res.render('chat'));
 app.get('/meeting/:roomId', checkAuth, (req, res) => res.render('meeting', { roomId: req.params.roomId }));
 
-// --- 5. ROTALAR (POST İŞLEMLERİ) ---
+// --- 5. ROTALAR (POST) ---
 
-// Giriş & Kayıt
+// Login & Register
 app.post('/register', async (req, res) => {
     try {
         const { nickname, email, password } = req.body;
@@ -81,7 +81,7 @@ app.post('/register', async (req, res) => {
         });
         await newUser.save();
         res.send('<script>alert("Kayıt Başarılı! 2500 BPL Hediye."); window.location.href="/";</script>');
-    } catch (e) { res.status(500).send("Kayıt hatası!"); }
+    } catch (e) { res.status(500).send("Hata!"); }
 });
 
 app.post('/login', async (req, res) => {
@@ -91,31 +91,31 @@ app.post('/login', async (req, res) => {
         req.session.userId = user._id;
         return req.session.save(() => res.redirect('/profil'));
     }
-    res.send('<script>alert("Bilgiler hatalı!"); window.location.href="/";</script>');
+    res.send('<script>alert("Giriş Başarısız!"); window.location.href="/";</script>');
 });
 
-// İletişim Formu (Max 180 Karakter)
+// İletişim (180 Karakter Sınırı)
 app.post('/contact', async (req, res) => {
     const { email, note } = req.body;
     if (note.length > 180) return res.send("Not çok uzun!");
     await new Log({ type: 'CONTACT', content: note, userEmail: email }).save();
-    res.send('<script>alert("Mesajınız iletildi."); window.location.href="/";</script>');
+    res.send('<script>alert("Mesaj iletildi."); window.location.href="/";</script>');
 });
 
-// Arena Bot Sistemi (%60 Kayıp / %40 Kazanç)
+// Arena Bot Sistemi (%60 Kayıp Oranı)
 app.post('/arena/battle', checkAuth, async (req, res) => {
     const user = await User.findById(req.session.userId);
     const bots = ['Lion', 'Goril', 'Tiger', 'Eagle'];
     const botOpponent = bots[Math.floor(Math.random() * bots.length)];
     
-    const userWins = Math.random() > 0.6; // Kullanıcı %40 ihtimalle kazanır
+    const userWins = Math.random() > 0.6; // %60 Kaybetme ihtimali
     let prize = userWins ? 150 : -50;
     
     user.bpl += prize;
     if(user.bpl < 0) user.bpl = 0;
     await user.save();
 
-    // Loglama (Victory/Punishment)
+    // Atlas Kayıtları
     if(userWins) {
         await new Victory({ userEmail: user.email, amount: 150, opponent: botOpponent }).save();
     } else {
@@ -125,16 +125,15 @@ app.post('/arena/battle', checkAuth, async (req, res) => {
     res.json({ win: userWins, opponent: botOpponent, newBpl: user.bpl });
 });
 
-// --- 6. SOCKET.IO (CHAT & HEDİYE YAKIM) ---
+// --- 6. SOCKET.IO (CHAT & MEETING & HEDİYE YAKIM) ---
 io.on('connection', (socket) => {
     socket.on('join-room', (roomId) => socket.join(roomId));
 
-    // Tebrik / Hediye (40 BPL Yakımlı)
+    // Tebrik / Hediye (40 BPL Yakım)
     socket.on('send-tebrik', async (data) => {
         const { senderNick, receiverNick } = data;
         const sender = await User.findOne({ nickname: senderNick });
         const receiver = await User.findOne({ nickname: receiverNick });
-
         const brut = 450, net = 410, burn = 40;
 
         if (sender && receiver && sender.bpl >= brut) {
@@ -142,13 +141,8 @@ io.on('connection', (socket) => {
             receiver.bpl += net;
             await sender.save(); await receiver.save();
 
-            // Yakım Logu
-            await new Log({ type: 'BPL_BURN', content: `Yakım: ${burn} BPL`, userEmail: sender.email }).save();
-
-            io.emit('new-message', { 
-                sender: "SİSTEM", 
-                text: `💎 ${sender.nickname}, ${receiver.nickname} için 410 BPL ateşledi!` 
-            });
+            await new Log({ type: 'BPL_BURN', content: `Yakıldı: ${burn}`, userEmail: sender.email }).save();
+            io.emit('new-message', { sender: "SİSTEM", text: `💎 ${sender.nickname}, ${receiver.nickname} kumandana 410 BPL ateşledi!` });
         }
     });
 
