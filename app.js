@@ -60,66 +60,70 @@ const MARKET_ANIMALS = [
     { id: 10, name: 'Tiger', price: 5000, img: '/caracter/profile/tiger.jpg' }
 ];
 
-// --- 5. SAYFA ROTALARI (GET) ---
+// --- 5. GET ROTALARI (SAYFALAR) ---
+
 app.get('/', (req, res) => res.render('index', { user: req.session.userId || null }));
+
 app.get('/profil', checkAuth, async (req, res) => {
-    const user = await User.findById(req.session.userId);
-    res.render('profil', { user });
+    try {
+        const user = await User.findById(req.session.userId);
+        res.render('profil', { user });
+    } catch (e) { res.redirect('/'); }
 });
+
 app.get('/market', checkAuth, async (req, res) => {
     const user = await User.findById(req.session.userId);
     res.render('market', { user, animals: MARKET_ANIMALS });
 });
+
 app.get('/arena', checkAuth, async (req, res) => {
     const user = await User.findById(req.session.userId);
-    res.render('arena', { user, selectedAnimal: user.inventory[0]?.name || "Karakter Yok", lastVictories: [] });
+    res.render('arena', { user, selectedAnimal: user.inventory[0]?.name || "Eagle", lastVictories: [] });
 });
+
 app.get('/wallet', checkAuth, async (req, res) => {
     const user = await User.findById(req.session.userId);
     res.render('wallet', { user });
 });
+
+app.get('/payment', checkAuth, async (req, res) => {
+    const user = await User.findById(req.session.userId);
+    res.render('payment', { user }); // Views içinde payment.ejs olmalı
+});
+
 app.get('/development', checkAuth, async (req, res) => {
     const user = await User.findById(req.session.userId);
     res.render('development', { user });
 });
+
+app.get('/chat', checkAuth, async (req, res) => {
+    const user = await User.findById(req.session.userId);
+    res.render('chat', { user });
+});
+
 app.get('/meeting', checkAuth, async (req, res) => {
     const user = await User.findById(req.session.userId);
     res.render('meeting', { user, roomId: "BPL-VIP-KONSEY" });
 });
 
-// --- 6. İŞLEM ROTALARI (POST) ---
+// --- 6. POST ROTALARI (İŞLEMLER) ---
 
-// HATAYI DÜZELTEN KAYIT ROTASI
 app.post('/register', async (req, res) => {
     const { nickname, email, password } = req.body;
     try {
-        const existingUser = await User.findOne({ email });
-        if (existingUser) return res.send('<script>alert("E-posta zaten kayıtlı!"); window.location.href="/";</script>');
-
-        const newUser = new User({ 
-            nickname, 
-            email, 
-            password, // Gerçek projelerde şifrelemiş olmalısınız
-            bpl: 2500, 
-            inventory: [] 
-        });
+        const exists = await User.findOne({ email });
+        if (exists) return res.send('<script>alert("E-posta kayıtlı!"); window.location.href="/";</script>');
+        const newUser = new User({ nickname, email, password, bpl: 2500, inventory: [] });
         await newUser.save();
-        res.send('<script>alert("Kayıt başarılı! Giriş yapabilirsiniz."); window.location.href="/";</script>');
-    } catch (err) { 
-        console.error(err);
-        res.status(500).send("Kayıt sırasında hata oluştu."); 
-    }
+        res.send('<script>alert("Başarılı!"); window.location.href="/";</script>');
+    } catch (err) { res.status(500).send("Hata!"); }
 });
 
 app.post('/login', async (req, res) => {
     const { email, password } = req.body;
     const user = await User.findOne({ email, password });
-    if (user) {
-        req.session.userId = user._id;
-        res.redirect('/profil');
-    } else {
-        res.send('<script>alert("Giriş bilgileri hatalı!"); window.location.href="/";</script>');
-    }
+    if (user) { req.session.userId = user._id; res.redirect('/profil'); }
+    else res.send('<script>alert("Hata!"); window.location.href="/";</script>');
 });
 
 app.get('/logout', (req, res) => {
@@ -127,9 +131,10 @@ app.get('/logout', (req, res) => {
     res.redirect('/');
 });
 
-// --- 7. SOCKET.IO SİSTEMİ (RENDER HATASINI DÜZELTEN BLOK) ---
+// --- 7. SOCKET.IO (CHAT VE ARENA BAĞLANTISI) ---
+
 io.on('connection', (socket) => {
-    console.log('Yeni bağlantı:', socket.id);
+    console.log('Kumandan Bağlandı:', socket.id);
 
     socket.on('register-user', (data) => {
         if (data && data.nickname) {
@@ -140,36 +145,17 @@ io.on('connection', (socket) => {
     });
 
     socket.on('chat-message', (data) => {
-        if (data.text) {
-            io.to('Global').emit('new-message', { sender: socket.nickname || "Misafir", text: data.text });
-        }
+        io.to('Global').emit('new-message', { sender: socket.nickname || "Misafir", text: data.text });
     });
 
     socket.on('join-meeting', (roomId) => {
         socket.join(roomId);
-        console.log(`Kullanıcı ${socket.nickname} VIP odaya girdi.`);
     });
 
-    socket.on('send-gift-vip', async (data) => {
-        try {
-            const sender = await User.findById(data.senderId);
-            const receiver = await User.findOne({ nickname: data.targetNick });
-            if (sender && receiver && sender.bpl >= 5000) {
-                const tax = (data.tax || 25) / 100;
-                const netAmount = Math.floor(data.amount * (1 - tax));
-                sender.bpl -= data.amount;
-                receiver.bpl += netAmount;
-                await sender.save(); await receiver.save();
-                io.to(data.room).emit('new-message', { sender: "SİSTEM", text: `🎁 ${sender.nickname} -> ${receiver.nickname}: ${data.amount} BPL gönderdi!` });
-                socket.emit('gift-result', { status: 'success' });
-            }
-        } catch (e) { console.error(e); }
-    });
-
-    socket.on('disconnect', () => console.log('Bağlantı kesildi.'));
+    socket.on('disconnect', () => console.log('Ayrıldı.'));
 });
 
-// --- 8. SUNUCU ---
+// --- 8. SUNUCU BAŞLATMA ---
 server.listen(PORT, "0.0.0.0", () => {
     console.log(`BPL ECOSYSTEM AKTİF: PORT ${PORT}`);
 });
