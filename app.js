@@ -1,4 +1,3 @@
-// --- 1. MODÜLLER ---
 require('dotenv').config();
 const express = require('express');
 const http = require('http');
@@ -7,89 +6,135 @@ const session = require('express-session');
 const MongoStore = require('connect-mongo');
 const path = require('path');
 const bcrypt = require('bcryptjs');
+const mongoose = require('mongoose');
 
-// --- 2. VERİTABANI BAĞLANTISI ---
+// MODELLER (Yüklediğiniz dosyalara göre)
 const connectDB = require('./db');
 const User = require('./models/User');
+const ArenaLog = require('./models/ArenaLogs');
+const Message = mongoose.model('Contact', new mongoose.Schema({ email: String, note: String, date: { type: Date, default: Date.now }}));
 
-connectDB(); // MongoDB Atlas Bağlantısı
+connectDB();
 
 const app = express();
 const server = http.createServer(app);
 const io = socketIo(server);
 const PORT = process.env.PORT || 10000;
 
-// --- 3. MIDDLEWARE YAPILANDIRMASI ---
+// MIDDLEWARE
 app.set('view engine', 'ejs');
 app.use(express.static(path.join(__dirname, 'public')));
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
 
-// GÜNCELLEME: Loglardaki virgül hatası giderildi
+// OTURUM YÖNETİMİ (image_d73c5e.png hatası giderildi)
 app.use(session({
-    secret: process.env.SESSION_SECRET || 'bpl_global_secret_key_2026',
+    secret: process.env.SESSION_SECRET,
     resave: false,
     saveUninitialized: false,
-    store: MongoStore.create({ 
-        mongoUrl: process.env.MONGO_URI,
-        collectionName: 'sessions'
-    }),
-    cookie: { 
-        secure: false, // Render HTTP üzerinden çalıştığı için false kalmalı
-        maxAge: 24 * 60 * 60 * 1000 
-    }
+    store: MongoStore.create({ mongoUrl: process.env.MONGO_URI }),
+    cookie: { secure: false, maxAge: 24 * 60 * 60 * 1000 }
 }));
 
-// Global Kullanıcı Değişkeni (EJS tarafında user.bpl vb. erişimi sağlar)
-app.use((req, res, next) => {
-    res.locals.user = req.session.user || null;
+// GLOBAL DEĞİŞKEN
+app.use(async (req, res, next) => {
+    res.locals.user = req.session.userId ? await User.findById(req.session.userId) : null;
     next();
 });
 
-// --- 4. AUTH SİSTEMİ (Giriş/Kayıt) ---
+const checkAuth = (req, res, next) => req.session.userId ? next() : res.redirect('/');
 
+// --- ROTALAR (GET) ---
 app.get('/', (req, res) => res.render('index'));
+app.get('/profil', checkAuth, (req, res) => res.render('profil'));
+app.get('/market', checkAuth, (req, res) => res.render('market'));
+app.get('/development', checkAuth, (req, res) => res.render('development'));
+app.get('/arena', checkAuth, (req, res) => res.render('arena'));
+app.get('/wallet', checkAuth, (req, res) => res.render('wallet'));
+app.get('/chat', checkAuth, (req, res) => res.render('chat'));
 
-// KAYIT: Bcrypt ile şifreleme ve hediye BPL/Karakter
+// --- ROTALAR (POST) ---
+
+// Giriş & Kayıt
 app.post('/register', async (req, res) => {
     const { nickname, email, password } = req.body;
-    try {
-        const exists = await User.findOne({ email });
-        if (exists) return res.send('<script>alert("Bu e-posta kayıtlı!"); window.location.href="/";</script>');
-        
-        const hashedPassword = await bcrypt.hash(password, 10);
-        const newUser = new User({ 
-            nickname, 
-            email, 
-            password: hashedPassword, 
-            bpl: 2500,
-            inventory: [
-                { name: 'Eagle', level: 1, img: '/caracter/profile/eagle.jpg', stats: { hp: 150, atk: 30, def: 20 } },
-                { name: 'Bear', level: 1, img: '/caracter/profile/bear.jpg', stats: { hp: 100, atk: 20, def: 15 } }
-            ] 
-        });
-        await newUser.save();
-        res.send('<script>alert("Kayıt Başarılı! 2500 BPL Hediye Edildi."); window.location.href="/";</script>');
-    } catch (err) { res.status(500).send("Kayıt Hatası: " + err.message); }
+    const hashedPassword = await bcrypt.hash(password, 10);
+    const newUser = new User({ nickname, email, password: hashedPassword, bpl: 2500, inventory: [{ name: 'Eagle', level: 1, stats: { hp: 150, atk: 30 } }] });
+    await newUser.save();
+    res.redirect('/');
 });
 
-// LOGIN: Atlas bağlantısını kontrol eder ve giriş yaptırır
 app.post('/login', async (req, res) => {
-    const { email, password } = req.body;
-    try {
-        const user = await User.findOne({ email });
-        // Atlas'taki şifrelenmiş veri ile karşılaştırma yapar
-        if (user && await bcrypt.compare(password, user.password)) {
-            req.session.userId = user._id;
-            req.session.user = user;
-            
-            // Session'ı DB'ye kaydeder ve yönlendirir
-            return req.session.save(() => {
-                res.redirect('/profil');
-            });
+    const user = await User.findOne({ email: req.body.email });
+    if (user && await bcrypt.compare(req.body.password, user.password)) {
+        req.session.userId = user._id;
+        return req.session.save(() => res.redirect('/profil'));
+    }
+    res.send('<script>alert("Hata!"); window.location.href="/";</script>');
+});
+
+// İletişim Formu (Max 180 Karakter)
+app.post('/contact', async (req, res) => {
+    const { email, note } = req.body;
+    if(note.length > 180) return res.send("Not çok uzun!");
+    await new Message({ email, note }).save();
+    res.send('<script>alert("Mesajınız iletildi."); window.location.href="/";</script>');
+});
+
+// Arena Bot Sistemi (Kazanan 150 BPL, Kaybeden -50 BPL)
+app.post('/arena/battle', checkAuth, async (req, res) => {
+    const user = await User.findById(req.session.userId);
+    const bots = ['Lion', 'Goril', 'Tiger', 'Eagle'];
+    const botOpponent = bots[Math.floor(Math.random() * bots.length)];
+    
+    // %60 Kullanıcı Kaybetme Mantığı
+    const userWins = Math.random() > 0.6; 
+    let prize = userWins ? 150 : -50;
+    
+    user.bpl += prize;
+    if(user.bpl < 0) user.bpl = 0;
+    await user.save();
+
+    const log = new ArenaLog({
+        challenger: user.nickname,
+        opponent: botOpponent + " (BOT)",
+        winner: userWins ? user.nickname : botOpponent,
+        totalPrize: prize
+    });
+    await log.save();
+
+    res.json({ win: userWins, opponent: botOpponent, newBpl: user.bpl });
+});
+
+// Geliştirme (Level Up)
+app.post('/develop/:charName', checkAuth, async (req, res) => {
+    const user = await User.findById(req.session.userId);
+    const char = user.inventory.find(i => i.name === req.params.charName);
+    const cost = char.level * 500;
+    
+    if(user.bpl >= cost) {
+        user.bpl -= cost;
+        char.level += 1;
+        char.stats.atk += 10;
+        await user.save();
+        res.json({ success: true, level: char.level });
+    } else {
+        res.json({ success: false, msg: "Yetersiz BPL" });
+    }
+});
+
+// --- SOCKET SİSTEMİ (Global Chat & Odalar) ---
+io.on('connection', (socket) => {
+    socket.on('send-gift', async (data) => { // Sohbetten hediye gönderimi
+        const sender = await User.findById(data.senderId);
+        const receiver = await User.findOne({ nickname: data.receiverNick });
+        if(sender.bpl >= data.amount) {
+            sender.bpl -= data.amount;
+            receiver.bpl += data.amount;
+            await sender.save(); await receiver.save();
+            io.emit('gift-announce', { msg: `${sender.nickname}, ${receiver.nickname}'a ${data.amount} BPL hediye etti!` });
         }
-        res.send('<script>alert("Hatalı Giriş Bilgileri!"); window.location.href="/";</script>');
-    } catch (err) { res.redirect('/'); }
+    });
 });
 
 app.get('/logout', (req, res) => {
@@ -97,16 +142,4 @@ app.get('/logout', (req, res) => {
     res.redirect('/');
 });
 
-// --- 5. PROFİL (Korumalı Rota) ---
-app.get('/profil', async (req, res) => {
-    if (!req.session.userId) return res.redirect('/');
-    try {
-        const user = await User.findById(req.session.userId);
-        res.render('profil', { user }); // Envanter görüntüsü burada render edilir
-    } catch (err) { res.redirect('/'); }
-});
-
-// --- 6. SUNUCU BAŞLATMA ---
-server.listen(PORT, "0.0.0.0", () => {
-    console.log(`BPL ENGINE AKTİF: ${PORT}`);
-});
+server.listen(PORT, () => console.log(`Sistem aktif: ${PORT}`));
