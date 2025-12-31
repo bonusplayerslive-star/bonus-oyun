@@ -1,47 +1,86 @@
 <%- include('header') %>
 
 <style>
+    @import url('https://fonts.googleapis.com/css2?family=Orbitron:wght@400;700&family=Rajdhani:wght@500;700&display=swap');
+    
+    body {
+        background: #050505;
+        font-family: 'Rajdhani', sans-serif;
+    }
+
     .upgrade-card {
-        background: rgba(20, 20, 20, 0.95);
-        border: 1px solid #28a745;
-        border-radius: 15px;
-        transition: transform 0.3s;
-        margin-bottom: 20px;
+        background: rgba(15, 15, 15, 0.95);
+        border: 1px solid rgba(57, 255, 20, 0.2);
+        border-radius: 20px;
+        transition: all 0.3s ease;
+        margin-bottom: 25px;
+        position: relative;
+        overflow: hidden;
     }
+    
     .upgrade-card:hover {
-        transform: translateY(-5px);
-        box-shadow: 0 0 20px rgba(40, 167, 69, 0.2);
+        transform: translateY(-8px);
+        border-color: #39FF14;
+        box-shadow: 0 0 25px rgba(57, 255, 20, 0.15);
     }
+
     .stat-label {
-        font-size: 0.8rem;
-        color: #aaa;
-        margin-bottom: 2px;
-    }
-    .progress {
-        height: 8px;
-        background-color: #333;
-        margin-bottom: 15px;
-    }
-    .char-img {
-        width: 100px;
-        height: 100px;
-        object-fit: cover;
-        border: 2px solid #28a745;
-        border-radius: 50%;
-    }
-    .btn-upgrade {
-        font-size: 0.75rem;
-        font-weight: bold;
+        font-size: 0.85rem;
+        color: #888;
+        font-family: 'Orbitron', sans-serif;
         letter-spacing: 1px;
+    }
+
+    .progress {
+        height: 10px;
+        background-color: #1a1a1a;
+        margin-bottom: 15px;
+        border-radius: 5px;
+        border: 1px solid #333;
+    }
+
+    .char-img {
+        width: 120px;
+        height: 120px;
+        object-fit: cover;
+        border: 3px solid #39FF14;
+        border-radius: 50%;
+        box-shadow: 0 0 15px rgba(57, 255, 20, 0.3);
+    }
+
+    .btn-upgrade {
+        font-family: 'Orbitron', sans-serif;
+        font-size: 0.7rem;
+        font-weight: bold;
+        text-transform: uppercase;
+        padding: 10px;
+        transition: 0.3s;
+    }
+
+    .neon-text {
+        color: #39FF14;
+        text-shadow: 0 0 10px rgba(57, 255, 20, 0.5);
+    }
+
+    .wallet-banner {
+        background: rgba(0,0,0,0.8);
+        border: 1px solid #ffd700;
+        padding: 15px;
+        border-radius: 12px;
+        display: inline-block;
     }
 </style>
 
 <div class="container mt-5">
     <div class="text-center mb-5">
-        <h1 class="text-success fw-bold">BPL GELİŞTİRME MERKEZİ</h1>
-        <p class="text-white-50">Karakterlerini güçlendir ve arenada rakipsiz ol!</p>
-        <div class="badge bg-dark border border-warning p-2 text-warning" style="font-size: 1.2rem;">
-            CÜZDAN: <span id="balanceDisplay"><%= user.bpl %></span> BPL
+        <h1 class="neon-text fw-bold" style="font-family: 'Orbitron';">BPL GELİŞTİRME MERKEZİ</h1>
+        <p class="text-white-50">Savaşçılarını evrimleştir ve arenayı domine et!</p>
+        
+        <div class="wallet-banner">
+            <span class="text-white-50 small d-block">MEVCUT BAKİYE</span>
+            <span class="text-warning fw-bold h4" id="balanceDisplay">
+                <i class="fas fa-coins me-2"></i><%= user.bpl.toLocaleString() %> BPL
+            </span>
         </div>
     </div>
 
@@ -50,83 +89,110 @@
             <% user.inventory.forEach(animal => { %>
                 <div class="col-md-6 col-lg-4">
                     <div class="upgrade-card p-4">
-                        <div class="text-center mb-3">
-                            <img src="/caracter/profile/<%= animal.name %>.jpg" class="char-img mb-2" alt="<%= animal.name %>">
-                            <h3 class="text-white"><%= animal.name.toUpperCase() %></h3>
-                            <span class="badge bg-success">SEVİYE 1</span>
+                        <div class="text-center mb-4">
+                            <img src="/caracter/profile/<%= animal.name.toLowerCase() %>.jpg" 
+                                 onerror="this.src='/caracter/page/logo.jpeg'"
+                                 class="char-img mb-3" 
+                                 alt="<%= animal.name %>">
+                            
+                            <h3 class="text-white text-uppercase" style="font-family: 'Orbitron';"><%= animal.name %></h3>
+                            <span class="badge bg-dark border border-success text-success">
+                                SEVİYE <%= animal.level || 1 %>
+                            </span>
                         </div>
 
                         <div class="stat-box">
-                            <div class="d-flex justify-content-between stat-label">
-                                <span>SAĞLIK (HP)</span>
-                                <span><%= animal.stats.hp %></span>
+                            <div class="d-flex justify-content-between stat-label mb-1">
+                                <span><i class="fas fa-heart text-danger me-1"></i> SAĞLIK (HP)</span>
+                                <span class="text-white"><%= animal.stats.hp %> / 500</span>
                             </div>
                             <div class="progress">
-                                <div class="progress-bar bg-danger" style="width: <%= (animal.stats.hp / 500) * 100 %>%"></div>
+                                <div class="progress-bar bg-danger shadow-sm" style="width: <%= (animal.stats.hp / 500) * 100 %>%"></div>
                             </div>
                             <button class="btn btn-outline-danger w-100 btn-upgrade mb-3" onclick="upgradeStat('<%= animal.name %>', 'hp', 50)">
-                                HP YÜKSELT <span class="float-end">50 BPL</span>
+                                HP GÜÇLENDİR <span class="float-end">50 BPL</span>
                             </button>
                         </div>
 
                         <div class="stat-box">
-                            <div class="d-flex justify-content-between stat-label">
-                                <span>SALDIRI (ATK)</span>
-                                <span><%= animal.stats.atk %></span>
+                            <div class="d-flex justify-content-between stat-label mb-1">
+                                <span><i class="fas fa-fist-raised text-warning me-1"></i> SALDIRI (ATK)</span>
+                                <span class="text-white"><%= animal.stats.atk %> / 200</span>
                             </div>
                             <div class="progress">
-                                <div class="progress-bar bg-warning" style="width: <%= (animal.stats.atk / 200) * 100 %>%"></div>
+                                <div class="progress-bar bg-warning shadow-sm" style="width: <%= (animal.stats.atk / 200) * 100 %>%"></div>
                             </div>
                             <button class="btn btn-outline-warning w-100 btn-upgrade mb-3" onclick="upgradeStat('<%= animal.name %>', 'atk', 40)">
-                                ATK YÜKSELT <span class="float-end">40 BPL</span>
+                                ATK GÜÇLENDİR <span class="float-end">40 BPL</span>
                             </button>
                         </div>
 
                         <div class="stat-box">
-                            <div class="d-flex justify-content-between stat-label">
-                                <span>SAVUNMA (DEF)</span>
-                                <span><%= animal.stats.def %></span>
+                            <div class="d-flex justify-content-between stat-label mb-1">
+                                <span><i class="fas fa-shield-alt text-info me-1"></i> SAVUNMA (DEF)</span>
+                                <span class="text-white"><%= animal.stats.def %> / 200</span>
                             </div>
                             <div class="progress">
-                                <div class="progress-bar bg-info" style="width: <%= (animal.stats.def / 200) * 100 %>%"></div>
+                                <div class="progress-bar bg-info shadow-sm" style="width: <%= (animal.stats.def / 200) * 100 %>%"></div>
                             </div>
                             <button class="btn btn-outline-info w-100 btn-upgrade" onclick="upgradeStat('<%= animal.name %>', 'def', 35)">
-                                DEF YÜKSELT <span class="float-end">35 BPL</span>
+                                DEF GÜÇLENDİR <span class="float-end">35 BPL</span>
                             </button>
                         </div>
                     </div>
                 </div>
             <% }) %>
         <% } else { %>
-            <div class="col-12 text-center text-white">
-                <p>Henüz bir karakteriniz yok. Marketten bir tane edinin!</p>
-                <a href="/market" class="btn btn-success">MARKETE GİT</a>
+            <div class="col-12 text-center p-5">
+                <div class="glass-panel p-5 border border-secondary rounded">
+                    <i class="fas fa-ghost fa-4x text-muted mb-4"></i>
+                    <h3 class="text-white-50">Ordun henüz kurulmadı kumandan!</h3>
+                    <p class="mb-4">Geliştirme yapabilmek için önce marketten bir karakter edinmelisin.</p>
+                    <a href="/market" class="btn btn-success btn-lg px-5">MARKETE GİT</a>
+                </div>
             </div>
         <% } %>
     </div>
 </div>
 
+<script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
 <script>
 function upgradeStat(animalName, statType, cost) {
-    if(!confirm(animalName + ' için ' + statType.toUpperCase() + ' geliştirmek istediğine emin misin?')) return;
-
-    fetch('/upgrade-stat', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ animalName, statType, cost })
-    })
-    .then(res => res.json())
-    .then(data => {
-        if (data.status === 'success') {
-            alert('🚀 ' + data.msg);
-            location.reload(); // İstatistiklerin güncellenmesi için sayfayı yeniler
-        } else {
-            alert('❌ Hata: ' + data.msg);
+    Swal.fire({
+        title: 'Onay Gerekiyor',
+        text: `${animalName} için ${statType.toUpperCase()} geliştirmesi ${cost} BPL tutacak.`,
+        icon: 'info',
+        showCancelButton: true,
+        confirmButtonColor: '#39FF14',
+        cancelButtonColor: '#d33',
+        confirmButtonText: 'Geliştir!',
+        cancelButtonText: 'Vazgeç',
+        background: '#111',
+        color: '#fff'
+    }).then((result) => {
+        if (result.isConfirmed) {
+            fetch('/upgrade-stat', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ animalName, statType, cost })
+            })
+            .then(res => res.json())
+            .then(data => {
+                if (data.status === 'success') {
+                    Swal.fire({
+                        title: 'BAŞARILI!',
+                        text: 'Karakterin artık daha güçlü.',
+                        icon: 'success',
+                        confirmButtonColor: '#39FF14'
+                    }).then(() => location.reload());
+                } else {
+                    Swal.fire('HATA', data.msg, 'error');
+                }
+            })
+            .catch(err => {
+                Swal.fire('SİSTEM HATASI', 'Bağlantı kurulamadı.', 'error');
+            });
         }
-    })
-    .catch(err => {
-        console.error('Sistem hatası:', err);
-        alert('Geliştirme sırasında bir hata oluştu.');
     });
 }
 </script>
