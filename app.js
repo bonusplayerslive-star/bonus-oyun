@@ -185,6 +185,50 @@ app.post('/buy-animal', checkAuth, async (req, res) => {
     }
 });
 
+app.post('/attack-bot', checkAuth, async (req, res) => {
+    try {
+        const user = await User.findById(req.session.userId);
+        if (!user || user.bpl < 200) {
+            return res.json({ status: 'error', msg: 'Arena girişi için en az 200 BPL gerekli!' });
+        }
+
+        // Gelen hayvan ismini küçük harfe çeviriyoruz (Örn: "Eagle" -> "eagle")
+        const animalName = (req.body.animal || "eagle").toLowerCase().trim();
+        
+        // Şans Faktörü: %50 kazanma ihtimali
+        const isWin = Math.random() > 0.5;
+
+        if (isWin) {
+            user.bpl += 200;
+            // Global chatte duyur
+            io.to('GlobalChat').emit('new-message', { 
+                sender: "ARENA", 
+                text: `🏆 ${user.nickname}, ${animalName.toUpperCase()} ile zafer kazandı! (+200 BPL)` 
+            });
+        } else {
+            user.bpl -= 200;
+        }
+
+        await user.save();
+
+        // Arena.ejs'nin beklediği video objesi
+        res.json({ 
+            status: 'success', 
+            animation: { 
+                isWin: isWin,
+                // Saldırı Videosu: eagle1.mp4
+                actionVideo: `/caracter/profile/${animalName}1.mp4`, 
+                // Zafer Videosu: eagle.mp4
+                winVideo: `/caracter/profile/${animalName}.mp4`
+            }, 
+            newBalance: user.bpl 
+        });
+
+    } catch (err) {
+        console.error("Arena İşlem Hatası:", err);
+        res.status(500).json({ status: 'error', msg: 'Sunucu hatası!' });
+    }
+});
 
 // --- 6. SOCKET.IO SİSTEMİ (ARENA VE CHAT HATALARINI ÇÖZER) ---
 io.on('connection', (socket) => {
@@ -214,5 +258,6 @@ io.on('connection', (socket) => {
 server.listen(PORT, "0.0.0.0", () => {
     console.log(`SUNUCU ÇALIŞIYOR: ${PORT}`);
 });
+
 
 
