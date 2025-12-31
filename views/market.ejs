@@ -6,39 +6,59 @@
     <title>BPL ULTIMATE MARKET</title>
     <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css">
+    <link href="https://fonts.googleapis.com/css2?family=Rajdhani:wght@500;700&family=Orbitron:wght@400;700&display=swap" rel="stylesheet">
     <style>
         :root { --neon-green: #39FF14; --dark-bg: #0a0a0a; --card-bg: #111; }
-        body { background: var(--dark-bg); color: white; font-family: 'Rajdhani', sans-serif; }
+        body { 
+            background: var(--dark-bg); 
+            color: white; 
+            font-family: 'Rajdhani', sans-serif;
+            background: url('/caracter/page/welcome.jpg') no-repeat center center fixed;
+            background-size: cover;
+        }
         
+        /* Arkaplanı biraz karartalım market kartları net görünsün */
+        body::before {
+            content: ""; position: fixed; top: 0; left: 0; width: 100%; height: 100%;
+            background: rgba(0,0,0,0.85); z-index: -1;
+        }
+
         .market-header {
             background: rgba(0,0,0,0.9);
             border-bottom: 2px solid var(--neon-green);
             padding: 15px 0;
             margin-bottom: 30px;
+            backdrop-filter: blur(10px);
         }
 
         .animal-card {
-            background: var(--card-bg);
+            background: rgba(17, 17, 17, 0.9);
             border-radius: 15px;
             padding: 20px;
             text-align: center;
-            transition: transform 0.3s;
-            margin-bottom: 20px;
-            border: 1px solid #333;
+            transition: all 0.3s ease;
+            margin-bottom: 30px;
+            border: 1px solid rgba(57, 255, 20, 0.1);
         }
 
-        .animal-card:hover { transform: translateY(-10px); border-color: var(--neon-green); }
+        .animal-card:hover { 
+            transform: translateY(-10px); 
+            border-color: var(--neon-green);
+            box-shadow: 0 0 20px rgba(57, 255, 20, 0.2);
+        }
 
         .animal-img {
             width: 100%;
-            height: 250px;
+            aspect-ratio: 1/1;
             object-fit: cover;
             border-radius: 10px;
             margin-bottom: 15px;
-            /* Resimler burada dinamikleşecek */
+            border: 1px solid #333;
         }
 
-        .price-tag { color: #FFD700; font-weight: bold; font-size: 1.2rem; }
+        .animal-name { font-family: 'Orbitron'; font-size: 1.2rem; color: var(--neon-green); margin-bottom: 10px; }
+        .price-tag { color: #FFD700; font-weight: bold; font-size: 1.3rem; margin-bottom: 15px; display: block; }
+        
         .btn-buy {
             background: transparent;
             border: 1px solid var(--neon-green);
@@ -46,22 +66,36 @@
             width: 100%;
             padding: 10px;
             font-weight: bold;
+            font-family: 'Orbitron';
+            font-size: 0.8rem;
             transition: 0.3s;
         }
         .btn-buy:hover { background: var(--neon-green); color: black; }
-        .btn-owned { background: #333; color: #777; border: none; cursor: not-allowed; }
+        
+        .btn-owned { 
+            background: #222; 
+            color: #555; 
+            border: 1px solid #333; 
+            width: 100%; 
+            padding: 10px; 
+            cursor: not-allowed; 
+            font-family: 'Orbitron';
+            font-size: 0.8rem;
+        }
     </style>
 </head>
 <body>
 
 <header class="market-header">
     <div class="container d-flex justify-content-between align-items-center">
-        <h2 style="color: var(--neon-green);"><i class="fas fa-shopping-cart"></i> BPL MARKET</h2>
+        <h2 style="color: var(--neon-green); font-family: 'Orbitron';" class="mb-0">
+            <i class="fas fa-shopping-cart me-2"></i>BPL MARKET
+        </h2>
         <div class="d-flex align-items-center">
-            <div class="me-3 px-3 py-1" style="background: rgba(57, 255, 20, 0.1); border: 1px solid var(--neon-green); border-radius: 20px;">
-                <span style="color: #FFD700;"><i class="fas fa-coins"></i> <%= user.bpl %> BPL</span>
+            <div class="me-3 px-3 py-2" style="background: rgba(57, 255, 20, 0.1); border: 1px solid var(--neon-green); border-radius: 10px;">
+                <span style="color: #FFD700; font-family: 'Orbitron';"><i class="fas fa-coins me-1"></i> <%= user.bpl.toLocaleString() %> BPL</span>
             </div>
-            <a href="/profil" class="btn btn-outline-light btn-sm">Profil</a>
+            <a href="/profil" class="btn btn-outline-light">Üsse Dön</a>
         </div>
     </div>
 </header>
@@ -69,52 +103,27 @@
 <div class="container">
     <div class="row">
         <% animals.forEach(animal => { %>
-            <div class="col-md-3 col-sm-6">
-              <div class="animal-card">
-    <div class="animal-img-container">
-        <img src="/caracter/profile/<%= animal.name %>.jpg" 
-             alt="<%= animal.name %>" 
-             class="animal-img"
-             onerror="this.src='/caracter/page/logo.jpeg'"> </div>
-    <h3 class="animal-name"><%= animal.name %></h3>
-    <p class="animal-price"><%= animal.price %> BPL</p>
-    </div>
-
-<%- include('header') %>
-<div class="container mt-5">
-    <h2 class="text-center text-success mb-4">KARAKTER PAZARI</h2>
-    <div class="row">
-        <% animals.forEach(animal => { %>
-            <div class="col-md-3 mb-4">
-                <div class="card bg-dark text-white border-success">
-                    <img src="<%= animal.img %>" class="card-img-top" alt="<%= animal.name %>">
-                    <div class="card-body text-center">
-                        <h5 class="card-title"><%= animal.name %></h5>
-                        <p class="text-warning fw-bold"><%= animal.price %> BPL</p>
-                        <button class="btn btn-outline-success w-100 buy-btn" 
-                                data-id="<%= animal.id %>" 
-                                data-name="<%= animal.name %>" 
-                                data-price="<%= animal.price %>">SATIN AL</button>
-                    </div>
-                </div>
-            </div>
-        <% }) %>
-    </div>
-</div>
-<script>
-    // Satın alma mantığı buraya (fetch /buy-animal)
-</script>
-<%- include('footer') %>
+            <div class="col-lg-3 col-md-4 col-sm-6">
+                <div class="animal-card">
+                    <img src="/caracter/profile/<%= animal.name.toLowerCase() %>.jpg" 
+                         alt="<%= animal.name %>" 
+                         class="animal-img"
+                         onerror="this.src='/caracter/page/logo.jpeg'">
+                    
+                    <h3 class="animal-name text-uppercase"><%= animal.name %></h3>
+                    <span class="price-tag"><%= animal.price.toLocaleString() %> BPL</span>
 
                     <% 
-                        // Kullanıcının bu hayvana zaten sahip olup olmadığını kontrol et
-                        const isOwned = user.inventory.some(item => item.name === animal.name);
+                        // Envanter kontrolü
+                        const isOwned = user.inventory.some(item => item.name.toLowerCase() === animal.name.toLowerCase());
                     %>
 
                     <% if (isOwned) { %>
-                        <button class="btn btn-owned" disabled>SAHİPSİN</button>
+                        <button class="btn btn-owned" disabled><i class="fas fa-check me-1"></i> SAHİPSİN</button>
                     <% } else { %>
-                        <button onclick="buyAnimal('<%= animal.id %>')" id="btn-<%= animal.id %>" class="btn btn-buy">SATIN AL</button>
+                        <button onclick="buyAnimal('<%= animal.id %>', '<%= animal.name %>')" class="btn btn-buy">
+                            <i class="fas fa-shopping-bag me-1"></i> SATIN AL
+                        </button>
                     <% } %>
                 </div>
             </div>
@@ -124,29 +133,47 @@
 
 <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
 <script>
-    async function buyAnimal(id) {
-        const res = await fetch('/buy-animal', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ animalId: id })
+    async function buyAnimal(id, name) {
+        // Onay kutusu
+        const result = await Swal.fire({
+            title: 'Emin misin?',
+            text: name + " satın almak üzeresin!",
+            icon: 'question',
+            showCancelButton: true,
+            confirmButtonColor: '#39FF14',
+            cancelButtonColor: '#d33',
+            confirmButtonText: 'Evet, Alıyorum!',
+            cancelButtonText: 'Vazgeç',
+            background: '#111',
+            color: '#fff'
         });
-        
-        const data = await res.json();
-        
-        if (data.status === 'success') {
-            Swal.fire({
-                title: 'Tebrikler!',
-                text: data.msg,
-                icon: 'success',
-                confirmButtonColor: '#39FF14'
-            }).then(() => location.reload()); // Sayfayı yenile ki bakiye ve buton güncellensin
-        } else {
-            Swal.fire('Hata', data.msg, 'error');
+
+        if (result.isConfirmed) {
+            try {
+                const res = await fetch('/buy-animal', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ animalId: id })
+                });
+                
+                const data = await res.json();
+                
+                if (data.status === 'success') {
+                    Swal.fire({
+                        title: 'Başarılı!',
+                        text: name + ' başarıyla orduya katıldı!',
+                        icon: 'success',
+                        confirmButtonColor: '#39FF14'
+                    }).then(() => location.reload());
+                } else {
+                    Swal.fire('Hata', data.msg, 'error');
+                }
+            } catch (err) {
+                Swal.fire('Hata', 'Sunucu bağlantısı koptu!', 'error');
+            }
         }
     }
 </script>
 
 </body>
 </html>
-
-
