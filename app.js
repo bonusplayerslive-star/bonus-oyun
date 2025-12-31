@@ -154,4 +154,78 @@ app.get('/logout', (req, res) => {
     res.redirect('/');
 });
 
+// --- 6. SOCKET.IO SİSTEMİ (Chat, Hediye ve Meeting) ---
+io.on('connection', (socket) => {
+    console.log('Bir kullanıcı bağlandı:', socket.id);
+
+    // Kanala Katılma (Global Sohbet)
+    socket.on('join-room', (roomName) => {
+        socket.join(roomName);
+    });
+
+    // Mesajlaşma Sistemi
+    socket.on('chat-message', async (data) => {
+        const { sender, text, room } = data;
+        
+        // Sohbet kaydını MongoDB'ye ekle
+        await new Log({
+            type: 'CHAT_MESSAGE',
+            content: text,
+            userEmail: sender // Kullanıcı e-postası veya takma adı
+        }).save();
+
+        io.to(room).emit('new-message', { sender, text });
+    });
+
+    // TEBRİK / HEDİYE SİSTEMİ (Gönderdiğin .txt dosyasındaki mantık)
+    socket.on('send-tebrik', async (data) => {
+        try {
+            const { senderNick, receiverNick } = data;
+            const sender = await User.findOne({ nickname: senderNick });
+            const receiver = await User.findOne({ nickname: receiverNick });
+
+            const brutHediye = 450;
+            const netHediye = 410;
+            const kesinti = 40; // Yakılacak miktar
+
+            if (sender && receiver && sender.bpl >= brutHediye) {
+                sender.bpl -= brutHediye;
+                receiver.bpl += netHediye;
+
+                await sender.save();
+                await receiver.save();
+
+                // Yakım (Burn) Kaydı
+                await new Log({
+                    type: 'BPL_BURN',
+                    content: `Tebrik yakımı: ${kesinti} BPL`,
+                    userEmail: sender.email
+                }).save();
+
+                // Global Duyuru
+                io.emit('new-message', {
+                    sender: "SİSTEM",
+                    text: `💎 ${sender.nickname}, şampiyon ${receiver.nickname}'ı tebrik etti! (410 BPL iletildi)`
+                });
+            }
+        } catch (e) {
+            console.error("Hediye gönderim hatası:", e);
+        }
+    });
+
+    socket.on('disconnect', () => {
+        console.log('Kullanıcı ayrıldı.');
+    });
+});
+
+// --- 7. MEETING (BEŞGEN MASA) ROTALARI ---
+app.get('/meeting', checkAuth, (req, res) => {
+    res.render('meeting', { roomId: 'Global' });
+});
+
+app.get('/meeting/:roomId', checkAuth, (req, res) => {
+    res.render('meeting', { roomId: req.params.roomId });
+});
+
 server.listen(PORT, () => console.log(`BPL ECOSYSTEM AKTİF: ${PORT}`));
+
