@@ -32,7 +32,7 @@ app.use(express.urlencoded({ extended: true }));
 
 // Güvenli Oturum Yönetimi
 app.use(session({
-    secret: process.env.SESSION_SECRET || 'bpl_nirvana_secret_2026',
+    secret: process.env.SESSION_SECRET || ,
     resave: false,
     saveUninitialized: false,
     store: MongoStore.create({ mongoUrl: process.env.MONGO_URI }),
@@ -134,16 +134,27 @@ app.post('/login', async (req, res) => {
     const { email, password } = req.body;
     try {
         const user = await User.findOne({ email });
-        if (user && await bcrypt.compare(password, user.password)) {
-            req.session.userId = user._id;
-            req.session.user = user;
-            res.redirect('/profil');
-        } else {
-            res.send('<script>alert("Hatalı giriş!"); window.location.href="/";</script>');
+        
+        if (user) {
+            // bcrypt.compare kullanımı şarttır
+            const isMatch = await bcrypt.compare(password, user.password);
+            
+            if (isMatch) {
+                req.session.userId = user._id; // ID ataması
+                req.session.user = user;      // Kullanıcı objesi ataması
+                
+                // Session'ın veritabanına yazıldığından emin olup sonra yönlendir
+                return req.session.save(() => {
+                    res.redirect('/profil');
+                });
+            }
         }
-    } catch (err) { res.redirect('/'); }
+        res.send('<script>alert("Hatalı giriş!"); window.location.href="/";</script>');
+    } catch (err) {
+        console.error("Login Hatası:", err);
+        res.redirect('/');
+    }
 });
-
 // Arena Saldırı Mekaniği
 app.post('/attack-bot', checkAuth, async (req, res) => {
     try {
@@ -195,3 +206,4 @@ server.listen(PORT, "0.0.0.0", () => {
     ===========================================
     `);
 });
+
