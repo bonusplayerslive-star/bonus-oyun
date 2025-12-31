@@ -5,15 +5,17 @@ const bodyParser = require('body-parser');
 const http = require('http');
 const socketIo = require('socket.io');
 const session = require('express-session');
+const MongoStore = require('connect-mongo'); // OTURUMU KAYDETMEK İÇİN ŞART
 const mongoose = require('mongoose');
 const path = require('path');
-const bcrypt = require('bcryptjs'); // Şifre güvenliği için şart
+const bcrypt = require('bcryptjs');
 
 // --- 2. VERİTABANI VE MODELLER ---
 const connectDB = require('./db');
 const User = require('./models/User');
 const Log = require('./models/Log');
-// const Payment = require('./models/Payment'); // Gerekirse aktif edersin
+const Victory = require('./models/Victory');
+const Punishment = require('./models/Punishment');
 
 connectDB();
 
@@ -30,23 +32,25 @@ app.use(bodyParser.json());
 app.use(bodyParser.urlencoded({ extended: true }));
 app.set('trust proxy', 1);
 
+// OTURUM YÖNETİMİ (v6.0.0 HATASIZ VE KALICI YAPI)
 app.use(session({
-    secret: 'bpl_ozel_anahtar',
+    secret: process.env.SESSION_SECRET || 'bpl_global_key_2026',
     resave: false,
     saveUninitialized: false,
+    store: MongoStore.create({ 
+        mongoUrl: process.env.MONGO_URI,
+        collectionName: 'sessions'
+    }),
     cookie: { 
-        secure: process.env.NODE_ENV === 'production', // Render'da true olması gerekebilir
+        secure: process.env.NODE_ENV === 'production', 
         maxAge: 24 * 60 * 60 * 1000 
     }
 }));
 
 // Oturum Kontrolü Middleware
 const checkAuth = (req, res, next) => {
-    if (req.session.userId) {
-        next();
-    } else {
-        res.redirect('/');
-    }
+    if (req.session.userId) return next();
+    res.redirect('/');
 };
 
 // Sabit Veriler
@@ -58,7 +62,8 @@ const MARKET_ANIMALS = [
 
 const eliteBots = [
     { nickname: "X-Terminator", animal: "Tiger" },
-    { nickname: "Shadow-Ghost", animal: "Lion" }
+    { nickname: "Shadow-Ghost", animal: "Lion" },
+    { nickname: "Berserker", animal: "Gorilla" }
 ];
 
 const last20Victories = [];
@@ -66,24 +71,17 @@ const last20Victories = [];
 // --- 4. ROTALAR (AUTH & ANA SAYFA) ---
 
 app.get('/', (req, res) => {
-    // Eğer zaten giriş yapmışsa profile yönlendir
     if (req.session.userId) return res.redirect('/profil');
     res.render('index', { user: null });
 });
 
-// --- KAYIT (REGISTER) GÜNCELLEME ---
 app.post('/register', async (req, res) => {
     try {
         let { nickname, email, password } = req.body;
+        email = email.trim().toLowerCase();
         
-        // Boşlukları sil ve e-postayı küçük harfe çevir
-        email = email.trim().toLowerCase(); 
-
-        // Email zaten var mı kontrol et
         const existingUser = await User.findOne({ email });
-        if (existingUser) {
-            return res.send('<script>alert("Bu email zaten kayıtlı!"); window.location.href="/";</script>');
-        }
+        if (existingUser) return res.send('<script>alert("Bu email zaten kayıtlı!"); window.location.href="/";</script>');
 
         const hashedPassword = await bcrypt.hash(password, 10);
         const newUser = new User({ 
@@ -95,73 +93,29 @@ app.post('/register', async (req, res) => {
         });
 
         await newUser.save();
-        res.send('<script>alert("Kayıt Başarılı! Şimdi giriş yapabilirsiniz."); window.location.href="/";</script>');
-    } catch (e) { 
+        res.send('<script>alert("Kayıt Başarılı! 2500 BPL Hediye Edildi."); window.location.href="/";</script>');
+    } catch (e) {
         console.error("Kayıt hatası:", e);
-        res.status(500).send("Kayıt sırasında hata oluştu."); 
+        res.status(500).send("Kayıt hatası.");
     }
 });
 
-// --- GİRİŞ (LOGIN) GÜNCELLEME ---
+// LOGIN: TEK VE SAĞLAM BLOK (Çakışma Giderildi)
 app.post('/login', async (req, res) => {
     try {
         let { email, password } = req.body;
+        const cleanEmail = email.trim().toLowerCase();
 
-        // Giriş yaparken de aynı temizliği yapıyoruz
-        email = email.trim().toLowerCase(); 
-
-        console.log("Giriş deneniyor:", email); // Render loglarında takip etmek için
-
-        const user = await User.findOne({ email });
-
+        const user = await User.findOne({ email: cleanEmail });
         if (!user) {
-            console.log("Hata: Kullanıcı bulunamadı ->", email);
             return res.send('<script>alert("Email kayıtlı değil!"); window.location.href="/";</script>');
         }
 
         const isMatch = await bcrypt.compare(password, user.password);
         if (isMatch) {
             req.session.userId = user._id;
-            return req.session.save(() => {
-                console.log("Giriş Başarılı:", user.nickname);
-                res.redirect('/profil');
-            });
-        } else {
-            res.send('<script>alert("Şifre hatalı!"); window.location.href="/";</script>');
-        }
-    } catch (error) {
-        console.error("Login hatası:", error);
-        res.status(500).send("Sunucu hatası.");
-    }
-});
-
-app.post('/login', async (req, res) => {
-    try {
-        const { email, password } = req.body;
-        
-        // 1. Kullanıcıyı bul
-        const user = await User.findOne({ email: email.toLowerCase() }); // Email küçük harf hassasiyeti
-        
-        if (!user) {
-            console.log("Giriş Hatası: Kullanıcı bulunamadı ->", email);
-            return res.send('<script>alert("Bu email adresi kayıtlı değil!"); window.location.href="/";</script>');
-        }
-
-        // 2. Şifreyi Karşılaştır
-        const isMatch = await bcrypt.compare(password, user.password);
-        console.log("Şifre kontrolü:", isMatch ? "BAŞARILI" : "HATALI");
-
-        if (isMatch) {
-            // 3. Oturumu Kaydet
-            req.session.userId = user._id;
-            
-            // KRİTİK: Oturumun MongoDB'ye yazıldığından emin ol ve sonra yönlendir
             req.session.save((err) => {
-                if (err) {
-                    console.error("Session Save Hatası:", err);
-                    return res.send("Oturum hatası oluştu.");
-                }
-                console.log("Giriş Başarılı, Yönlendiriliyor...");
+                if (err) return res.send("Oturum hatası.");
                 res.redirect('/profil');
             });
         } else {
@@ -169,17 +123,16 @@ app.post('/login', async (req, res) => {
         }
     } catch (error) {
         console.error("Login hatası:", error);
-        res.status(500).send("Sunucu hatası.");
+        res.status(500).send("Sistem hatası.");
     }
 });
+
 app.get('/profil', checkAuth, async (req, res) => {
     try {
         const user = await User.findById(req.session.userId);
         if (!user) return res.redirect('/logout');
         res.render('profil', { user });
-    } catch (err) {
-        res.redirect('/');
-    }
+    } catch (err) { res.redirect('/'); }
 });
 
 // --- 5. ARENA VE MARKET SİSTEMİ ---
@@ -193,7 +146,9 @@ app.post('/attack-bot', checkAuth, async (req, res) => {
     try {
         const user = await User.findById(req.session.userId);
         const bot = eliteBots[Math.floor(Math.random() * eliteBots.length)];
-        const isWin = Math.random() > 0.5;
+        
+        // %60 Kayıp Oranı (Math.random() > 0.6 ise kazanır, yani %40 kazanç)
+        const isWin = Math.random() > 0.6;
 
         if (isWin) {
             user.bpl += 200;
@@ -205,6 +160,8 @@ app.post('/attack-bot', checkAuth, async (req, res) => {
             });
             if(last20Victories.length > 20) last20Victories.pop();
             
+            await new Victory({ userEmail: user.email, amount: 200, opponent: bot.nickname }).save();
+            
             io.emit('new-message', { 
                 sender: "ARENA", 
                 text: `🏆 ${user.nickname} kazandı!`, 
@@ -212,17 +169,16 @@ app.post('/attack-bot', checkAuth, async (req, res) => {
                 winnerNick: user.nickname 
             });
         } else {
-            if (user.bpl >= 200) user.bpl -= 200;
+            user.bpl = Math.max(0, user.bpl - 200);
+            await new Punishment({ userEmail: user.email, amount: 200, reason: "Arena Mağlubiyeti" }).save();
         }
 
         await user.save();
         res.json({ status: 'success', isWin, newBalance: user.bpl, opponent: bot.nickname });
-    } catch (err) { 
-        res.status(500).json({ status: 'error' }); 
-    }
+    } catch (err) { res.status(500).json({ status: 'error' }); }
 });
 
-// --- 6. SOCKET.IO (CHAT & TRANSFER) ---
+// --- 6. SOCKET.IO (CHAT & TEBRİK) ---
 io.on('connection', (socket) => {
     socket.on('register-user', ({ id, nickname }) => {
         socket.userId = id;
@@ -241,18 +197,18 @@ io.on('connection', (socket) => {
             const sender = await User.findById(socket.userId);
             const receiver = await User.findOne({ nickname: data.winnerNick });
             
-            if (sender && receiver && sender.bpl >= 5000 && sender.nickname !== receiver.nickname) {
-                sender.bpl -= 500;
-                receiver.bpl += 410; // %18 kesinti
+            const brut = 500, net = 410, yakim = 90;
+
+            if (sender && receiver && sender.bpl >= brut && sender.nickname !== receiver.nickname) {
+                sender.bpl -= brut;
+                receiver.bpl += net;
                 await sender.save();
                 await receiver.save();
                 
-                await new Log({ type: 'BPL_BURN', content: `Tebrik yakımı: 90 BPL`, userEmail: sender.email }).save();
-                io.to('Global').emit('new-message', { sender: "SİSTEM", text: `💎 ${sender.nickname}, ${receiver.nickname}'ı tebrik etti!` });
+                await new Log({ type: 'BPL_BURN', content: `Yakıldı: ${yakim} BPL`, userEmail: sender.email }).save();
+                io.to('Global').emit('new-message', { sender: "SİSTEM", text: `💎 ${sender.nickname}, ${receiver.nickname}'ı tebrik etti (410 BPL iletildi, 90 BPL yakıldı!)` });
             }
-        } catch (err) {
-            console.error("Tebrik hatası:", err);
-        }
+        } catch (err) { console.error("Tebrik hatası:", err); }
     });
 });
 
@@ -263,13 +219,5 @@ app.get('/logout', (req, res) => {
 
 // --- 7. BAŞLATMA ---
 server.listen(PORT, "0.0.0.0", () => {
-    console.log(`
-    =========================================
-    BPL ECOSYSTEM AKTİF!
-    PORT: ${PORT}
-    VERİTABANI: Bağlantı Kuruluyor...
-    =========================================
-    `);
+    console.log(`BPL ECOSYSTEM ONLINE PORT: ${PORT}`);
 });
-
-
