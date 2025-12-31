@@ -35,6 +35,10 @@ app.use(bodyParser.json());
 app.use(bodyParser.urlencoded({ extended: true }));
 app.set('trust proxy', 1);
 
+
+
+
+
 app.use(session({
     secret: 'bpl_ozel_anahtar',
     resave: false,
@@ -57,6 +61,20 @@ app.get('/profil', checkAuth, async (req, res) => {
 });
 
 app.get('/market', checkAuth, async (req, res) => {
+const MARKET_ANIMALS = [
+    { id: 1, name: 'Bear', price: 1000, img: '/caracter/profile/bear.jpg' },
+    { id: 2, name: 'Crocodile', price: 1000, img: '/caracter/profile/crocodile.jpg' },
+    { id: 3, name: 'Eagle', price: 1000, img: '/caracter/profile/eagle.jpg' },
+    { id: 4, name: 'Gorilla', price: 5000, img: '/caracter/profile/gorilla.jpg' },
+    { id: 5, name: 'Kurd', price: 1000, img: '/caracter/profile/kurd.jpg' },
+    { id: 6, name: 'Lion', price: 5000, img: '/caracter/profile/lion.jpg' },
+    { id: 7, name: 'Falcon', price: 1000, img: '/caracter/profile/peregrinefalcon.jpg' },
+    { id: 8, name: 'Rhino', price: 5000, img: '/caracter/profile/rhino.jpg' },
+    { id: 9, name: 'Snake', price: 1000, img: '/caracter/profile/snake.jpg' },
+    { id: 10, name: 'Tiger', price: 5000, img: '/caracter/profile/tiger.jpg' }
+];
+
+    
     const user = await User.findById(req.session.userId);
     res.render('market', { user });
 });
@@ -150,3 +168,4 @@ io.on('connection', (socket) => {
 server.listen(PORT, "0.0.0.0", () => {
     console.log(`SUNUCU ÇALIŞIYOR: ${PORT}`);
 });
+
