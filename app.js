@@ -71,30 +71,67 @@ app.get('/', (req, res) => {
     res.render('index', { user: null });
 });
 
+// --- KAYIT (REGISTER) GÜNCELLEME ---
 app.post('/register', async (req, res) => {
-    // name="nickname" ejs'de doğru yazılmalı!
-    const { nickname, email, password } = req.body;
     try {
+        let { nickname, email, password } = req.body;
+        
+        // Boşlukları sil ve e-postayı küçük harfe çevir
+        email = email.trim().toLowerCase(); 
+
+        // Email zaten var mı kontrol et
         const existingUser = await User.findOne({ email });
-        if (existingUser) return res.send('<script>alert("Bu e-posta kayıtlı!"); window.location.href="/";</script>');
+        if (existingUser) {
+            return res.send('<script>alert("Bu email zaten kayıtlı!"); window.location.href="/";</script>');
+        }
 
-        // Şifreyi hashleyerek kaydet (Güvenlik için)
         const hashedPassword = await bcrypt.hash(password, 10);
-
-        const newUser = new User({
-            nickname,
-            email,
-            password: hashedPassword,
+        const newUser = new User({ 
+            nickname: nickname.trim(), 
+            email, 
+            password: hashedPassword, 
             bpl: 2500,
-            inventory: []
+            inventory: [{ name: 'Eagle', level: 1, stats: { hp: 150, atk: 30 } }] 
         });
 
         await newUser.save();
-        await new Log({ type: 'REGISTER', content: `Yeni kullanıcı: ${nickname}`, userEmail: email }).save();
-        res.send('<script>alert("Kayıt başarılı! Giriş yapabilirsin."); window.location.href="/";</script>');
-    } catch (err) {
-        console.error(err);
-        res.status(500).send("Kayıt sırasında teknik bir hata oluştu!");
+        res.send('<script>alert("Kayıt Başarılı! Şimdi giriş yapabilirsiniz."); window.location.href="/";</script>');
+    } catch (e) { 
+        console.error("Kayıt hatası:", e);
+        res.status(500).send("Kayıt sırasında hata oluştu."); 
+    }
+});
+
+// --- GİRİŞ (LOGIN) GÜNCELLEME ---
+app.post('/login', async (req, res) => {
+    try {
+        let { email, password } = req.body;
+
+        // Giriş yaparken de aynı temizliği yapıyoruz
+        email = email.trim().toLowerCase(); 
+
+        console.log("Giriş deneniyor:", email); // Render loglarında takip etmek için
+
+        const user = await User.findOne({ email });
+
+        if (!user) {
+            console.log("Hata: Kullanıcı bulunamadı ->", email);
+            return res.send('<script>alert("Email kayıtlı değil!"); window.location.href="/";</script>');
+        }
+
+        const isMatch = await bcrypt.compare(password, user.password);
+        if (isMatch) {
+            req.session.userId = user._id;
+            return req.session.save(() => {
+                console.log("Giriş Başarılı:", user.nickname);
+                res.redirect('/profil');
+            });
+        } else {
+            res.send('<script>alert("Şifre hatalı!"); window.location.href="/";</script>');
+        }
+    } catch (error) {
+        console.error("Login hatası:", error);
+        res.status(500).send("Sunucu hatası.");
     }
 });
 
@@ -234,4 +271,5 @@ server.listen(PORT, "0.0.0.0", () => {
     =========================================
     `);
 });
+
 
