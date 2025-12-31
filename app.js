@@ -4,8 +4,11 @@ const express = require('express');
 const http = require('http');
 const socketIo = require('socket.io');
 const session = require('express-session');
-// KRİTİK DÜZELTME: connect-mongo v6+ için import yapısı
+
+// KRİTİK DÜZELTME BURADA: v6 sürümü için .default eklenmeli veya 
+// modül v6 yapısına uygun çağrılmalı. 
 const MongoStore = require('connect-mongo'); 
+
 const mongoose = require('mongoose');
 const path = require('path');
 const bcrypt = require('bcryptjs');
@@ -18,7 +21,7 @@ const Victory = require('./models/Victory');
 const Punishment = require('./models/Punishment');
 const ArenaLog = require('./models/ArenaLogs');
 
-connectDB(); // MongoDB Atlas Bağlantısı
+connectDB();
 
 const app = express();
 const server = http.createServer(app);
@@ -32,18 +35,19 @@ app.use(express.static(path.join(__dirname, 'public')));
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
 
-// --- HATAYI BİTİREN OTURUM YÖNETİMİ (v6 UYUMLU) ---
+// --- HATAYI BİTİREN OTURUM YÖNETİMİ (v6 KESİN ÇÖZÜM) ---
 app.use(session({
     secret: process.env.SESSION_SECRET || 'bpl_global_secret_2026',
     resave: false,
     saveUninitialized: false,
     store: MongoStore.create({ 
-        mongoUrl: process.env.MONGO_URI,
+        mongoUrl: process.env.MONGO_URI, // .env dosyasındaki URI kullanılmalı
+        dbName: 'test', // Atlas üzerindeki DB adın neyse o (genelde test veya production)
         collectionName: 'sessions',
         ttl: 14 * 24 * 60 * 60 
     }),
     cookie: { 
-        secure: false, // Render HTTP için false kalmalı
+        secure: false, // Render ücretsiz/standart planda SSL proxy olduğu için false kalmalı
         maxAge: 24 * 60 * 60 * 1000 
     }
 }));
@@ -51,7 +55,11 @@ app.use(session({
 // Global User Değişkeni (EJS dosyaları için)
 app.use(async (req, res, next) => {
     try {
-        res.locals.user = req.session.userId ? await User.findById(req.session.userId) : null;
+        if (req.session && req.session.userId) {
+            res.locals.user = await User.findById(req.session.userId);
+        } else {
+            res.locals.user = null;
+        }
         next();
     } catch (err) { next(err); }
 });
@@ -70,7 +78,6 @@ app.get('/meeting/:roomId', checkAuth, (req, res) => res.render('meeting', { roo
 
 // --- 5. ROTALAR (POST) ---
 
-// Login & Register
 app.post('/register', async (req, res) => {
     try {
         const { nickname, email, password } = req.body;
@@ -94,7 +101,6 @@ app.post('/login', async (req, res) => {
     res.send('<script>alert("Giriş Başarısız!"); window.location.href="/";</script>');
 });
 
-// İletişim (180 Karakter Sınırı)
 app.post('/contact', async (req, res) => {
     const { email, note } = req.body;
     if (note.length > 180) return res.send("Not çok uzun!");
@@ -102,20 +108,18 @@ app.post('/contact', async (req, res) => {
     res.send('<script>alert("Mesaj iletildi."); window.location.href="/";</script>');
 });
 
-// Arena Bot Sistemi (%60 Kayıp Oranı)
 app.post('/arena/battle', checkAuth, async (req, res) => {
     const user = await User.findById(req.session.userId);
     const bots = ['Lion', 'Goril', 'Tiger', 'Eagle'];
     const botOpponent = bots[Math.floor(Math.random() * bots.length)];
     
-    const userWins = Math.random() > 0.6; // %60 Kaybetme ihtimali
+    const userWins = Math.random() > 0.6; 
     let prize = userWins ? 150 : -50;
     
     user.bpl += prize;
     if(user.bpl < 0) user.bpl = 0;
     await user.save();
 
-    // Atlas Kayıtları
     if(userWins) {
         await new Victory({ userEmail: user.email, amount: 150, opponent: botOpponent }).save();
     } else {
@@ -129,7 +133,6 @@ app.post('/arena/battle', checkAuth, async (req, res) => {
 io.on('connection', (socket) => {
     socket.on('join-room', (roomId) => socket.join(roomId));
 
-    // Tebrik / Hediye (40 BPL Yakım)
     socket.on('send-tebrik', async (data) => {
         const { senderNick, receiverNick } = data;
         const sender = await User.findOne({ nickname: senderNick });
