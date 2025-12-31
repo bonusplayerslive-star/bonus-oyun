@@ -27,7 +27,7 @@ const server = http.createServer(app);
 const io = socketIo(server);
 const PORT = process.env.PORT || 10000;
 
-// --- 3. MIDDLEWARE ---
+// --- 3. MIDDLEWARE (ARA KATMANLAR) ---
 app.set('view engine', 'ejs');
 app.set('views', path.join(__dirname, 'views'));
 app.use(express.static(path.join(__dirname, 'public')));
@@ -42,43 +42,28 @@ app.use(session({
     cookie: { secure: false, maxAge: 24 * 60 * 60 * 1000 }
 }));
 
+// Giriş Kontrolü
 const checkAuth = (req, res, next) => {
     if (req.session.userId) next(); else res.redirect('/');
 };
 
-// --- 4. SABİT VERİLER ---
-const MARKET_ANIMALS = [
-    { id: 1, name: 'Bear', price: 1000, img: '/caracter/profile/bear.jpg' },
-    { id: 2, name: 'Crocodile', price: 1000, img: '/caracter/profile/crocodile.jpg' },
-    { id: 3, name: 'Eagle', price: 1000, img: '/caracter/profile/eagle.jpg' },
-    { id: 4, name: 'Gorilla', price: 5000, img: '/caracter/profile/gorilla.jpg' },
-    { id: 5, name: 'Kurd', price: 1000, img: '/caracter/profile/kurd.jpg' },
-    { id: 6, name: 'Lion', price: 5000, img: '/caracter/profile/lion.jpg' },
-    { id: 7, name: 'Falcon', price: 1000, img: '/caracter/profile/peregrinefalcon.jpg' },
-    { id: 8, name: 'Rhino', price: 5000, img: '/caracter/profile/rhino.jpg' },
-    { id: 9, name: 'Snake', price: 1000, img: '/caracter/profile/snake.jpg' },
-    { id: 10, name: 'Tiger', price: 5000, img: '/caracter/profile/tiger.jpg' }
-];
-
-// --- 5. GET ROTALARI (SAYFALAR) ---
+// --- 4. SAYFA ROTALARI (GET) ---
 
 app.get('/', (req, res) => res.render('index', { user: req.session.userId || null }));
 
 app.get('/profil', checkAuth, async (req, res) => {
-    try {
-        const user = await User.findById(req.session.userId);
-        res.render('profil', { user });
-    } catch (e) { res.redirect('/'); }
+    const user = await User.findById(req.session.userId);
+    res.render('profil', { user });
 });
 
 app.get('/market', checkAuth, async (req, res) => {
     const user = await User.findById(req.session.userId);
-    res.render('market', { user, animals: MARKET_ANIMALS });
+    res.render('market', { user });
 });
 
 app.get('/arena', checkAuth, async (req, res) => {
     const user = await User.findById(req.session.userId);
-    res.render('arena', { user, selectedAnimal: user.inventory[0]?.name || "Eagle", lastVictories: [] });
+    res.render('arena', { user, selectedAnimal: user.inventory[0]?.name || "Eagle" });
 });
 
 app.get('/wallet', checkAuth, async (req, res) => {
@@ -88,12 +73,7 @@ app.get('/wallet', checkAuth, async (req, res) => {
 
 app.get('/payment', checkAuth, async (req, res) => {
     const user = await User.findById(req.session.userId);
-    res.render('payment', { user }); // Views içinde payment.ejs olmalı
-});
-
-app.get('/development', checkAuth, async (req, res) => {
-    const user = await User.findById(req.session.userId);
-    res.render('development', { user });
+    res.render('payment', { user });
 });
 
 app.get('/chat', checkAuth, async (req, res) => {
@@ -106,7 +86,12 @@ app.get('/meeting', checkAuth, async (req, res) => {
     res.render('meeting', { user, roomId: "BPL-VIP-KONSEY" });
 });
 
-// --- 6. POST ROTALARI (İŞLEMLER) ---
+app.get('/development', checkAuth, async (req, res) => {
+    const user = await User.findById(req.session.userId);
+    res.render('development', { user });
+});
+
+// --- 5. İŞLEM ROTALARI (POST) ---
 
 app.post('/register', async (req, res) => {
     const { nickname, email, password } = req.body;
@@ -115,15 +100,21 @@ app.post('/register', async (req, res) => {
         if (exists) return res.send('<script>alert("E-posta kayıtlı!"); window.location.href="/";</script>');
         const newUser = new User({ nickname, email, password, bpl: 2500, inventory: [] });
         await newUser.save();
-        res.send('<script>alert("Başarılı!"); window.location.href="/";</script>');
-    } catch (err) { res.status(500).send("Hata!"); }
+        res.send('<script>alert("Kayıt başarılı!"); window.location.href="/";</script>');
+    } catch (err) { res.status(500).send("Sunucu hatası!"); }
 });
 
 app.post('/login', async (req, res) => {
     const { email, password } = req.body;
-    const user = await User.findOne({ email, password });
-    if (user) { req.session.userId = user._id; res.redirect('/profil'); }
-    else res.send('<script>alert("Hata!"); window.location.href="/";</script>');
+    try {
+        const user = await User.findOne({ email, password });
+        if (user) {
+            req.session.userId = user._id;
+            res.redirect('/profil');
+        } else {
+            res.send('<script>alert("Hatalı giriş!"); window.location.href="/";</script>');
+        }
+    } catch (err) { res.redirect('/'); }
 });
 
 app.get('/logout', (req, res) => {
@@ -131,10 +122,9 @@ app.get('/logout', (req, res) => {
     res.redirect('/');
 });
 
-// --- 7. SOCKET.IO (CHAT VE ARENA BAĞLANTISI) ---
-
+// --- 6. SOCKET.IO SİSTEMİ (ARENA VE CHAT HATALARINI ÇÖZER) ---
 io.on('connection', (socket) => {
-    console.log('Kumandan Bağlandı:', socket.id);
+    console.log('Bir kullanıcı bağlandı:', socket.id);
 
     socket.on('register-user', (data) => {
         if (data && data.nickname) {
@@ -150,12 +140,13 @@ io.on('connection', (socket) => {
 
     socket.on('join-meeting', (roomId) => {
         socket.join(roomId);
+        console.log(`VIP Konseyine Katılım: ${socket.nickname}`);
     });
 
-    socket.on('disconnect', () => console.log('Ayrıldı.'));
+    socket.on('disconnect', () => console.log('Kullanıcı ayrıldı.'));
 });
 
-// --- 8. SUNUCU BAŞLATMA ---
+// --- 7. BAŞLATMA ---
 server.listen(PORT, "0.0.0.0", () => {
-    console.log(`BPL ECOSYSTEM AKTİF: PORT ${PORT}`);
+    console.log(`SUNUCU ÇALIŞIYOR: ${PORT}`);
 });
