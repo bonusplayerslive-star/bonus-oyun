@@ -1,4 +1,4 @@
-// --- 1. MODÜLLER VE GÜVENLİK ---
+// --- 1. MODÜLLER ---
 require('dotenv').config();
 const express = require('express');
 const http = require('http');
@@ -8,12 +8,11 @@ const MongoStore = require('connect-mongo');
 const path = require('path');
 const bcrypt = require('bcryptjs');
 
-// --- 2. VERİTABANI VE MODELLER ---
+// --- 2. VERİTABANI BAĞLANTISI ---
 const connectDB = require('./db');
 const User = require('./models/User');
-const ArenaLog = require('./models/ArenaLogs');
 
-connectDB();
+connectDB(); // MongoDB Atlas Bağlantısı
 
 const app = express();
 const server = http.createServer(app);
@@ -26,33 +25,32 @@ app.use(express.static(path.join(__dirname, 'public')));
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
 
-// Loglardaki virgül hatası burada giderildi
+// GÜNCELLEME: Loglardaki virgül hatası giderildi
 app.use(session({
     secret: process.env.SESSION_SECRET || 'bpl_global_secret_key_2026',
     resave: false,
     saveUninitialized: false,
-    store: MongoStore.create({ mongoUrl: process.env.MONGO_URI }),
+    store: MongoStore.create({ 
+        mongoUrl: process.env.MONGO_URI,
+        collectionName: 'sessions'
+    }),
     cookie: { 
         secure: false, // Render HTTP üzerinden çalıştığı için false kalmalı
         maxAge: 24 * 60 * 60 * 1000 
     }
 }));
 
-// Global Kullanıcı Değişkeni
+// Global Kullanıcı Değişkeni (EJS tarafında user.bpl vb. erişimi sağlar)
 app.use((req, res, next) => {
     res.locals.user = req.session.user || null;
     next();
 });
 
-// Yetki Kontrolü (Giriş yapmayanları ana sayfaya atar)
-const checkAuth = (req, res, next) => {
-    if (req.session.userId) return next();
-    res.redirect('/');
-};
-
 // --- 4. AUTH SİSTEMİ (Giriş/Kayıt) ---
 
-// Kayıt: 2500 BPL + Eagle Karakteri
+app.get('/', (req, res) => res.render('index'));
+
+// KAYIT: Bcrypt ile şifreleme ve hediye BPL/Karakter
 app.post('/register', async (req, res) => {
     const { nickname, email, password } = req.body;
     try {
@@ -66,29 +64,31 @@ app.post('/register', async (req, res) => {
             password: hashedPassword, 
             bpl: 2500,
             inventory: [
-                { name: 'Eagle', level: 1, img: '/caracter/profile/eagle.jpg', stats: { hp: 150, atk: 30, def: 20 } }
+                { name: 'Eagle', level: 1, img: '/caracter/profile/eagle.jpg', stats: { hp: 150, atk: 30, def: 20 } },
+                { name: 'Bear', level: 1, img: '/caracter/profile/bear.jpg', stats: { hp: 100, atk: 20, def: 15 } }
             ] 
         });
         await newUser.save();
-        res.send('<script>alert("Kayıt Başarılı! 2500 BPL Tanımlandı."); window.location.href="/";</script>');
-    } catch (err) { res.status(500).send("Kayıt sırasında hata oluştu."); }
+        res.send('<script>alert("Kayıt Başarılı! 2500 BPL Hediye Edildi."); window.location.href="/";</script>');
+    } catch (err) { res.status(500).send("Kayıt Hatası: " + err.message); }
 });
 
-// Login: Bcrypt Karşılaştırmalı ve Session Kayıtlı
+// LOGIN: Atlas bağlantısını kontrol eder ve giriş yaptırır
 app.post('/login', async (req, res) => {
     const { email, password } = req.body;
     try {
         const user = await User.findOne({ email });
+        // Atlas'taki şifrelenmiş veri ile karşılaştırma yapar
         if (user && await bcrypt.compare(password, user.password)) {
             req.session.userId = user._id;
             req.session.user = user;
             
-            // Session'ı DB'ye kaydet ve yönlendir
+            // Session'ı DB'ye kaydeder ve yönlendirir
             return req.session.save(() => {
                 res.redirect('/profil');
             });
         }
-        res.send('<script>alert("E-posta veya şifre hatalı!"); window.location.href="/";</script>');
+        res.send('<script>alert("Hatalı Giriş Bilgileri!"); window.location.href="/";</script>');
     } catch (err) { res.redirect('/'); }
 });
 
@@ -97,37 +97,16 @@ app.get('/logout', (req, res) => {
     res.redirect('/');
 });
 
-// --- 5. KOMUTA MERKEZİ ROTALARI ---
-
-app.get('/profil', checkAuth, async (req, res) => {
+// --- 5. PROFİL (Korumalı Rota) ---
+app.get('/profil', async (req, res) => {
+    if (!req.session.userId) return res.redirect('/');
     try {
         const user = await User.findById(req.session.userId);
-        res.render('profil', { user });
-    } catch (err) { res.redirect('/logout'); }
+        res.render('profil', { user }); // Envanter görüntüsü burada render edilir
+    } catch (err) { res.redirect('/'); }
 });
 
-app.get('/market', checkAuth, (req, res) => res.render('market'));
-app.get('/development', checkAuth, (req, res) => res.render('development'));
-app.get('/arena', checkAuth, (req, res) => res.render('arena'));
-app.get('/wallet', checkAuth, (req, res) => res.render('wallet'));
-app.get('/meeting/:roomId', checkAuth, (req, res) => res.render('meeting', { roomId: req.params.roomId }));
-
-// --- 6. SOCKET.IO (Chat ve Arena) ---
-io.on('connection', (socket) => {
-    socket.on('join-chat', (nickname) => {
-        socket.nickname = nickname;
-        socket.join('GlobalChat');
-    });
-
-    socket.on('chat-message', (msg) => {
-        io.to('GlobalChat').emit('new-message', {
-            sender: socket.nickname || "Misafir",
-            text: msg
-        });
-    });
-});
-
-// --- 7. SUNUCU BAŞLATMA ---
+// --- 6. SUNUCU BAŞLATMA ---
 server.listen(PORT, "0.0.0.0", () => {
     console.log(`BPL ENGINE AKTİF: ${PORT}`);
 });
