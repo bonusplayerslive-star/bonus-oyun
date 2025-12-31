@@ -189,21 +189,19 @@ app.post('/attack-bot', checkAuth, async (req, res) => {
     try {
         const user = await User.findById(req.session.userId);
         if (!user || user.bpl < 200) {
-            return res.json({ status: 'error', msg: 'Arena girişi için en az 200 BPL gerekli!' });
+            return res.json({ status: 'error', msg: 'Yetersiz bakiye!' });
         }
 
-        // Gelen hayvan ismini küçük harfe çeviriyoruz (Örn: "Eagle" -> "eagle")
-        const animalName = (req.body.animal || "eagle").toLowerCase().trim();
+        // Gelen hayvan ismini olduğu gibi alıyoruz (Eagle, Bear vb.)
+        const animalName = (req.body.animal || "Eagle").trim();
         
-        // Şans Faktörü: %50 kazanma ihtimali
         const isWin = Math.random() > 0.5;
 
         if (isWin) {
             user.bpl += 200;
-            // Global chatte duyur
             io.to('GlobalChat').emit('new-message', { 
                 sender: "ARENA", 
-                text: `🏆 ${user.nickname}, ${animalName.toUpperCase()} ile zafer kazandı! (+200 BPL)` 
+                text: `🏆 ${user.nickname}, ${animalName} ile zafer kazandı!` 
             });
         } else {
             user.bpl -= 200;
@@ -211,21 +209,17 @@ app.post('/attack-bot', checkAuth, async (req, res) => {
 
         await user.save();
 
-        // Arena.ejs'nin beklediği video objesi
+        // Dosya Yolları: /caracter/move/Eagle/Eagle1.mp4 gibi
         res.json({ 
             status: 'success', 
             animation: { 
                 isWin: isWin,
-                // Saldırı Videosu: eagle1.mp4
-                actionVideo: `/caracter/profile/${animalName}1.mp4`, 
-                // Zafer Videosu: eagle.mp4
-                winVideo: `/caracter/profile/${animalName}.mp4`
-            }, 
-            newBalance: user.bpl 
+                actionVideo: `/caracter/move/${animalName}/${animalName}1.mp4`, 
+                winVideo: `/caracter/move/${animalName}/${animalName}.mp4`
+            }
         });
 
     } catch (err) {
-        console.error("Arena İşlem Hatası:", err);
         res.status(500).json({ status: 'error', msg: 'Sunucu hatası!' });
     }
 });
@@ -258,6 +252,7 @@ io.on('connection', (socket) => {
 server.listen(PORT, "0.0.0.0", () => {
     console.log(`SUNUCU ÇALIŞIYOR: ${PORT}`);
 });
+
 
 
 
