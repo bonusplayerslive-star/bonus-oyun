@@ -140,6 +140,52 @@ app.get('/logout', (req, res) => {
     res.redirect('/');
 });
 
+app.post('/register', async (req, res) => {
+    try {
+        const { nickname, email, password } = req.body;
+        
+        // E-posta kontrolü
+        const existingUser = await User.findOne({ email });
+        if (existingUser) return res.send('<script>alert("Bu e-posta zaten kayıtlı!"); window.location.href="/";</script>');
+
+        const newUser = new User({ 
+            nickname, 
+            email, 
+            password, 
+            bpl: 2500, // Yeni kayıt hediyesi
+            inventory: [] // Envanter boş başlar, marketten kendisi alır
+        });
+
+        await newUser.save();
+        res.send('<script>alert("Başarıyla orduya katıldın! 2500 BPL hediyen tanımlandı. Marketten hayvanını alarak başlayabilirsin."); window.location.href="/";</script>');
+    } catch (err) { 
+        console.error("Kayıt Hatası:", err);
+        res.status(500).send("Sistem hatası oluştu."); 
+    }
+});
+
+// Örnek Satın Alma Rotası Mantığı
+app.post('/buy-animal', checkAuth, async (req, res) => {
+    const { animalName, price } = req.body;
+    const user = await User.findById(req.session.userId);
+
+    if (user.bpl >= price) {
+        user.bpl -= price;
+        user.inventory.push({
+            name: animalName,
+            level: 1,
+            // Dosya yolunu küçük harf ve .jpg olarak zorluyoruz
+            img: `/caracter/profile/${animalName.toLowerCase()}.jpg`, 
+            stats: { hp: 100, atk: 20, def: 15 }
+        });
+        await user.save();
+        res.json({ status: 'success' });
+    } else {
+        res.json({ status: 'error', msg: 'Yetersiz BPL!' });
+    }
+});
+
+
 // --- 6. SOCKET.IO SİSTEMİ (ARENA VE CHAT HATALARINI ÇÖZER) ---
 io.on('connection', (socket) => {
     console.log('Bir kullanıcı bağlandı:', socket.id);
@@ -168,4 +214,5 @@ io.on('connection', (socket) => {
 server.listen(PORT, "0.0.0.0", () => {
     console.log(`SUNUCU ÇALIŞIYOR: ${PORT}`);
 });
+
 
