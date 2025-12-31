@@ -99,20 +99,42 @@ app.post('/register', async (req, res) => {
 });
 
 app.post('/login', async (req, res) => {
-    const { email, password } = req.body;
     try {
-        const user = await User.findOne({ email });
-        if (user && await bcrypt.compare(password, user.password)) {
-            req.session.userId = user._id;
-            res.redirect('/profil');
-        } else {
-            res.send('<script>alert("Hatalı e-posta veya şifre!"); window.location.href="/";</script>');
+        const { email, password } = req.body;
+        
+        // 1. Kullanıcıyı bul
+        const user = await User.findOne({ email: email.toLowerCase() }); // Email küçük harf hassasiyeti
+        
+        if (!user) {
+            console.log("Giriş Hatası: Kullanıcı bulunamadı ->", email);
+            return res.send('<script>alert("Bu email adresi kayıtlı değil!"); window.location.href="/";</script>');
         }
-    } catch (err) {
-        res.status(500).send("Giriş hatası!");
+
+        // 2. Şifreyi Karşılaştır
+        const isMatch = await bcrypt.compare(password, user.password);
+        console.log("Şifre kontrolü:", isMatch ? "BAŞARILI" : "HATALI");
+
+        if (isMatch) {
+            // 3. Oturumu Kaydet
+            req.session.userId = user._id;
+            
+            // KRİTİK: Oturumun MongoDB'ye yazıldığından emin ol ve sonra yönlendir
+            req.session.save((err) => {
+                if (err) {
+                    console.error("Session Save Hatası:", err);
+                    return res.send("Oturum hatası oluştu.");
+                }
+                console.log("Giriş Başarılı, Yönlendiriliyor...");
+                res.redirect('/profil');
+            });
+        } else {
+            res.send('<script>alert("Şifre hatalı!"); window.location.href="/";</script>');
+        }
+    } catch (error) {
+        console.error("Login hatası:", error);
+        res.status(500).send("Sunucu hatası.");
     }
 });
-
 app.get('/profil', checkAuth, async (req, res) => {
     try {
         const user = await User.findById(req.session.userId);
@@ -212,3 +234,4 @@ server.listen(PORT, "0.0.0.0", () => {
     =========================================
     `);
 });
+
