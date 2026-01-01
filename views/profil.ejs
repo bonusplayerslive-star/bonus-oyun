@@ -11,7 +11,6 @@
         :root { --neon-green: #39FF14; --dark-bg: #050505; --glass: rgba(0, 0, 0, 0.85); }
         body { background: var(--dark-bg); color: white; font-family: 'Rajdhani', sans-serif; overflow-x: hidden; }
         
-        /* Arkaplan Süsü */
         body::before {
             content: ""; position: fixed; top: 0; left: 0; width: 100%; height: 100%;
             background: url('/caracter/page/welcome.jpg') no-repeat center center fixed;
@@ -47,6 +46,17 @@
         .progress { background: #1a1a1a; border-radius: 10px; border: 1px solid #333; }
         .stat-label { font-size: 0.75rem; color: #aaa; font-family: 'Orbitron'; }
         .font-orbitron { font-family: 'Orbitron'; }
+
+        /* Market Pulsing Effect */
+        .btn-market-special {
+            background: var(--neon-green); color: black; border: none;
+            box-shadow: 0 0 15px var(--neon-green); animation: pulse 2s infinite;
+        }
+        @keyframes pulse {
+            0% { box-shadow: 0 0 5px var(--neon-green); }
+            50% { box-shadow: 0 0 25px var(--neon-green); }
+            100% { box-shadow: 0 0 5px var(--neon-green); }
+        }
     </style>
 </head>
 <body>
@@ -55,7 +65,7 @@
         <div class="container d-flex justify-content-between align-items-center">
             <a href="/profil"><img src="/caracter/page/logo.jpeg" alt="BPL LOGO" class="logo-img"></a>
             <div class="text-end">
-                <h5 class="mb-0" style="color: var(--neon-green); font-family: 'Orbitron';"><%= user.nickname %></h5>
+                <h5 class="mb-0 text-uppercase" style="color: var(--neon-green); font-family: 'Orbitron';"><%= user.nickname %></h5>
                 <span class="bpl-badge"><i class="fas fa-coins me-1"></i><%= user.bpl.toLocaleString() %> BPL</span>
             </div>
         </div>
@@ -66,15 +76,14 @@
             <div class="col-md-3 mb-4">
                 <div class="glass-panel text-center">
                     <h6 class="text-muted border-bottom border-secondary pb-2 mb-3 font-orbitron">COMMAND CENTER</h6>
-                    <a href="/market" class="btn btn-outline-success nav-btn"><i class="fas fa-shopping-cart me-2"></i>MARKET</a>
+                    <a href="/market" class="btn btn-market-special nav-btn mb-4"><i class="fas fa-shopping-cart me-2"></i>BPL MARKET</a>
+                    
                     <a href="/development" class="btn btn-outline-warning nav-btn"><i class="fas fa-tools me-2"></i>GELİŞTİRME</a>
                     <a href="/arena" class="btn btn-outline-danger nav-btn"><i class="fas fa-crosshairs me-2"></i>ARENA (BATTLE)</a>
                     <a href="/chat" class="btn btn-outline-info nav-btn"><i class="fas fa-comments me-2"></i>GLOBAL CHAT</a>
-                    
                     <a href="/meeting" class="btn btn-outline-primary nav-btn" style="border-color: #ffc107; color: #ffc107;">
                         <i class="fas fa-video me-2"></i>BEŞGEN MASA
                     </a>
-
                     <a href="/wallet" class="btn btn-outline-light nav-btn"><i class="fas fa-wallet me-2"></i>WALLET (CÜZDAN)</a>
                     <hr class="border-secondary">
                     <a href="/logout" class="btn btn-dark nav-btn text-danger border-danger"><i class="fas fa-power-off me-2"></i>SİSTEMDEN ÇIK</a>
@@ -84,59 +93,56 @@
             <div class="col-md-9">
                 <div class="glass-panel">
                     <div class="d-flex justify-content-between align-items-center mb-4">
-                        <h4 class="font-orbitron mb-0"><i class="fas fa-boxes me-2"></i>ENVANTER (ASSETS)</h4>
-                        <span class="badge rounded-pill bg-dark border border-secondary">Karakter Sayısı: <%= user.inventory.length %></span>
+                        <h4 class="font-orbitron mb-0 text-uppercase"><i class="fas fa-boxes me-2 text-success"></i>Envanter Listesi</h4>
+                        <span class="badge rounded-pill bg-dark border border-secondary p-2">Aktif Varlık: <%= user.inventory.length %></span>
                     </div>
 
                     <div class="row">
                         <% if(!user.inventory || user.inventory.length === 0) { %>
-                            <div class="col-12 text-center p-5 border border-secondary border-dashed rounded text-muted">
-                                <i class="fas fa-box-open fa-3x mb-3" style="opacity: 0.3;"></i><br>
-                                <p>Envanterin boş kumandan! <br> 2500 BPL hediyenle markete gidip ilk karakterini satın alabilirsin.</p>
-                                <a href="/market" class="btn btn-success mt-2">MARKETE GİT</a>
+                            <div class="col-12 text-center py-5 border border-secondary border-dashed rounded" style="background: rgba(57, 255, 20, 0.02);">
+                                <i class="fas fa-dragon fa-4x mb-3 text-secondary" style="opacity: 0.2;"></i>
+                                <h3 class="font-orbitron text-uppercase mb-3">Savaşçı Bulunamadı!</h3>
+                                <p class="text-muted lead">2500 BPL Başlangıç Bonusu hesabına tanımlandı kumandan.<br>Hemen markete girip ilk savaşçını orduna katmalısın.</p>
+                                <a href="/market" class="btn btn-neon-green btn-lg font-orbitron mt-3 px-5 py-3" style="background: var(--neon-green); color: black;">
+                                    MARKETE GİT & KARAKTER AL
+                                </a>
                             </div>
                         <% } else { %>
                             <% user.inventory.forEach((item, index) => { %>
                                 <div class="col-md-4 mb-4">
                                     <div class="stat-card text-center" style="background: rgba(0,0,0,0.6); border: 1px solid rgba(57, 255, 20, 0.3);">
-                                        
                                         <div style="position: relative;">
                                             <img src="/caracter/profile/<%= item.name.toLowerCase() %>.jpg" 
                                                  onerror="this.src='/caracter/page/logo.jpeg'" 
                                                  class="inventory-img">
-                                            
                                             <span style="position: absolute; top: 10px; right: 10px; background: var(--neon-green); color: black; padding: 2px 8px; border-radius: 5px; font-weight: bold; font-family: 'Orbitron'; font-size: 0.7rem;">
                                                 LVL <%= item.level || 1 %>
                                             </span>
                                         </div>
-
                                         <h5 class="text-uppercase my-3 font-orbitron" style="color: var(--neon-green); letter-spacing: 2px;"><%= item.name %></h5>
-                                        
                                         <div class="p-2" style="background: rgba(0,0,0,0.4); border-radius: 10px;">
                                             <div class="mb-2 text-start">
                                                 <div class="d-flex justify-content-between stat-label mb-1">
                                                     <span><i class="fas fa-heart text-danger"></i> SAĞLIK</span>
-                                                    <span class="text-white"><%= (item.stats && item.stats.hp) ? item.stats.hp : 100 %> / 100</span>
+                                                    <span class="text-white"><%= item.stats.hp %> / 100</span>
                                                 </div>
                                                 <div class="progress" style="height: 6px;">
-                                                    <div class="progress-bar" style="width: <%= (item.stats && item.stats.hp) ? item.stats.hp : 100 %>%; background: linear-gradient(90deg, #ff416c, #ff4b2b);"></div>
+                                                    <div class="progress-bar" style="width: <%= item.stats.hp %>%; background: linear-gradient(90deg, #ff416c, #ff4b2b);"></div>
                                                 </div>
                                             </div>
-
                                             <div class="mb-2 text-start">
                                                 <div class="d-flex justify-content-between stat-label mb-1">
                                                     <span><i class="fas fa-swords text-warning"></i> SALDIRI</span>
-                                                    <span class="text-white"><%= (item.stats && item.stats.atk) ? item.stats.atk : 20 %></span>
+                                                    <span class="text-white"><%= item.stats.atk %></span>
                                                 </div>
                                                 <div class="progress" style="height: 6px;">
                                                     <div class="progress-bar" style="width: 50%; background: linear-gradient(90deg, #f7971e, #ffd200);"></div>
                                                 </div>
                                             </div>
                                         </div>
-
                                         <a href="/arena" class="btn btn-sm w-100 font-orbitron mt-3" 
                                            style="background: transparent; border: 1px solid #ff4444; color: #ff4444;">
-                                            ARENAYA GİT
+                                            ARENAYA GÖNDER
                                         </a>
                                     </div>
                                 </div>
