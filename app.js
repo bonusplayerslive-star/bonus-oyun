@@ -31,23 +31,22 @@ app.use(bodyParser.json());
 // Render HTTPS ve Proxy Desteği
 app.set('trust proxy', 1);
 
-// KESİN ÇÖZÜM: MongoStore v6 ve Session Yapısı
 app.use(session({
-    secret: process.env.SESSION_SECRET || 'bpl_gizli_anahtar_2025',
-    resave: false,
-    saveUninitialized: false,
+    secret: process.env.SESSION_SECRET,
+    resave: false, // Bahsettiğin "false" değerlerinden biri buydu, oturum çakışmasını önler
+    saveUninitialized: false, // Boş oturum oluşturulmasını engeller, veritabanını şişirmez
     store: MongoStore.create({ 
         mongoUrl: process.env.MONGO_URI,
         collectionName: 'sessions',
-        ttl: 24 * 60 * 60 // 1 gün
+        stringify: false, // Veriyi JSON olarak sakla (bahsettiğin ek ayarlardan biri)
+        autoRemove: 'native' // MongoDB'nin kendi TTL indeksini kullanmasını sağlar
     }),
     cookie: { 
         secure: process.env.NODE_ENV === 'production', 
-        sameSite: 'lax',
+        sameSite: 'lax', 
         maxAge: 24 * 60 * 60 * 1000 
     }
 }));
-
 // --- 3. MAİL MOTORU (Şifremi Unuttum İçin) ---
 const transporter = nodemailer.createTransport({
     service: 'gmail',
@@ -170,3 +169,4 @@ app.get('/logout', (req, res) => {
 server.listen(PORT, "0.0.0.0", () => {
     console.log(`🚀 BPL Sunucusu Hazır | Port: ${PORT}`);
 });
+
