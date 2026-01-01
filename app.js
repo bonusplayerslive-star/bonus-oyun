@@ -1,51 +1,45 @@
-// --- 1. MODÜLLER VE AYARLAR ---
 require('dotenv').config();
 const express = require('express');
 const bodyParser = require('body-parser');
 const http = require('http');
-const socketIo = require('socket.io');
 const session = require('express-session');
-
-// KRİTİK HATA ÇÖZÜMÜ: v6+ için bu satır hayatidir
 const MongoStore = require('connect-mongo'); 
-
 const mongoose = require('mongoose');
 const path = require('path');
 const bcrypt = require('bcryptjs');
+const crypto = require('crypto');
+const nodemailer = require('nodemailer');
 
-// --- 2. VERİTABANI VE MODELLER ---
-const connectDB = require('./db');
+// --- 1. VERİTABANI BAĞLANTISI ---
+mongoose.connect(process.env.MONGO_URI)
+    .then(() => console.log("✅ MongoDB Atlas Bağlantısı Başarılı"))
+    .catch(err => console.error("❌ MongoDB Hatası:", err));
+
 const User = require('./models/User');
-const Log = require('./models/Log');
-const Victory = require('./models/Victory');
-const Punishment = require('./models/Punishment');
-
-connectDB();
 
 const app = express();
 const server = http.createServer(app);
-const io = socketIo(server);
 const PORT = process.env.PORT || 10000;
 
-// --- 3. MIDDLEWARE (OTURUM VE GÜVENLİK) ---
+// --- 2. MIDDLEWARE & AYARLAR ---
 app.set('view engine', 'ejs');
 app.set('views', path.join(__dirname, 'views'));
 app.use(express.static(path.join(__dirname, 'public')));
-app.use(bodyParser.json());
 app.use(bodyParser.urlencoded({ extended: true }));
+app.use(bodyParser.json());
 
-// Render HTTPS/Proxy ayarı (Login sorununu çözer)
+// Render HTTPS ve Proxy Desteği
 app.set('trust proxy', 1);
 
-// HATASIZ OTURUM YÖNETİMİ
+// KESİN ÇÖZÜM: MongoStore v6 ve Session Yapısı
 app.use(session({
-    secret: process.env.SESSION_SECRET || 'bpl_global_key_2026',
-    resave: true,
+    secret: process.env.SESSION_SECRET || 'bpl_gizli_anahtar_2025',
+    resave: false,
     saveUninitialized: false,
     store: MongoStore.create({ 
         mongoUrl: process.env.MONGO_URI,
         collectionName: 'sessions',
-        ttl: 14 * 24 * 60 * 60 
+        ttl: 24 * 60 * 60 // 1 gün
     }),
     cookie: { 
         secure: process.env.NODE_ENV === 'production', 
@@ -54,27 +48,30 @@ app.use(session({
     }
 }));
 
-// Giriş Kontrolü
-const checkAuth = (req, res, next) => {
-    if (req.session && req.session.userId) return next();
-    res.redirect('/');
-};
+// --- 3. MAİL MOTORU (Şifremi Unuttum İçin) ---
+const transporter = nodemailer.createTransport({
+    service: 'gmail',
+    auth: {
+        user: process.env.MAIL_USER,
+        pass: process.env.MAIL_APP_PASS
+    }
+});
 
-// --- 4. ROTALAR (AUTH & ANA SAYFA) ---
+// --- 4. ROTALAR (AUTH) ---
 
 app.get('/', (req, res) => {
     if (req.session.userId) return res.redirect('/profil');
     res.render('index', { user: null });
 });
 
-// KAYIT: Email temizliği ve Otomatik Login
+// KAYIT (REGISTER)
 app.post('/register', async (req, res) => {
     try {
         let { nickname, email, password } = req.body;
         const cleanEmail = email.trim().toLowerCase();
         
-        const existingUser = await User.findOne({ email: cleanEmail });
-        if (existingUser) return res.send('<script>alert("Bu email zaten kayıtlı!"); window.location.href="/";</script>');
+        const existingUser = await User.findOne({ $or: [{ email: cleanEmail }, { nickname: nickname.trim() }] });
+        if (existingUser) return res.send('<script>alert("Email veya Nickname zaten kayıtlı!"); window.location.href="/";</script>');
 
         const hashedPassword = await bcrypt.hash(password, 10);
         const newUser = new User({ 
@@ -82,103 +79,94 @@ app.post('/register', async (req, res) => {
             email: cleanEmail, 
             password: hashedPassword, 
             bpl: 2500,
-            inventory: [{ name: 'Eagle', level: 1, stats: { hp: 150, atk: 30 } }] 
+            inventory: [{ name: 'Eagle', level: 1, stats: { hp: 150, atk: 30, def: 10 } }] 
         });
 
         const savedUser = await newUser.save();
         
-        // Kayıt sonrası otomatik oturum açma
+        // Kayıt sonrası otomatik login
         req.session.userId = savedUser._id;
-        req.session.save(() => res.redirect('/profil'));
+        req.session.save((err) => {
+            if (err) return res.redirect('/');
+            res.redirect('/profil');
+        });
     } catch (e) {
-        res.status(500).send("Kayıt hatası.");
+        console.error(e);
+        res.status(500).send("Kayıt hatası oluştu.");
     }
 });
 
-// LOGIN: Çakışma giderilmiş temiz blok
+// GİRİŞ (LOGIN)
 app.post('/login', async (req, res) => {
     try {
         let { email, password } = req.body;
         const cleanEmail = email.trim().toLowerCase();
 
         const user = await User.findOne({ email: cleanEmail });
-        if (!user) return res.send('<script>alert("Email kayıtlı değil!"); window.location.href="/";</script>');
+        if (!user) return res.send('<script>alert("Bu email adresi kayıtlı değil!"); window.location.href="/";</script>');
 
         const isMatch = await bcrypt.compare(password, user.password);
         if (isMatch) {
             req.session.userId = user._id;
-            req.session.save(() => res.redirect('/profil'));
+            req.session.save((err) => {
+                if (err) return res.status(500).send("Oturum kaydedilemedi.");
+                res.redirect('/profil');
+            });
         } else {
-            res.send('<script>alert("Şifre hatalı!"); window.location.href="/";</script>');
+            res.send('<script>alert("Şifre yanlış!"); window.location.href="/";</script>');
         }
     } catch (error) {
-        res.status(500).send("Login hatası.");
+        res.status(500).send("Sistem hatası.");
     }
 });
 
-app.get('/profil', checkAuth, async (req, res) => {
+// PROFİL (Giriş kontrolü dahil)
+app.get('/profil', async (req, res) => {
+    if (!req.session.userId) return res.redirect('/');
     try {
         const user = await User.findById(req.session.userId);
         if (!user) return res.redirect('/logout');
-        res.render('profil', { user });
+        res.render('profil', { 
+            user, 
+            wallet: process.env.WALLET_ADDRESS,
+            contract: process.env.CONTRACT_ADDRESS 
+        });
     } catch (err) { res.redirect('/'); }
 });
 
-// --- 5. ARENA SİSTEMİ (%60 KAYIP) ---
-app.post('/attack-bot', checkAuth, async (req, res) => {
+// --- 5. ŞİFREMİ UNUTTUM SİSTEMİ ---
+
+app.post('/forgot-password', async (req, res) => {
+    const { email } = req.body;
     try {
-        const user = await User.findById(req.session.userId);
-        
-        // Şans Faktörü: %60 Kaybetme (0.6'dan büyük gelirse kazanır)
-        const isWin = Math.random() > 0.6;
-        let amount = 200;
+        const user = await User.findOne({ email: email.trim().toLowerCase() });
+        if (!user) return res.send('<script>alert("Email bulunamadı!"); window.location.href="/";</script>');
 
-        if (isWin) {
-            user.bpl += amount;
-            await new Victory({ userEmail: user.email, amount: amount, opponent: "Elite Bot" }).save();
-            io.emit('new-message', { sender: "ARENA", text: `🏆 ${user.nickname} botu paramparça etti!` });
-        } else {
-            user.bpl = Math.max(0, user.bpl - amount);
-            await new Punishment({ userEmail: user.email, amount: amount, reason: "Arena Mağlubiyeti" }).save();
-        }
-
+        const token = crypto.randomBytes(20).toString('hex');
+        user.resetPasswordToken = token;
+        user.resetPasswordExpires = Date.now() + 3600000; // 1 saat geçerli
         await user.save();
-        res.json({ status: 'success', isWin, newBalance: user.bpl });
-    } catch (err) { res.status(500).json({ status: 'error' }); }
+
+        const resetLink = `https://bonus-oyun.onrender.com/reset/${token}`;
+        
+        await transporter.sendMail({
+            to: user.email,
+            subject: 'BPL ECOSYSTEM - Şifre Sıfırlama',
+            html: `<h3>Şifrenizi sıfırlamak için <a href="${resetLink}">buraya tıklayın</a>.</h3>`
+        });
+
+        res.send('<script>alert("Sıfırlama maili gönderildi!"); window.location.href="/";</script>');
+    } catch (err) { res.status(500).send("İşlem başarısız."); }
 });
 
-// --- 6. SOCKET.IO (CHAT & TEBRİK YAKIMI) ---
-io.on('connection', (socket) => {
-    socket.on('chat-message', (data) => {
-        io.emit('new-message', { sender: "Kullanıcı", text: data.text });
-    });
-
-    // Tebrik: 500 BPL Gönderilir -> 410 Gider, 90 Yakılır
-    socket.on('tebrik-et', async (data) => {
-        try {
-            const sender = await User.findById(data.senderId);
-            const receiver = await User.findOne({ nickname: data.winnerNick });
-            const brut = 500, net = 410, burn = 90;
-
-            if (sender && receiver && sender.bpl >= brut) {
-                sender.bpl -= brut;
-                receiver.bpl += net;
-                await sender.save();
-                await receiver.save();
-                
-                await new Log({ type: 'BPL_BURN', content: `Yakılan: ${burn}`, userEmail: sender.email }).save();
-                io.emit('new-message', { sender: "SİSTEM", text: `💎 ${sender.nickname}, ${receiver.nickname}'ı tebrik etti! 90 BPL yakıldı.` });
-            }
-        } catch (e) { console.error(e); }
-    });
-});
-
+// ÇIKIŞ
 app.get('/logout', (req, res) => {
-    req.session.destroy();
-    res.clearCookie('connect.sid');
-    res.redirect('/');
+    req.session.destroy(() => {
+        res.clearCookie('connect.sid');
+        res.redirect('/');
+    });
 });
 
 server.listen(PORT, "0.0.0.0", () => {
-    console.log(`BPL ECOSYSTEM AKTİF: ${PORT}`);
+    console.log(`🚀 BPL Sunucusu Hazır | Port: ${PORT}`);
 });
