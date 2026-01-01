@@ -3,7 +3,7 @@ const express = require('express');
 const bodyParser = require('body-parser');
 const http = require('http');
 const session = require('express-session');
-const MongoStore = require('connect-mongo'); 
+const MongoStore = require('connect-mongo').default;
 const mongoose = require('mongoose');
 const path = require('path');
 const bcrypt = require('bcryptjs');
@@ -169,4 +169,5 @@ app.get('/logout', (req, res) => {
 server.listen(PORT, "0.0.0.0", () => {
     console.log(`🚀 BPL Sunucusu Hazır | Port: ${PORT}`);
 });
+
 
