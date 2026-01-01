@@ -1,18 +1,13 @@
 const express = require('express');
+const mongoose = require('mongoose'); // EKSİKTİ: Eklendi
 const session = require('express-session');
 const MongoStore = require('connect-mongo');
-
-// Eski MongoStore.create yerine bunu kullanıyoruz, v22'de en garantisi budur:
-const sessionStore = MongoStore.create({
-    mongoUrl: process.env.MONGO_URI,
-    collectionName: 'sessions'
-});
 const path = require('path');
 const http = require('http');
 const socketIo = require('socket.io');
 require('dotenv').config();
 
-// Modeller (2. resimdeki yapıya göre)
+// Modeller
 const User = require('./models/User');
 const Payment = require('./models/Payment');
 const Victory = require('./models/Victory');
@@ -21,6 +16,13 @@ const Log = require('./models/Log');
 const app = express();
 const server = http.createServer(app);
 const io = socketIo(server);
+
+// --- KRİTİK: SESSION STORE YAPILANDIRMASI ---
+const sessionStore = MongoStore.create({
+    mongoUrl: process.env.MONGO_URI,
+    collectionName: 'sessions',
+    autoRemove: 'native'
+});
 
 // MongoDB Bağlantısı
 mongoose.connect(process.env.MONGO_URI)
@@ -33,17 +35,12 @@ app.use(express.static(path.join(__dirname, 'public')));
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
 
-// Session Ayarları
+// Session Ayarları ( sessionStore kullanılarak düzeltildi )
 app.use(session({
     secret: process.env.SESSION_SECRET || 'bpl_gizli_anahtar_2025',
     resave: false,
     saveUninitialized: false,
-    store: MongoStore.create({ 
-        mongoUrl: process.env.MONGO_URI,
-        collectionName: 'sessions',
-        // Bağlantı kopmalarını önlemek için opsiyonel:
-        mongoOptions: { useNewUrlParser: true, useUnifiedTopology: true }
-    }),
+    store: sessionStore, // HATA BURADAYDI: Doğrudan değişkeni veriyoruz
     cookie: { 
         secure: process.env.NODE_ENV === 'production', 
         maxAge: 24 * 60 * 60 * 1000 
@@ -60,8 +57,12 @@ app.use((req, res, next) => {
 app.get('/', (req, res) => res.render('index'));
 app.get('/profil', async (req, res) => {
     if(!req.session.user) return res.redirect('/');
-    const user = await User.findById(req.session.user._id);
-    res.render('profil', { user });
+    try {
+        const user = await User.findById(req.session.user._id);
+        res.render('profil', { user });
+    } catch (err) {
+        res.redirect('/');
+    }
 });
 app.get('/market', (req, res) => res.render('market'));
 app.get('/arena', (req, res) => res.render('arena'));
@@ -74,15 +75,16 @@ app.get('/payment', (req, res) => res.render('payment'));
 // --- MARKET SATIN ALMA (POST) ---
 app.post('/buy-animal', async (req, res) => {
     const { animalName, price } = req.body;
+    if(!req.session.user) return res.status(401).json({msg: "Giriş yapmalısın"});
+    
     const user = await User.findById(req.session.user._id);
-
     if (user.bpl < price) return res.status(400).json({ msg: 'Bakiye Yetersiz!' });
 
     user.bpl -= price;
     user.inventory.push({
         name: animalName,
         level: 1,
-        stats: { hp: 150, atk: 30, def: 20 } // Varsayılan statlar
+        stats: { hp: 150, atk: 30, def: 20 }
     });
 
     await user.save();
@@ -93,40 +95,38 @@ app.post('/buy-animal', async (req, res) => {
 // --- SOCKET.IO (CHAT & HEDİYE SİSTEMİ) ---
 io.on('connection', (socket) => {
     socket.on('send-gift', async (data) => {
-        // data: { fromId, toId, amount }
-        const sender = await User.findById(data.fromId);
-        const receiver = await User.findById(data.toId);
+        try {
+            const sender = await User.findById(data.fromId);
+            const receiver = await User.findById(data.toId);
 
-        // KURALLAR: 
-        // 1. En az 6000 BPL bakiye şartı
-        // 2. Maksimum 250 BPL gönderim sınırı
-        if (sender.bpl >= 6000 && data.amount <= 250) {
-            const tax = Math.floor(data.amount * 0.18); // %18 Kesinti (Yakım)
-            const netAmount = data.amount - tax;
+            if (sender.bpl >= 6000 && data.amount <= 250) {
+                const tax = Math.floor(data.amount * 0.18);
+                const netAmount = data.amount - tax;
 
-            sender.bpl -= data.amount;
-            receiver.bpl += netAmount;
+                sender.bpl -= data.amount;
+                receiver.bpl += netAmount;
 
-            await sender.save();
-            await receiver.save();
+                await sender.save();
+                await receiver.save();
 
-            // Kayıt Altına Al (Payment Modeli)
-            await Payment.create({
-                sender: sender.nickname,
-                receiver: receiver.nickname,
-                amount: data.amount,
-                tax: tax,
-                status: 'Completed'
-            });
+                await Payment.create({
+                    sender: sender.nickname,
+                    receiver: receiver.nickname,
+                    amount: data.amount,
+                    tax: tax,
+                    status: 'Completed'
+                });
 
-            io.emit('notification', { msg: `${sender.nickname} kişisinden ${netAmount} BPL hediye geldi! (${tax} BPL yakıldı)` });
-        } else {
-            socket.emit('error', { msg: 'Hediye limitleri veya bakiye uygun değil!' });
+                // Yakılan miktar için Log kaydı
+                await Log.create({ type: 'BURN', amount: tax, detail: 'Gift Tax Burned' });
+
+                io.emit('notification', { msg: `${sender.nickname} kişisinden ${netAmount} BPL hediye geldi! (${tax} BPL yakıldı)` });
+            }
+        } catch (err) {
+            socket.emit('error', { msg: 'İşlem başarısız!' });
         }
     });
 });
 
 const PORT = process.env.PORT || 10000;
 server.listen(PORT, () => console.log(`🚀 Sistem Port ${PORT} üzerinde aktif!`));
-
-
