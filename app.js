@@ -5,7 +5,7 @@ const bodyParser = require('body-parser');
 const http = require('http');
 const socketIo = require('socket.io');
 const session = require('express-session');
-const MongoStore = require('connect-mongo'); // require('connect-mongo').default; yerine bu daha güvenlidir
+const MongoStore = require('connect-mongo'); 
 const mongoose = require('mongoose');
 const path = require('path');
 const bcrypt = require('bcryptjs');
@@ -14,8 +14,6 @@ const bcrypt = require('bcryptjs');
 const connectDB = require('./db');
 const User = require('./models/User');
 const Log = require('./models/Log');
-const Victory = require('./models/Victory');
-const Punishment = require('./models/Punishment');
 
 connectDB();
 
@@ -30,27 +28,31 @@ app.set('views', path.join(__dirname, 'views'));
 app.use(express.static(path.join(__dirname, 'public')));
 app.use(bodyParser.json());
 app.use(bodyParser.urlencoded({ extended: true }));
+
+// RENDER İÇİN KRİTİK AYAR: Proxy'ye güven
 app.set('trust proxy', 1);
 
-// OTURUM YÖNETİMİ (v6.0.0 HATASIZ YAPI)
+// OTURUM YÖNETİMİ (RENDER VE v6 UYUMLU)
 app.use(session({
-    secret: process.env.SESSION_SECRET || 'bpl_global_key_2026',
-    resave: false,
+    secret: process.env.SESSION_SECRET || 'bpl_ozel_anahtar_2026',
+    resave: true, // Oturumu her seferinde güncelle
     saveUninitialized: false,
     store: MongoStore.create({ 
         mongoUrl: process.env.MONGO_URI,
-        collectionName: 'sessions',
-        ttl: 14 * 24 * 60 * 60 
+        collectionName: 'sessions'
     }),
     cookie: { 
+        // Render HTTPS kullandığı için production'da true olmalı
         secure: process.env.NODE_ENV === 'production', 
+        sameSite: 'lax',
         maxAge: 24 * 60 * 60 * 1000 
     }
 }));
 
-// Oturum Kontrolü Middleware
 const checkAuth = (req, res, next) => {
-    if (req.session.userId) return next();
+    if (req.session && req.session.userId) {
+        return next();
+    }
     res.redirect('/');
 };
 
@@ -61,7 +63,7 @@ app.get('/', (req, res) => {
     res.render('index', { user: null });
 });
 
-// KAYIT (REGISTER) - Kayıttan sonra direkt giriş yaptırır
+// KAYIT VE OTOMATİK GİRİŞ
 app.post('/register', async (req, res) => {
     try {
         let { nickname, email, password } = req.body;
@@ -81,20 +83,18 @@ app.post('/register', async (req, res) => {
 
         const savedUser = await newUser.save();
         
-        // ÖNEMLİ: Kayıt olduktan sonra oturumu hemen açıyoruz
+        // KAYIT SONRASI OTURUMU BAŞLAT
         req.session.userId = savedUser._id;
         req.session.save((err) => {
             if (err) return res.redirect('/');
-            res.send('<script>alert("Hoş geldiniz! 2500 BPL hesabınıza yüklendi."); window.location.href="/profil";</script>');
+            res.redirect('/profil'); // Alert koymadan direkt yönlendirme daha sağlıklıdır
         });
-
     } catch (e) {
-        console.error("Kayıt hatası:", e);
         res.status(500).send("Kayıt hatası.");
     }
 });
 
-// GİRİŞ (LOGIN)
+// LOGIN
 app.post('/login', async (req, res) => {
     try {
         let { email, password } = req.body;
@@ -126,41 +126,12 @@ app.get('/profil', checkAuth, async (req, res) => {
     } catch (err) { res.redirect('/'); }
 });
 
-// --- 5. ARENA VE MARKET ---
-
-app.get('/market', checkAuth, async (req, res) => {
-    const user = await User.findById(req.session.userId);
-    const animals = [
-        { id: 1, name: 'Tiger', price: 1000, img: '/caracter/profile/tiger.jpg' },
-        { id: 2, name: 'Lion', price: 1000, img: '/caracter/profile/lion.jpg' },
-        { id: 3, name: 'Eagle', price: 1000, img: '/caracter/profile/eagle.jpg' }
-    ];
-    res.render('market', { user, animals });
-});
-
-app.post('/attack-bot', checkAuth, async (req, res) => {
-    try {
-        const user = await User.findById(req.session.userId);
-        const isWin = Math.random() > 0.6; // %60 Kayıp
-
-        if (isWin) {
-            user.bpl += 200;
-            await new Victory({ userEmail: user.email, amount: 200, opponent: "Elite Bot" }).save();
-        } else {
-            user.bpl = Math.max(0, user.bpl - 200);
-            await new Punishment({ userEmail: user.email, amount: 200, reason: "Arena Yenilgisi" }).save();
-        }
-
-        await user.save();
-        res.json({ status: 'success', isWin, newBalance: user.bpl });
-    } catch (err) { res.status(500).json({ status: 'error' }); }
-});
-
 app.get('/logout', (req, res) => {
     req.session.destroy();
+    res.clearCookie('connect.sid'); // Çerezi temizle
     res.redirect('/');
 });
 
 server.listen(PORT, "0.0.0.0", () => {
-    console.log(`BPL ECOSYSTEM AKTİF - PORT: ${PORT}`);
+    console.log(`BPL ECOSYSTEM ÇALIŞIYOR: ${PORT}`);
 });
