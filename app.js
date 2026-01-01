@@ -1,8 +1,12 @@
 const express = require('express');
-const mongoose = require('mongoose');
 const session = require('express-session');
-// KRİTİK: v6 hatasını çözen default kullanımı
-const MongoStore = require('connect-mongo').default; 
+const MongoStore = require('connect-mongo');
+
+// Eski MongoStore.create yerine bunu kullanıyoruz, v22'de en garantisi budur:
+const sessionStore = MongoStore.create({
+    mongoUrl: process.env.MONGO_URI,
+    collectionName: 'sessions'
+});
 const path = require('path');
 const http = require('http');
 const socketIo = require('socket.io');
@@ -124,4 +128,5 @@ io.on('connection', (socket) => {
 
 const PORT = process.env.PORT || 10000;
 server.listen(PORT, () => console.log(`🚀 Sistem Port ${PORT} üzerinde aktif!`));
+
 
