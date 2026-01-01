@@ -31,14 +31,19 @@ app.use(express.urlencoded({ extended: true }));
 
 // Session Ayarları
 app.use(session({
-    secret: process.env.SESSION_SECRET,
+    secret: process.env.SESSION_SECRET || 'bpl_gizli_anahtar_2025',
     resave: false,
     saveUninitialized: false,
     store: MongoStore.create({ 
         mongoUrl: process.env.MONGO_URI,
-        collectionName: 'sessions' 
+        collectionName: 'sessions',
+        // Bağlantı kopmalarını önlemek için opsiyonel:
+        mongoOptions: { useNewUrlParser: true, useUnifiedTopology: true }
     }),
-    cookie: { secure: process.env.NODE_ENV === 'production', maxAge: 24 * 60 * 60 * 1000 }
+    cookie: { 
+        secure: process.env.NODE_ENV === 'production', 
+        maxAge: 24 * 60 * 60 * 1000 
+    }
 }));
 
 // Kullanıcıyı Tüm View'lara Aktar
@@ -119,3 +124,4 @@ io.on('connection', (socket) => {
 
 const PORT = process.env.PORT || 10000;
 server.listen(PORT, () => console.log(`🚀 Sistem Port ${PORT} üzerinde aktif!`));
+
