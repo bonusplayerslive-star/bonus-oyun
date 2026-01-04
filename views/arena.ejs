@@ -120,9 +120,9 @@
 
     <script>
        // arena.ejs içindeki socket bağlantısını şu şekilde güncelleyin:
-const arenaSocket = io(window.location.hostname.includes('localhost') 
-    ? "http://localhost:3001" 
-    : "https://bonus-oyun.onrender.com"); // Buraya kendi Render URL'ini tam olarak yaz
+// arena.ejs içinde:
+// Port yazmıyoruz, böylece ana site hangi porttaysa (Render'da 10000) ona bağlanır.
+const arenaSocket = io();
         const videoElement = document.getElementById('battle-video');
         const statusMsg = document.getElementById('battle-status');
         const resultBanner = document.getElementById('result-banner');
@@ -299,3 +299,4 @@ function startSearch() {
 </body>
 
 </html>
+
