@@ -119,7 +119,10 @@
     </div>
 
     <script>
-        const arenaSocket = io("http://localhost:3001");
+       // arena.ejs içindeki socket bağlantısını şu şekilde güncelleyin:
+const arenaSocket = io(window.location.hostname.includes('localhost') 
+    ? "http://localhost:3001" 
+    : "https://bonus-oyun.onrender.com"); // Buraya kendi Render URL'ini tam olarak yaz
         const videoElement = document.getElementById('battle-video');
         const statusMsg = document.getElementById('battle-status');
         const resultBanner = document.getElementById('result-banner');
@@ -294,4 +297,5 @@ function startSearch() {
 
     </script>
 </body>
+
 </html>
