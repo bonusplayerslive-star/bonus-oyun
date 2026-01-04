@@ -327,7 +327,64 @@ socket.on('invite-meeting', async (data) => {
     } catch (e) { console.log(e); }
 });
 
+// --- ARENA SİSTEMİ (Tek Port Entegrasyonu) ---
+let arenaWaitingPool = []; // Online oyuncu havuzu
 
+socket.on('find-match', async (data) => {
+    // Havuzda bekleyen başka biri var mı?
+    if (arenaWaitingPool.length > 0) {
+        const opponentSocket = arenaWaitingPool.shift();
+        const roomId = `arena_${opponentSocket.id}_${socket.id}`;
+
+        socket.join(roomId);
+        opponentSocket.join(roomId);
+
+        // Her iki tarafa da eşleşme bilgisini gönder
+        const matchData = {
+            roomId: roomId,
+            players: [
+                { id: socket.id, nick: socket.nickname, animal: data.myAnimal },
+                { id: opponentSocket.id, nick: opponentSocket.nickname, animal: opponentSocket.animal }
+            ]
+        };
+
+        io.to(roomId).emit('pvp-found', matchData);
+        console.log(`⚔️ Maç Başladı: ${socket.nickname} vs ${opponentSocket.nickname}`);
+    } else {
+        // Kimse yoksa havuza gir
+        socket.animal = data.myAnimal;
+        arenaWaitingPool.push(socket);
+        console.log(`⏳ ${socket.nickname} arena havuzuna girdi.`);
+    }
+});
+
+// Bot Savaşı Tetikleyici (13 saniye dolunca)
+socket.on('start-bot-battle', async (data) => {
+    // Havuzdan temizle
+    arenaWaitingPool = arenaWaitingPool.filter(s => s.id !== socket.id);
+    
+    try {
+        const user = await User.findById(socket.userId);
+        const botNames = ["Nova_Commander", "Alpha_Strike", "Cyber_Ronin"];
+        const botAnimals = ["Lion", "Tiger", "Bear"];
+        
+        const isWin = Math.random() > 0.6;
+        const prize = isWin ? 50 : 0;
+
+        if(user) {
+            user.bpl += (isWin ? prize : -25);
+            await user.save();
+        }
+
+        socket.emit('battle-result', {
+            isWin,
+            opponentName: botNames[Math.floor(Math.random() * botNames.length)],
+            opponentAnimal: botAnimals[Math.floor(Math.random() * botAnimals.length)],
+            prize: prize,
+            type: 'BOT'
+        });
+    } catch (e) { console.log("Arena Bot Hatası:", e); }
+});
 
 
 });
@@ -336,4 +393,5 @@ socket.on('invite-meeting', async (data) => {
 const PORT = process.env.PORT || 3000;
 httpServer.listen(PORT, () => {
     console.log(`🌍 Sunucu Yayında: http://localhost:${PORT}`);
+
 });
