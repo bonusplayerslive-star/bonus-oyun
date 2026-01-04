@@ -1,0 +1,241 @@
+// Path: views\market.ejs
+<!DOCTYPE html>
+<html lang="tr">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>BPL ULTIMATE MARKET</title>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css">
+    <link href="https://fonts.googleapis.com/css2?family=Rajdhani:wght@500;700&family=Orbitron:wght@400;700&display=swap" rel="stylesheet">
+    <style>
+        :root { --neon-green: #39FF14; --dark-bg: #0a0a0a; --card-bg: #111; --gold: #FFD700; }
+        body { 
+            background: var(--dark-bg); 
+            color: white; 
+            font-family: 'Rajdhani', sans-serif;
+            background: url('/caracter/page/welcome.jpg') no-repeat center center fixed;
+            background-size: cover;
+        }
+        
+        body::before {
+            content: ""; position: fixed; top: 0; left: 0; width: 100%; height: 100%;
+            background: rgba(0,0,0,0.85); z-index: -1;
+        }
+
+        .market-header {
+            background: rgba(0,0,0,0.9);
+            border-bottom: 2px solid var(--neon-green);
+            padding: 15px 0;
+            margin-bottom: 30px;
+            backdrop-filter: blur(10px);
+        }
+
+        .animal-card {
+            background: rgba(17, 17, 17, 0.95);
+            border-radius: 15px;
+            padding: 15px;
+            text-align: center;
+            transition: all 0.3s ease;
+            margin-bottom: 30px;
+            border: 1px solid rgba(57, 255, 20, 0.1);
+        }
+
+        .animal-card:hover { 
+            transform: translateY(-10px); 
+            border-color: var(--neon-green);
+            box-shadow: 0 0 25px rgba(57, 255, 20, 0.3);
+        }
+
+        .animal-img {
+            width: 100%;
+            aspect-ratio: 1/1;
+            object-fit: cover;
+            border-radius: 10px;
+            margin-bottom: 15px;
+            border: 2px solid #222;
+        }
+
+        .animal-name { font-family: 'Orbitron'; font-size: 1.1rem; color: var(--neon-green); margin-bottom: 5px; }
+        .price-tag { color: var(--gold); font-weight: bold; font-size: 1.2rem; margin-bottom: 15px; display: block; font-family: 'Orbitron'; }
+
+        /* --- GÜÇ BARLARI --- */
+        .stat-container { margin-bottom: 15px; text-align: left; padding: 0 10px; }
+        .stat-label { font-size: 0.75rem; font-family: 'Orbitron'; color: #aaa; margin-bottom: 2px; display: flex; justify-content: space-between; }
+        .progress { background-color: #222; height: 6px; border-radius: 3px; margin-bottom: 8px; border: 1px solid #333; }
+        .progress-bar-hp { background: linear-gradient(90deg, #ff416c, #ff4b2b); }
+        .progress-bar-atk { background: linear-gradient(90deg, #fcead2, #f8d49d, #39FF14); }
+        .progress-bar-def { background: linear-gradient(90deg, #4facfe, #00f2fe); }
+
+        .btn-buy {
+            background: transparent;
+            border: 1px solid var(--neon-green);
+            color: var(--neon-green);
+            width: 100%;
+            padding: 10px;
+            font-weight: bold;
+            font-family: 'Orbitron';
+            font-size: 0.8rem;
+            transition: 0.3s;
+        }
+        .btn-buy:hover { background: var(--neon-green); color: black; box-shadow: 0 0 15px var(--neon-green); }
+        
+        .btn-owned { 
+            background: #222; 
+            color: #555; 
+            border: 1px solid #333; 
+            width: 100%; 
+            padding: 10px; 
+            cursor: not-allowed; 
+            font-family: 'Orbitron';
+            font-size: 0.8rem;
+        }
+    </style>
+</head>
+<body>
+
+<header class="market-header">
+    <div class="container d-flex justify-content-between align-items-center">
+        <h2 style="color: var(--neon-green); font-family: 'Orbitron';" class="mb-0">
+            <i class="fas fa-shopping-cart me-2"></i>BPL MARKET
+        </h2>
+        <div class="d-flex align-items-center">
+            <div class="me-3 px-3 py-2" style="background: rgba(57, 255, 20, 0.1); border: 1px solid var(--neon-green); border-radius: 10px;">
+                <span style="color: var(--gold); font-family: 'Orbitron';">
+                    <i class="fas fa-coins me-1"></i> <%= user.bpl.toLocaleString() %> BPL
+                </span>
+            </div>
+            <a href="/profil" class="btn btn-outline-light btn-sm">Üsse Dön</a>
+        </div>
+    </div>
+</header>
+
+<div class="container">
+    <div class="row">
+        <% 
+        // Hayvan Listesi ve Özellikleri
+        const marketAnimals = [
+            { name: 'Tiger', price: 5000, hp: 90, atk: 95, def: 60 },
+            { name: 'Lion', price: 5000, hp: 85, atk: 90, def: 70 },
+            { name: 'Rhino', price: 5000, hp: 100, atk: 60, def: 95 },
+            { name: 'Gorilla', price: 5000, hp: 95, atk: 85, def: 80 },
+            { name: 'Bear', price: 1000, hp: 80, atk: 75, def: 65 },
+            { name: 'Crocodile', price: 1000, hp: 75, atk: 80, def: 70 },
+            { name: 'Eagle', price: 1000, hp: 50, atk: 85, def: 40 },
+            { name: 'Wolf', price: 1000, hp: 60, atk: 70, def: 55 },
+            { name: 'Snake', price: 1000, hp: 45, atk: 90, def: 30 },
+            { name: 'Falcon', price: 1000, hp: 40, atk: 95, def: 35 }
+        ];
+
+        marketAnimals.forEach(animal => { 
+            const isOwned = user.inventory.some(item => item.name.toLowerCase() === animal.name.toLowerCase());
+        %>
+            <div class="col-lg-3 col-md-4 col-sm-6">
+                <div class="animal-card">
+                    <img src="/caracter/profile/<%= animal.name.toLowerCase() %>.jpg" 
+                         alt="<%= animal.name %>" 
+                         class="animal-img"
+                         onerror="this.src='/caracter/page/logo.jpeg'">
+                    
+                    <h3 class="animal-name"><%= animal.name.toUpperCase() %></h3>
+                    <span class="price-tag"><%= animal.price.toLocaleString() %> BPL</span>
+
+                    <div class="stat-container">
+                        <div class="stat-label"><span>HP (Can)</span><span><%= animal.hp %>%</span></div>
+                        <div class="progress"><div class="progress-bar progress-bar-hp" style="width: <%= animal.hp %>%"></div></div>
+                        
+                        <div class="stat-label"><span>ATK (Saldırı)</span><span><%= animal.atk %>%</span></div>
+                        <div class="progress"><div class="progress-bar progress-bar-atk" style="width: <%= animal.atk %>%"></div></div>
+                        
+                        <div class="stat-label"><span>DEF (Savunma)</span><span><%= animal.def %>%</span></div>
+                        <div class="progress"><div class="progress-bar progress-bar-def" style="width: <%= animal.def %>%"></div></div>
+                    </div>
+
+                    <% if (isOwned) { %>
+                        <button class="btn btn-owned" disabled><i class="fas fa-check me-1"></i> ENVANTERDE</button>
+                    <% } else { %>
+                        <button onclick="buyAnimal('<%= animal.name %>', <%= animal.price %>)" class="btn btn-buy">
+                            <i class="fas fa-shopping-bag me-1"></i> SATIN AL
+                        </button>
+                    <% } %>
+                </div>
+            </div>
+        <% }); %>
+    </div>
+</div>
+
+<script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
+<script>
+    async function buyAnimal(name, price) {
+        const result = await Swal.fire({
+            title: 'SATIN ALMA ONAYI',
+            text: `${name} için ${price.toLocaleString()} BPL harcanacak. Onaylıyor musun?`,
+            icon: 'warning',
+            showCancelButton: true,
+            confirmButtonColor: '#39FF14',
+            cancelButtonColor: '#d33',
+            confirmButtonText: 'EVET, KOMUTANIM!',
+            cancelButtonText: 'VAZGEÇ',
+            background: '#111',
+            color: '#fff'
+        });
+
+        if (result.isConfirmed) {
+            try {
+                const res = await fetch('/api/buy-item', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ itemName: name, price: price })
+                });
+                
+                const data = await res.json();
+                
+                if (data.success) {
+                    Swal.fire({
+                        title: 'BAŞARILI!',
+                        text: `${name} birliğine katıldı. Yeni Bakiyen: ${data.newBalance} BPL`,
+                        icon: 'success',
+                        confirmButtonColor: '#39FF14'
+                    }).then(() => location.reload());
+                } else {
+                    Swal.fire('HATA', data.error, 'error');
+                }
+            } catch (err) {
+                Swal.fire('HATA', 'İşlem başarısız oldu!', 'error');
+            }
+        }
+    }
+
+function inviteToArena(targetNick) {
+    const arenaRoomId = "arena_" + Math.random().toString(36).substr(2, 9);
+    // Sunucuya davet sinyali gönder
+    socket.emit('send-arena-invitation', {
+        targetNick: targetNick,
+        roomId: arenaRoomId
+    });
+    // Kendini hemen yönlendir
+    window.location.href = `/arena?opponent=${targetNick}&room=${arenaRoomId}`;
+}
+
+// Sunucudan gelen daveti yakala
+socket.on('receive-arena-invitation', (data) => {
+    Swal.fire({
+        title: 'DÜELLO DAVETİ!',
+        text: `${data.senderNick} seni Arena'ya çağırıyor!`,
+        icon: 'warning',
+        showCancelButton: true,
+        confirmButtonText: 'KABUL ET',
+        cancelButtonText: 'REDDET'
+    }).then((result) => {
+        if (result.isConfirmed) {
+            window.location.href = `/arena?opponent=${data.senderNick}&room=${data.roomId}`;
+        }
+    });
+});
+
+
+
+</script>
+
+</body>
+</html>

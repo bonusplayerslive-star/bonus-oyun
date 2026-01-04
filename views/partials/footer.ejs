@@ -1,0 +1,10 @@
+// Path: views\partials\footer.ejs
+// Portu belirtmeden bağlandığında otomatik 3000'e (ana sunucuya) gider
+const socket = io({ 
+    transports: ['websocket'],
+    upgrade: false 
+}); 
+
+socket.on('connect', () => {
+    console.log("3000 Sunucusuna başarıyla bağlandık!");
+});

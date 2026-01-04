@@ -1,0 +1,278 @@
+// Path: views\wallet.ejs
+<!DOCTYPE html>
+<html lang="tr">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>BPL | Cüzdan & Varlık Yönetimi</title>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css">
+    <style>
+        :root { --neon-green: #39FF14; --neon-red: #ff003c; --dark-bg: #0a0a0a; }
+        body { background: var(--dark-bg); color: #fff; font-family: 'Courier New', monospace; padding-top: 20px; }
+        
+        /* Neon Tasarım Elementleri */
+        .neon-border { border: 1px solid var(--neon-green); box-shadow: 0 0 15px rgba(57, 255, 20, 0.2); background: rgba(0,0,0,0.9); border-radius: 15px; }
+        .text-neon { color: var(--neon-green); text-shadow: 0 0 8px var(--neon-green); }
+        .btn-neon { border: 1px solid var(--neon-green); color: var(--neon-green); background: transparent; transition: 0.3s; font-weight: bold; text-transform: uppercase; }
+        .btn-neon:hover { background: var(--neon-green); color: #000; box-shadow: 0 0 25px var(--neon-green); }
+        
+        /* BEP20 Kritik Uyarı Animasyonu */
+        .bep20-alert {
+            background: rgba(255, 0, 60, 0.1);
+            border: 2px dashed var(--neon-red);
+            color: #fff;
+            padding: 15px;
+            border-radius: 10px;
+            animation: pulse-red 2s infinite;
+        }
+
+        @keyframes pulse-red {
+            0% { box-shadow: 0 0 5px var(--neon-red); }
+            50% { box-shadow: 0 0 20px var(--neon-red); }
+            100% { box-shadow: 0 0 5px var(--neon-red); }
+        }
+
+        /* Asset (Karakter) Kartları */
+        .asset-card {
+            background: linear-gradient(145deg, #0f0f0f, #1a1a1a);
+            border: 1px solid rgba(255,255,255,0.1);
+            border-radius: 12px;
+            overflow: hidden;
+            transition: 0.4s;
+            position: relative;
+        }
+        .asset-card:hover { border-color: var(--neon-green); transform: translateY(-10px); }
+        .asset-img { height: 160px; width: 100%; object-fit: cover; filter: grayscale(40%); transition: 0.5s; }
+        .asset-card:hover .asset-img { filter: grayscale(0%); }
+        
+        .status-badge {
+            font-size: 0.7rem;
+            padding: 3px 10px;
+            border-radius: 20px;
+            background: rgba(57, 255, 20, 0.1);
+            color: var(--neon-green);
+            border: 1px solid var(--neon-green);
+        }
+
+        .withdraw-note { font-size: 0.8rem; color: #ffa500; background: rgba(255,165,0,0.05); border-left: 3px solid #ffa500; padding: 10px; }
+        input.form-control { background: #111 !important; border: 1px solid #333 !important; color: #fff !important; }
+        input.form-control:focus { border-color: var(--neon-green) !important; box-shadow: none; }
+    </style>
+</head>
+<body>
+
+<div class="container pb-5">
+    <div class="d-flex justify-content-between align-items-center mb-4 p-4 neon-border">
+        <div>
+            <h2 class="text-neon m-0"><i class="fas fa-wallet me-2"></i>WALLET & ASSETS</h2>
+            <small class="text-muted">Merkeziyetsiz Varlık Yönetim Paneli</small>
+        </div>
+        <div class="text-end">
+            <span class="h4 d-block mb-1 text-warning"><%= user.bpl.toLocaleString() %> BPL</span>
+            <a href="/profil" class="btn btn-sm btn-outline-light"><i class="fas fa-arrow-left me-1"></i> Üsse Dön</a>
+        </div>
+    </div>
+
+    <div class="bep20-alert mb-5 text-center">
+        <h5 class="m-0 fw-bold"><i class="fas fa-exclamation-triangle me-2"></i> PROTOKOL UYARISI: SADECE BEP20 (BNB SMART CHAIN)</h5>
+        <small>Yanlış ağ üzerinden gönderilen varlıklar kurtarılamaz. USDT transferlerinde ağı BEP20 seçtiğinizden emin olun.</small>
+    </div>
+
+    <div class="row g-4">
+        <div class="col-md-6">
+            <div class="card p-4 neon-border h-100">
+                <h4 class="text-info mb-4 border-bottom border-info pb-2"><i class="fas fa-file-invoice-dollar me-2"></i>Finansal Altyapı</h4>
+                
+                <div class="mb-4">
+                    <label class="form-label text-info small">Resmi Şirket Kasası (USDT BEP20)</label>
+                    <div class="p-3 bg-dark rounded border border-secondary text-break font-monospace small position-relative">
+                        0x9f63e92E8B316b7119b4586998966dF4446Dc754
+                        <i class="fas fa-copy position-absolute end-0 top-50 translate-middle-y me-3 text-muted" style="cursor:pointer"></i>
+                    </div>
+                </div>
+
+                <div class="mb-4">
+                    <label class="form-label">Senin Geri Ödeme Adresin (BEP20)</label>
+                    <input type="text" id="usdtAddress" class="form-control" 
+                           value="<%= user.usdt_address || '' %>" placeholder="0x...">
+                    <button onclick="saveAddress()" class="btn btn-neon mt-3 w-100">ADRESİ PROTOKOLE KAYDET</button>
+                </div>
+
+                <div class="mt-auto pt-3">
+                    <a href="/payment" class="btn btn-warning w-100 py-3 fw-bold shadow-sm">
+                        <i class="fas fa-plus-circle me-2"></i>BPL PAKETİ SATIN AL (KOMİSYONSUZ)
+                    </a>
+                </div>
+            </div>
+        </div>
+
+        <div class="col-md-6">
+            <div class="card p-4 neon-border h-100" style="border-color: var(--neon-red)">
+                <h4 class="text-danger mb-4 border-bottom border-danger pb-2"><i class="fas fa-external-link-alt me-2"></i>BPL Tasfiye (Withdraw)</h4>
+                
+                <div class="withdraw-note mb-4">
+                    <strong>TASFİYE KURALLARI:</strong><br>
+                    • Minimum Eşik: 7,500 BPL<br>
+                    • İşlem Vergisi: %25 (Otomatik Yakım)<br>
+                    • Onay Süresi: 0-24 Saat (Manuel İnceleme)
+                </div>
+
+                <div class="mb-3">
+                    <label class="form-label small text-muted">Çekilecek BPL Miktarı</label>
+                    <input type="number" id="withdrawAmount" class="form-control" placeholder="Örn: 10000">
+                </div>
+
+                <div id="calcBox" class="p-3 mb-4 bg-danger bg-opacity-10 border border-danger rounded" style="display:none;">
+                    <div class="d-flex justify-content-between small">
+                        <span>Net Gönderilecek:</span>
+                        <span id="netAmount" class="fw-bold text-danger">0 BPL</span>
+                    </div>
+                    <div class="d-flex justify-content-between small text-muted">
+                        <span>Sistemden Yakılacak (%25):</span>
+                        <span id="taxAmount">0 BPL</span>
+                    </div>
+                </div>
+
+                <button onclick="withdrawRequest()" class="btn btn-danger w-100 py-3 fw-bold">TASFİYE TALEBİNİ İLET</button>
+            </div>
+        </div>
+    </div>
+
+    <div class="row mt-5">
+        <div class="col-12 text-center mb-4">
+            <h3 class="text-neon"><i class="fas fa-dragon me-2"></i>ASSET INVENTORY</h3>
+            <div style="height: 2px; width: 80px; background: var(--neon-green); margin: 0 auto;"></div>
+        </div>
+
+        <div class="row justify-content-center">
+            <% if(!user.inventory || user.inventory.length === 0) { %>
+                <div class="col-md-8 text-center text-muted py-5 border rounded border-secondary">
+                    <i class="fas fa-ghost fa-3x mb-3"></i>
+                    <p>Envanterinde hiç aktif varlık bulunamadı.</p>
+                </div>
+            <% } else { %>
+                <% 
+                    const animalTranslate = {
+                        "YILAN": "snake", "SNAKE": "snake", "KAPLAN": "tiger", "TIGER": "tiger",
+                        "AYI": "bear", "BEAR": "bear", "TIMSAH": "crocodile", "CROCODILE": "crocodile",
+                        "KARTAL": "eagle", "EAGLE": "eagle", "KURT": "kurd", "WOLF": "kurd", "KURD": "kurd",
+                        "ASLAN": "lion", "LION": "lion", "GORIL": "gorilla", "GORILLA": "gorilla",
+                        "GERGEDAN": "rhino", "RHINO": "rhino", "GÖKDOĞAN": "peregrinefalcon"
+                    };
+                %>
+                <% user.inventory.forEach((item, index) => { 
+                    let itemName = item.name || item;
+                    let upperName = itemName.toUpperCase();
+                    let engName = animalTranslate[upperName] || "logo";
+                    let originalPrice = ['ASLAN','LION','GERGEDAN','RHINO','GORIL','GORILLA','KAPLAN','TIGER'].includes(upperName) ? 5000 : 1000;
+                    let sellPrice = originalPrice * 0.70;
+                %>
+                    <div class="col-6 col-lg-3 mb-4">
+                        <div class="asset-card h-100 text-center pb-3">
+                            <img src="/caracter/profile/<%= engName %>.jpg" onerror="this.src='/caracter/page/logo.jpeg'" class="asset-img">
+                            <div class="p-3">
+                                <span class="status-badge mb-2 d-inline-block">LEVEL <%= item.level || 1 %></span>
+                                <h6 class="text-white text-uppercase"><%= itemName %></h6>
+                                <p class="text-warning fw-bold mb-3"><%= sellPrice %> BPL</p>
+                                
+                                <% if(user.inventory.length > 1) { %>
+                                    <button onclick="sellCharacter('<%= index %>', '<%= itemName %>', <%= originalPrice %>)" 
+                                            class="btn btn-sm btn-outline-danger w-100 py-2">
+                                        <i class="fas fa-fire me-1"></i> SAT (%30 YAKIM)
+                                    </button>
+                                <% } else { %>
+                                    <span class="badge bg-secondary w-100 py-2">ANA VARLIK (DOKUNULMAZ)</span>
+                                <% } %>
+                            </div>
+                        </div>
+                    </div>
+                <% }) %>
+            <% } %>
+        </div>
+    </div>
+</div>
+
+<script src="/socket.io/socket.io.js"></script>
+<script>
+    const userId = '<%= user.id %>';
+    const socket = io();
+
+    // Çekim hesaplama motoru
+    document.getElementById('withdrawAmount').addEventListener('input', function(e) {
+        const amount = parseFloat(e.target.value);
+        const box = document.getElementById('calcBox');
+        if(amount >= 7500) {
+            box.style.display = 'block';
+            const tax = amount * 0.25;
+            const net = amount - tax;
+            document.getElementById('netAmount').innerText = net.toLocaleString() + ' BPL';
+            document.getElementById('taxAmount').innerText = tax.toLocaleString() + ' BPL';
+        } else {
+            box.style.display = 'none';
+        }
+    });
+
+    function saveAddress() {
+        const usdt = document.getElementById('usdtAddress').value.trim();
+        if(!usdt.startsWith('0x') || usdt.length < 40) return alert("Geçerli bir BEP20 adresi giriniz!");
+
+        fetch('/save-wallet-address', {
+            method: 'POST',
+            headers: {'Content-Type': 'application/x-www-form-urlencoded'},
+            body: `userId=${userId}&usdtAddress=${usdt}`
+        }).then(r => r.json()).then(d => alert(d.msg));
+    }
+
+    function sellCharacter(index, name, originalPrice) {
+        const refund = originalPrice * 0.70;
+        if(!confirm(`${name} varlığını %30 yakım vergisi ile tasfiye etmek istediğine emin misin? Alacağın: ${refund} BPL`)) return;
+        
+        fetch('/sell-character', {
+            method: 'POST',
+            headers: {'Content-Type': 'application/x-www-form-urlencoded'},
+            body: `userId=${userId}&animalIndex=${index}&fiyat=${originalPrice}`
+        }).then(r => r.json()).then(d => {
+            alert(d.msg);
+            if(d.status === 'success') location.reload();
+        });
+    }
+
+    // Çekim hesaplama motoru güncelleme (%30)
+document.getElementById('withdrawAmount').addEventListener('input', function(e) {
+    const amount = parseFloat(e.target.value);
+    const box = document.getElementById('calcBox');
+    if(amount >= 7500) {
+        box.style.display = 'block';
+        const tax = amount * 0.30; // %30 yapıldı
+        const net = amount - tax;
+        document.getElementById('netAmount').innerText = net.toLocaleString() + ' BPL';
+        document.getElementById('taxAmount').innerText = tax.toLocaleString() + ' BPL';
+    } else {
+        box.style.display = 'none';
+    }
+});
+function varlikSat(animalName) {
+    if (confirm(animalName + " varlığını %30 yakım vergisi ile tasfiye etmek istediğine emin misin?")) {
+        fetch('/sell-animal', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ animalName: animalName })
+        })
+        .then(res => res.json())
+        .then(data => {
+            if (data.status === 'success') {
+                alert(data.msg);
+                location.reload(); // Sayfayı yenileyerek güncel bakiyeyi göster
+            } else {
+                alert("Hata: " + data.msg);
+            }
+        });
+    }
+}
+
+
+</script>
+
+</body>
+</html>

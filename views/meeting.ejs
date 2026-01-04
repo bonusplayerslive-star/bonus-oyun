@@ -1,0 +1,162 @@
+// Path: views\meeting.ejs
+<!DOCTYPE html>
+<html lang="tr">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>BPL | VIP KONSEY</title>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+    <style>
+        :root { --gold: #ffd700; --gold-dark: #d4af37; --panel: #111; }
+        body { background: #000; color: #fff; height: 100vh; overflow: hidden; font-family: 'Cinzel', serif; display: flex; margin:0; }
+        
+        /* SOL TARAF: DİKEY VİDEO LİSTESİ */
+        .video-sidebar { width: 180px; border-right: 2px solid var(--gold-dark); background: #0a0a0a; display: flex; flex-direction: column; gap: 15px; padding: 15px; overflow-y: auto; align-items: center; }
+        .v-slot { width: 120px; height: 120px; border: 3px solid var(--gold-dark); border-radius: 50%; overflow: hidden; position: relative; cursor: pointer; transition: 0.3s; background: #222; flex-shrink: 0; }
+        .v-slot:hover { transform: scale(1.05); box-shadow: 0 0 15px var(--gold); }
+        video { width: 100%; height: 100%; object-fit: cover; }
+        .user-label { position: absolute; bottom: 0; width: 100%; background: rgba(0,0,0,0.8); color: var(--gold); font-size: 0.6rem; text-align: center; font-weight: bold; }
+
+        /* SAĞ TARAF: CHAT VE KONTROLLER */
+        .main-content { flex: 1; display: flex; flex-direction: column; }
+        #vip-chat { flex: 1; padding: 20px; overflow-y: auto; background: rgba(0,0,0,0.5); border-bottom: 1px solid #333; }
+        .input-bar { padding: 15px; background: #111; display: flex; gap: 10px; border-top: 1px solid var(--gold-dark); }
+        
+        /* ÖZEL MENÜ */
+        #user-menu { position: fixed; display: none; background: #222; border: 1px solid var(--gold); z-index: 1000; min-width: 160px; border-radius: 4px; box-shadow: 0 4px 15px rgba(0,0,0,0.5); }
+        .menu-item { padding: 10px 15px; cursor: pointer; color: #fff; font-size: 0.85rem; border-bottom: 1px solid #333; }
+        .menu-item:hover { background: var(--gold-dark); color: #000; }
+    </style>
+</head>
+<body>
+
+<div class="video-sidebar" id="video-list">
+    <div class="v-slot" id="slot-me">
+        <video id="localVideo" autoplay muted playsinline></video>
+        <div class="user-label">SİZ</div>
+    </div>
+</div>
+
+<div class="main-content">
+    <div id="vip-chat"></div>
+    <div class="input-bar">
+        <span class="text-warning align-self-center me-3 fw-bold"><span id="my-bpl"><%= user.bpl %></span> BPL</span>
+        <input type="text" id="chat-input" class="form-control bg-dark text-white border-warning" placeholder="Komuta merkezine mesaj yazın...">
+        <button onclick="sendMessage()" class="btn btn-warning fw-bold px-4">GÖNDER</button>
+    </div>
+</div>
+
+<div id="user-menu">
+    <div class="menu-item" onclick="executeAction('gift')">🎁 50 BPL HEDİYE</div>
+    <div class="menu-item" onclick="executeAction('arena')">⚔️ ARENAYA DAVET</div>
+    <div class="menu-item text-danger text-center" onclick="hideMenu()">KAPAT</div>
+</div>
+
+<script src="/socket.io/socket.io.js"></script>
+<script src="https://unpkg.com/peerjs@1.5.2/dist/peerjs.min.js"></script>
+
+<script>
+    const myNick = "<%= user.nickname %>";
+    const currentRoom = new URLSearchParams(window.location.search).get('room') || "GENEL_KONSEY";
+    const socket = io("http://localhost:3002", { query: { nickname: myNick } });
+    
+    const myPeer = new Peer(); 
+    let myStream;
+    let selectedUserNick = null;
+
+    async function initCamera() {
+        try {
+            myStream = await navigator.mediaDevices.getUserMedia({ video: true, audio: true });
+            document.getElementById('localVideo').srcObject = myStream;
+        } catch (e) { appendMsg("SİSTEM", "⚠️ Kamera erişimi engellendi."); }
+    }
+
+    myPeer.on('open', id => {
+        socket.emit('join-meeting', currentRoom, id);
+    });
+
+    // Gelen aramaları yanıtla
+    myPeer.on('call', call => {
+        call.answer(myStream);
+        call.on('stream', userStream => addVideoSlot(call.peer, userStream));
+    });
+
+    // Yeni kullanıcı bağlandığında onu ara
+    socket.on('user-connected', (peerId, nick) => {
+        setTimeout(() => {
+            const call = myPeer.call(peerId, myStream);
+            call.on('stream', userStream => addVideoSlot(peerId, userStream, nick));
+        }, 1000); // Bağlantı oturması için kısa bir bekleme
+    });
+
+    function addVideoSlot(peerId, stream, nick = "KOMUTAN") {
+        if (document.getElementById(peerId)) return;
+
+        const slot = document.createElement('div');
+        slot.className = "v-slot";
+        slot.id = peerId;
+        slot.onclick = (e) => showMenu(e, nick);
+
+        const video = document.createElement('video');
+        video.srcObject = stream;
+        video.autoplay = true;
+        video.playsInline = true;
+
+        const label = document.createElement('div');
+        label.className = "user-label";
+        label.innerText = nick;
+
+        slot.append(video, label);
+        document.getElementById('video-list').append(slot);
+    }
+
+    socket.on('user-disconnected', peerId => {
+        const el = document.getElementById(peerId);
+        if(el) el.remove();
+    });
+
+    // MENÜ FONKSİYONLARI
+    function showMenu(e, nick) {
+        if(nick === "SİZ") return;
+        selectedUserNick = nick;
+        const menu = document.getElementById('user-menu');
+        menu.style.display = 'block';
+        menu.style.left = e.pageX + 'px';
+        menu.style.top = e.pageY + 'px';
+    }
+
+    function hideMenu() { document.getElementById('user-menu').style.display = 'none'; }
+
+    function executeAction(action) {
+        if(action === 'gift') {
+            socket.emit('send-gift-vip', { targetNick: selectedUserNick, amount: 50, tax: 5, room: currentRoom });
+        } else if(action === 'arena') {
+            // Arenaya davet mantığı: Bir sinyal gönder ve arena sayfasına yönlendir
+            appendMsg("SİSTEM", `⚔️ ${selectedUserNick} Arena'ya davet edildi!`);
+            window.location.href = `/arena?target=${selectedUserNick}`;
+        }
+        hideMenu();
+    }
+
+    // CHAT FONKSİYONLARI
+    function sendMessage() {
+        const input = document.getElementById('chat-input');
+        if(!input.value) return;
+        socket.emit('chat-message', { room: currentRoom, text: input.value });
+        input.value = '';
+    }
+
+    socket.on('new-message', d => appendMsg(d.sender, d.text));
+
+    function appendMsg(s, t) {
+        const chat = document.getElementById('vip-chat');
+        const color = s === "SİSTEM" ? "#ff4444" : "var(--gold)";
+        chat.innerHTML += `<div><b style="color:${color}">${s}:</b> <span class="text-white-50">${t}</span></div>`;
+        chat.scrollTop = chat.scrollHeight;
+    }
+
+    window.onclick = (e) => { if(!e.target.closest('.v-slot')) hideMenu(); };
+    initCamera();
+</script>
+</body>
+</html>

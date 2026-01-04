@@ -1,0 +1,246 @@
+// Path: views\development.ejs
+<%- include('header') %>
+
+<style>
+    @import url('https://fonts.googleapis.com/css2?family=Orbitron:wght@400;700&family=Rajdhani:wght@500;700&display=swap');
+    
+    body {
+        background: #050505;
+        font-family: 'Rajdhani', sans-serif;
+    }
+
+    .upgrade-card {
+        background: rgba(15, 15, 15, 0.95);
+        border: 1px solid rgba(57, 255, 20, 0.15);
+        border-radius: 20px;
+        transition: all 0.4s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+        margin-bottom: 25px;
+        position: relative;
+        overflow: hidden;
+        backdrop-filter: blur(10px);
+    }
+    
+    .upgrade-card:hover {
+        transform: translateY(-10px);
+        border-color: #39FF14;
+        box-shadow: 0 0 30px rgba(57, 255, 20, 0.2);
+    }
+
+    .stat-label {
+        font-size: 0.8rem;
+        color: #aaa;
+        font-family: 'Orbitron', sans-serif;
+        letter-spacing: 1px;
+        margin-bottom: 5px;
+    }
+
+    .progress {
+        height: 8px;
+        background-color: #111;
+        margin-bottom: 12px;
+        border-radius: 4px;
+        border: 1px solid #222;
+        box-shadow: inset 0 0 5px #000;
+    }
+
+    .progress-bar {
+        box-shadow: 0 0 10px currentColor;
+    }
+
+    .char-img {
+        width: 130px;
+        height: 130px;
+        object-fit: cover;
+        border: 3px solid #39FF14;
+        border-radius: 20px;
+        box-shadow: 0 0 20px rgba(57, 255, 20, 0.3);
+        background: #111;
+    }
+
+    .btn-upgrade {
+        font-family: 'Orbitron', sans-serif;
+        font-size: 0.75rem;
+        font-weight: 700;
+        text-transform: uppercase;
+        padding: 12px;
+        transition: 0.3s;
+        border-width: 2px;
+    }
+
+    .btn-upgrade:hover {
+        box-shadow: 0 0 15px currentColor;
+    }
+
+    .neon-text {
+        color: #39FF14;
+        text-shadow: 0 0 15px rgba(57, 255, 20, 0.5);
+    }
+
+    .wallet-banner {
+        background: rgba(17, 17, 17, 0.9);
+        border: 1px solid #ffd700;
+        padding: 15px 30px;
+        border-radius: 15px;
+        display: inline-block;
+        box-shadow: 0 0 20px rgba(255, 215, 0, 0.1);
+    }
+
+    .level-badge {
+        position: absolute;
+        top: 20px;
+        right: 20px;
+        background: #39FF14;
+        color: #000;
+        font-family: 'Orbitron';
+        font-weight: bold;
+        padding: 5px 15px;
+        border-radius: 8px;
+        box-shadow: 0 0 10px rgba(57, 255, 20, 0.4);
+    }
+</style>
+
+<div class="container mt-5">
+    <div class="text-center mb-5">
+        <h1 class="neon-text fw-bold mb-3" style="font-family: 'Orbitron'; letter-spacing: 3px;">BPL GELİŞTİRME MERKEZİ</h1>
+        <p class="text-white-50">Savaşçılarını evrimleştir ve arenayı domine et!</p>
+        
+        <div class="wallet-banner">
+            <span class="text-white-50 small d-block mb-1">STRATEJİK KAYNAK (BPL)</span>
+            <span class="text-warning fw-bold h3" id="balanceDisplay">
+                <i class="fas fa-coins me-2"></i><%= user.bpl %>
+            </span>
+        </div>
+    </div>
+
+    <div class="row">
+        <% if (user.inventory && user.inventory.length > 0) { %>
+            <% user.inventory.forEach(animal => { %>
+                <div class="col-md-6 col-lg-4">
+                    <div class="upgrade-card p-4">
+                        <div class="level-badge">LVL <%= animal.level || 1 %></div>
+                        
+                        <div class="text-center mb-4 mt-3">
+                            <img src="/caracter/profile/<%= animal.name.toLowerCase() %>.jpg" 
+                                 onerror="this.src='/caracter/page/logo.jpeg'"
+                                 class="char-img mb-3" 
+                                 alt="<%= animal.name %>">
+                            <h3 class="text-white text-uppercase" style="font-family: 'Orbitron'; letter-spacing: 1px;"><%= animal.name %></h3>
+                        </div>
+
+                        <div class="stat-box mb-4">
+                            <div class="d-flex justify-content-between stat-label">
+                                <span><i class="fas fa-heart text-danger me-1"></i> HP</span>
+                                <span class="text-white"><%= animal.hp %> / <%= animal.maxHp || 500 %></span>
+                            </div>
+                            <div class="progress">
+                                <div class="progress-bar bg-danger" style="width: <%= (animal.hp / (animal.maxHp || 500)) * 100 %>%"></div>
+                            </div>
+                            <button class="btn btn-outline-danger w-100 btn-upgrade" onclick="upgradeStat('<%= animal.name %>', 'hp')">
+                                HP GÜÇLENDİR <span class="float-end">15 BPL</span>
+                            </button>
+                        </div>
+
+                        <div class="stat-box mb-4">
+                            <div class="d-flex justify-content-between stat-label">
+                                <span><i class="fas fa-fist-raised text-warning me-1"></i> SALDIRI (ATK)</span>
+                                <span class="text-white"><%= animal.atk %> / 200</span>
+                            </div>
+                            <div class="progress">
+                                <div class="progress-bar bg-warning" style="width: <%= (animal.atk / 200) * 100 %>%"></div>
+                            </div>
+                            <button class="btn btn-outline-warning w-100 btn-upgrade" onclick="upgradeStat('<%= animal.name %>', 'atk')">
+                                ATK GÜÇLENDİR <span class="float-end">15 BPL</span>
+                            </button>
+                        </div>
+
+                        <div class="stat-box">
+                            <div class="d-flex justify-content-between stat-label">
+                                <span><i class="fas fa-shield-alt text-info me-1"></i> SAVUNMA (DEF)</span>
+                                <span class="text-white"><%= animal.def %> / 200</span>
+                            </div>
+                            <div class="progress">
+                                <div class="progress-bar bg-info" style="width: <%= (animal.def / 200) * 100 %>%"></div>
+                            </div>
+                            <button class="btn btn-outline-info w-100 btn-upgrade" onclick="upgradeStat('<%= animal.name %>', 'def')">
+                                DEF GÜÇLENDİR <span class="float-end">10 BPL</span>
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            <% }) %>
+        <% } else { %>
+            <div class="col-12 text-center p-5">
+                <div class="p-5 border border-secondary rounded-4" style="background: rgba(255,255,255,0.02);">
+                    <i class="fas fa-shield-virus fa-4x text-muted mb-4"></i>
+                    <h3 class="text-white-50">Kışla Boş Görünüyor!</h3>
+                    <p class="text-muted mb-4">Geliştirme yapabilmek için önce marketten bir karakter edinmelisin.</p>
+                    <a href="/market" class="btn btn-success btn-lg px-5">BİRLİK SATIN AL</a>
+                </div>
+            </div>
+        <% } %>
+    </div>
+</div>
+
+<script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
+<script src="/socket.io/socket.io.js"></script>
+
+<script>
+    // Socket bağlantısı (Port 3000 üzerinden)
+    const socket = io();
+
+    socket.on('connect', () => {
+        console.log("Geliştirme sunucusuna güvenli bağlantı sağlandı.");
+    });
+
+    /**
+     * İstatistik geliştirme fonksiyonu
+     * @param {string} animalName - Karakterin adı
+     * @param {string} statType - Geliştirilecek özellik (hp, atk, def)
+     */
+    function upgradeStat(animalName, statType) {
+        const cost = (statType === 'def') ? 10 : 15;
+
+        Swal.fire({
+            title: 'GELİŞTİRME ONAYI',
+            text: `${animalName} birimi için ${statType.toUpperCase()} takviyesi yapılacak. Maliyet: ${cost} BPL`,
+            icon: 'warning',
+            showCancelButton: true,
+            confirmButtonColor: '#39FF14',
+            cancelButtonColor: '#d33',
+            confirmButtonText: 'ONAYLA',
+            cancelButtonText: 'İPTAL',
+            background: '#111',
+            color: '#fff'
+        }).then((result) => {
+            if (result.isConfirmed) {
+                // API isteği gönderiliyor
+                fetch('/api/upgrade-stat', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ animalName, statType })
+                })
+                .then(res => res.json())
+                .then(data => {
+                    if (data.success) {
+                        Swal.fire({
+                            title: 'İŞLEM BAŞARILI',
+                            text: `Karakterin güçlendirildi! Yeni Bakiyen: ${data.newBalance} BPL`,
+                            icon: 'success',
+                            confirmButtonColor: '#39FF14'
+                        }).then(() => {
+                            location.reload(); // Sayfayı yenileyerek yeni değerleri göster
+                        });
+                    } else {
+                        Swal.fire('BAŞARISIZ', data.error || 'İşlem gerçekleştirilemedi.', 'error');
+                    }
+                })
+                .catch(err => {
+                    console.error("Fetch Hatası:", err);
+                    Swal.fire('BAĞLANTI HATASI', 'Sunucuya ulaşılamadı. Lütfen internetinizi kontrol edin.', 'error');
+                });
+            }
+        });
+    }
+</script>
+
+<%- include('footer') %>

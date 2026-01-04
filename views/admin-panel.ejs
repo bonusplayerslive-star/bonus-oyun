@@ -1,0 +1,109 @@
+<!DOCTYPE html>
+<html lang="tr">
+<head>
+    <meta charset="UTF-8">
+    <title>BPL | KOMUTA MERKEZİ</title>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css">
+    <style>
+        body { background: #050505; color: #eee; font-family: 'Courier New', monospace; }
+        .admin-card { background: #0f0f0f; border: 1px solid #333; border-radius: 10px; padding: 20px; margin-bottom: 30px; }
+        .table { color: #eee; border-color: #333; }
+        .text-neon { color: #39FF14; }
+        .btn-approve { background: #39FF14; color: #000; font-weight: bold; border: none; }
+        .btn-approve:hover { background: #2ecc11; }
+        .status-pending { color: #ffa500; font-weight: bold; }
+    </style>
+</head>
+<body>
+
+<div class="container mt-5">
+    <div class="d-flex justify-content-between align-items-center mb-5 border-bottom border-secondary pb-3">
+        <h2 class="text-neon"><i class="fas fa-user-shield me-3"></i>BPL KOMUTA MERKEZİ (ADMIN)</h2>
+        <a href="/profil" class="btn btn-outline-light btn-sm">Üsse Dön</a>
+    </div>
+
+    <div class="admin-card">
+        <h4 class="mb-4 text-info"><i class="fas fa-file-import me-2"></i>Bekleyen Ödeme Bildirimleri (BPL Yükleme)</h4>
+        <div class="table-responsive">
+            <table class="table table-dark table-hover">
+                <thead>
+                    <tr>
+                        <th>Kullanıcı</th>
+                        <th>Miktar (USD)</th>
+                        <th>Verilecek BPL</th>
+                        <th>TxID (Hash)</th>
+                        <th>İşlem</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    <% pendingPayments.forEach(p => { %>
+                        <tr>
+                            <td><%= p.userId ? p.userId.nickname : 'Bilinmiyor' %></td>
+                            <td>$<%= p.amount_usd %></td>
+                            <td class="text-neon"><%= p.amount_bpl %> BPL</td>
+                            <td><small class="text-muted"><%= p.txid %></small></td>
+                            <td>
+                                <button onclick="approvePayment('<%= p._id %>')" class="btn btn-approve btn-sm">ONAYLA</button>
+                                <a href="https://bscscan.com/tx/<%= p.txid %>" target="_blank" class="btn btn-outline-info btn-sm"><i class="fas fa-search"></i></a>
+                            </td>
+                        </tr>
+                    <% }) %>
+                    <% if(pendingPayments.length === 0) { %> <tr><td colspan="5" class="text-center text-muted">Bekleyen bildirim yok.</td></tr> <% } %>
+                </tbody>
+            </table>
+        </div>
+    </div>
+
+    <div class="admin-card">
+        <h4 class="mb-4 text-danger"><i class="fas fa-file-export me-2"></i>Bekleyen Tasfiye Talepleri (Para Çekme)</h4>
+        <div class="table-responsive">
+            <table class="table table-dark table-hover">
+                <thead>
+                    <tr>
+                        <th>Kullanıcı</th>
+                        <th>Çekilen BPL</th>
+                        <th>Net Ödenecek ($-USDT)</th>
+                        <th>Cüzdan Adresi (BEP20)</th>
+                        <th>İşlem</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    <% pendingWithdraws.forEach(w => { %>
+                        <tr>
+                            <td><%= w.userId ? w.userId.nickname : 'Bilinmiyor' %></td>
+                            <td><%= w.amount %> BPL</td>
+                            <td class="text-danger fw-bold">$<%= (w.amount * 0.75 / 100).toFixed(2) %></td> <td><code class="text-info"><%= w.address %></code></td>
+                            <td>
+                                <button onclick="approveWithdraw('<%= w._id %>')" class="btn btn-danger btn-sm">ÖDENDİ İŞARETLE</button>
+                            </td>
+                        </tr>
+                    <% }) %>
+                    <% if(pendingWithdraws.length === 0) { %> <tr><td colspan="5" class="text-center text-muted">Bekleyen talep yok.</td></tr> <% } %>
+                </tbody>
+            </table>
+        </div>
+    </div>
+</div>
+
+<script>
+    function approvePayment(id) {
+        if(!confirm('Bu TxID onaylanacak ve kullanıcıya BPL yüklenecek. Emin misin?')) return;
+        fetch('/admin/approve-payment', {
+            method: 'POST',
+            headers: {'Content-Type': 'application/x-www-form-urlencoded'},
+            body: `paymentId=${id}`
+        }).then(r => r.json()).then(d => { alert(d.msg); location.reload(); });
+    }
+
+    function approveWithdraw(id) {
+        if(!confirm('Kullanıcıya ödeme yaptıysanız onaylayın. Bu işlem geri alınamaz!')) return;
+        fetch('/admin/approve-withdraw', {
+            method: 'POST',
+            headers: {'Content-Type': 'application/x-www-form-urlencoded'},
+            body: `withdrawId=${id}`
+        }).then(r => r.json()).then(d => { alert(d.msg); location.reload(); });
+    }
+</script>
+</body>
+</html>
