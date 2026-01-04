@@ -3,13 +3,17 @@ const mongoose = require('mongoose');
 const User = require('./models/User'); 
 require('dotenv').config();
 
-// --- 1. SOCKET.IO KURULUMU ---
-const io = require('socket.io')(3001, {
+// arena-server.js içinde socket.io kurulumunu şu şekilde değiştirin:
+const PORT = process.env.PORT || 3001; // Render'ın atadığı portu veya yerelde 3001'i kullan
+
+const io = require('socket.io')(PORT, {
     cors: {
         origin: "*", 
         methods: ["GET", "POST"]
     }
 });
+
+console.log(`🚀 Sunucu ${PORT} portunda çalışıyor...`);
 
 // --- 2. VERİTABANI BAĞLANTISI ---
 const MONGO_URI = process.env.MONGO_URI || "mongodb+srv://bonusplayerslive_db_user:1nB1QyAsh3qVafpE@bonus.x39zlzq.mongodb.net/?appName=Bonus";
@@ -139,4 +143,5 @@ socket.on('join-private-match', (data) => {
 console.log("------------------------------------");
 console.log("🚀 BPL ARENA SERVER: 3001 AKTİF");
 console.log("⚔️ MOD: PVP (ÖNCELİKLİ) + BOT (YEDEK)");
+
 console.log("------------------------------------");
