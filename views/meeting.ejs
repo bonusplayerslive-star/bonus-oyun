@@ -133,7 +133,77 @@
     <div class="menu-item" onclick="executeAction('arena')">⚔️ ARENA DAVETİ</div>
     <div class="menu-item text-danger text-center" onclick="hideMenu()">KAPAT</div>
 </div>
+<div id="user-menu">
+    <div class="menu-header text-center py-2 border-bottom border-warning text-warning" style="font-size: 0.7rem;">
+        <span id="selected-user-name">KULLANICI</span> İÇİN EYLEM
+    </div>
+    <div class="menu-item" onclick="executeAction('gift', 50)">🎁 50 BPL HEDİYE</div>
+    <div class="menu-item" onclick="executeAction('gift', 100)">🎁 100 BPL HEDİYE</div>
+    <div class="menu-item" onclick="executeAction('gift', 150)">🎁 150 BPL HEDİYE</div>
+    <div class="menu-item" onclick="executeAction('arena')">⚔️ ARENAYA DAVET</div>
+    <div class="menu-item text-danger text-center" onclick="hideMenu()">KAPAT</div>
+</div>
 
+<script>
+    // ... mevcut socket ve peer tanımlamaları ...
+
+    function showMenu(e, nick) {
+        if(nick === "SİZ" || nick === myNick) return;
+        selectedUserNick = nick;
+        
+        const menu = document.getElementById('user-menu');
+        const nameLabel = document.getElementById('selected-user-name');
+        if(nameLabel) nameLabel.innerText = nick.toUpperCase();
+        
+        menu.style.display = 'block';
+        menu.style.left = e.pageX + 'px';
+        menu.style.top = e.pageY + 'px';
+    }
+
+    function executeAction(action, amount = 0) {
+        // Mevcut BPL miktarını DOM'dan sayı olarak al
+        const currentBpl = parseInt(document.getElementById('my-bpl').innerText);
+
+        if(action === 'gift') {
+            // KURAL 1: Kullanıcının bakiyesi 5500'ün altına düşmemeli
+            // KURAL 2: Göndermek istediği miktar elindeki paradan fazla olmamalı
+            if (currentBpl < 5500) {
+                appendMsg("SİSTEM", "⚠️ Hediye göndermek için bakiyeniz 5500 BPL üzerinde olmalıdır.");
+                hideMenu();
+                return;
+            }
+
+            if (currentBpl - amount < 5500) {
+                appendMsg("SİSTEM", `⚠️ Bu miktarı gönderirseniz bakiyeniz 5500'ün altına düşüyor. Daha az gönderin.`);
+                hideMenu();
+                return;
+            }
+
+            // Eğer kontrollerden geçerse gönder
+            socket.emit('send-gift-vip', { 
+                targetNick: selectedUserNick, 
+                amount: amount, 
+                tax: Math.floor(amount * 0.1), // Örn: %10 vergi
+                room: currentRoom 
+            });
+            
+            appendMsg("SİSTEM", `✅ ${selectedUserNick} kullanıcısına ${amount} BPL gönderildi.`);
+            
+        } else if(action === 'arena') {
+            appendMsg("SİSTEM", `⚔️ ${selectedUserNick} Arena'ya davet edildi!`);
+            window.location.href = `/arena?target=${selectedUserNick}`;
+        }
+        hideMenu();
+    }
+
+    // Sunucudan bakiye güncellemesi gelirse (Bakiye düştüğünde ekranı güncellemek için)
+    socket.on('update-bpl', (newBpl) => {
+        const bplElement = document.getElementById('my-bpl');
+        if(bplElement) bplElement.innerText = newBpl;
+    });
+
+    // ... diğer chat ve video fonksiyonları ...
+</script>
 <script src="/socket.io/socket.io.js"></script>
 <script src="https://unpkg.com/peerjs@1.5.2/dist/peerjs.min.js"></script>
 
@@ -259,3 +329,4 @@
 </script>
 </body>
 </html>
+
