@@ -1,4 +1,3 @@
-// Path: views\arena.ejs
 <!DOCTYPE html>
 <html lang="tr">
 <head>
@@ -8,44 +7,24 @@
     <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
     <link href="https://fonts.googleapis.com/css2?family=Orbitron:wght@400;700&display=swap" rel="stylesheet">
     <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
-    <script src="http://localhost:3001/socket.io/socket.io.js"></script>
+    
+    <script src="/socket.io/socket.io.js"></script>
     
     <style>
         :root { --neon-green: #39FF14; --neon-red: #ff003c; --neon-yellow: #ffc107; }
         body { background: #000; color: #fff; font-family: 'Orbitron', sans-serif; overflow: hidden; height: 100vh; margin:0; }
-
-        /* Savaş Sinematiği Overlay */
-        #video-overlay {
-            display: none; position: fixed; inset: 0; background: rgba(0,0,0,0.98);
-            z-index: 9999; flex-direction: column; align-items: center; justify-content: center;
-        }
-        .battle-view {
-            width: 90%; max-width: 950px; border: 2px solid var(--neon-green);
-            position: relative; box-shadow: 0 0 50px rgba(57, 255, 20, 0.2);
-        }
+        #video-overlay { display: none; position: fixed; inset: 0; background: rgba(0,0,0,0.98); z-index: 9999; flex-direction: column; align-items: center; justify-content: center; }
+        .battle-view { width: 90%; max-width: 950px; border: 2px solid var(--neon-green); position: relative; box-shadow: 0 0 50px rgba(57, 255, 20, 0.2); }
         video { width: 100%; display: block; filter: contrast(1.1) brightness(1.1); }
-
-        /* Karakter Panelleri */
         .player-header { display: flex; justify-content: space-between; width: 90%; max-width: 950px; margin-bottom: 20px; }
         .char-card { text-align: center; width: 150px; }
         .char-card img { width: 80px; height: 80px; border-radius: 50%; border: 2px solid var(--neon-green); margin-bottom: 5px; object-fit: cover; }
         .vs-label { font-size: 2.5rem; color: var(--neon-red); text-shadow: 0 0 15px var(--neon-red); align-self: center; }
-
-        /* Bahis Kartları */
-        .bet-card { 
-            background: rgba(20,20,20,0.8); border: 1px solid #333; transition: 0.3s; cursor: pointer;
-            padding: 20px; border-radius: 10px; text-align: center;
-        }
+        .bet-card { background: rgba(20,20,20,0.8); border: 1px solid #333; transition: 0.3s; cursor: pointer; padding: 20px; border-radius: 10px; text-align: center; }
         .bet-card:hover { border-color: var(--neon-green); transform: translateY(-5px); }
         .bet-card.active { border-color: var(--neon-green); box-shadow: 0 0 20px rgba(57, 255, 20, 0.3); background: #111; }
-
-        .win-banner {
-            position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%) scale(0);
-            font-size: 4rem; font-weight: 900; z-index: 10001; text-align: center;
-            transition: 0.5s cubic-bezier(0.175, 0.885, 0.32, 1.275); width: 100%;
-        }
+        .win-banner { position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%) scale(0); font-size: 4rem; font-weight: 900; z-index: 10001; text-align: center; transition: 0.5s cubic-bezier(0.175, 0.885, 0.32, 1.275); width: 100%; }
         .banner-active { transform: translate(-50%, -50%) scale(1); }
-        
         #timer { font-size: 5rem; color: var(--neon-red); text-shadow: 0 0 20px var(--neon-red); }
         .status-text { margin-top: 15px; color: var(--neon-green); letter-spacing: 2px; height: 30px; font-weight: bold; }
     </style>
@@ -66,7 +45,6 @@
                 <div id="opp-type" class="text-danger small">HEDEF</div>
             </div>
         </div>
-
         <div class="battle-view">
             <div id="result-banner" class="win-banner"></div>
             <video id="battle-video" playsinline muted></video>
@@ -77,33 +55,20 @@
     <div class="container py-5">
         <div id="lobby-ui" class="text-center">
             <h1 class="mb-5" style="color:var(--neon-green); text-shadow: 0 0 10px var(--neon-green);">BPL STRATEJİK ARENA</h1>
-            
             <div id="bet-selection">
                 <h4 class="mb-4 text-white-50">SALDIRI MODU VE BAHİS SEÇİN</h4>
                 <div class="row g-4 justify-content-center">
                     <div class="col-md-3" onclick="setMultiplier(1, this)">
-                        <div class="bet-card active">
-                            <h3 class="text-success">NORMAL</h3>
-                            <p class="mb-0 small">Giriş: 25 BPL</p>
-                        </div>
+                        <div class="bet-card active"><h3>NORMAL</h3><p class="mb-0 small">Giriş: 25 BPL</p></div>
                     </div>
                     <div class="col-md-3" onclick="setMultiplier(2, this)">
-                        <div class="bet-card">
-                            <h3 class="text-warning">2X GÜÇ</h3>
-                            <p class="mb-0 small">Giriş: 55 BPL</p>
-                        </div>
+                        <div class="bet-card"><h3>2X GÜÇ</h3><p class="mb-0 small">Giriş: 55 BPL</p></div>
                     </div>
                     <div class="col-md-3" onclick="setMultiplier(4, this)">
-                        <div class="bet-card">
-                            <h3 class="text-danger">4X ÖFKE</h3>
-                            <p class="mb-0 small">Giriş: 75 BPL</p>
-                        </div>
+                        <div class="bet-card"><h3>4X ÖFKE</h3><p class="mb-0 small">Giriş: 75 BPL</p></div>
                     </div>
                     <div class="col-md-3" onclick="setMultiplier(6, this)">
-                        <div class="bet-card">
-                            <h3 style="color: #ff00ff;">6X KATLİAM</h3>
-                            <p class="mb-0 small">Giriş: 85 BPL</p>
-                        </div>
+                        <div class="bet-card"><h3 style="color: #ff00ff;">6X KATLİAM</h3><p class="mb-0 small">Giriş: 85 BPL</p></div>
                     </div>
                 </div>
                 <button onclick="startSearch()" class="btn btn-danger btn-lg mt-5 px-5 py-3 fw-bold">SALDIRIYI BAŞLAT</button>
@@ -119,10 +84,7 @@
     </div>
 
     <script>
-       // arena.ejs içindeki socket bağlantısını şu şekilde güncelleyin:
-// arena.ejs içinde:
-// Port yazmıyoruz, böylece ana site hangi porttaysa (Render'da 10000) ona bağlanır.
-const arenaSocket = io();
+        const arenaSocket = io(); // Render uyumlu dinamik bağlantı
         const videoElement = document.getElementById('battle-video');
         const statusMsg = document.getElementById('battle-status');
         const resultBanner = document.getElementById('result-banner');
@@ -138,109 +100,82 @@ const arenaSocket = io();
         function setMultiplier(val, el) {
             selectedMultiplier = val;
             document.querySelectorAll('.bet-card').forEach(c => c.classList.remove('active'));
-            el.querySelector('.bet-card').classList.add('active');
+            el.classList.add('active');
         }
 
-        // --- ARAMAYI BAŞLAT ---
         function startSearch() {
+            if (!arenaSocket.connected) {
+                Swal.fire('Hata', 'Sunucuya bağlanılamadı. Lütfen sayfayı yenileyin.', 'error');
+                return;
+            }
+
             document.getElementById('bet-selection').style.display = 'none';
             document.getElementById('matching-ui').style.display = 'block';
-            
             isMatchFound = false;
 
-            // 1. Sunucuya "Ben hazırım, rakip bul" de
-            arenaSocket.emit('find-match', { 
-                myNick: myNick, 
-                myAnimal: myAnimal 
-            });
+            // URL Parametre kontrolü (Özel davet mi?)
+            const urlParams = new URLSearchParams(window.location.search);
+            const customRoom = urlParams.get('room');
 
-            // 2. 13 saniyelik geri sayımı başlat
-            runTimer();
+            if (customRoom) {
+                arenaSocket.emit('join-private-match', { roomId: customRoom, myNick, myAnimal });
+            } else {
+                arenaSocket.emit('find-match', { myNick, myAnimal });
+                runTimer();
+            }
         }
 
         function runTimer() {
             let count = 13;
+            document.getElementById('timer').innerText = count;
             timerInt = setInterval(() => {
-                if (isMatchFound) { 
-                    clearInterval(timerInt);
-                    return; 
-                }
-                
+                if (isMatchFound) { clearInterval(timerInt); return; }
                 count--;
                 document.getElementById('timer').innerText = count;
-                
                 if(count <= 0) {
                     clearInterval(timerInt);
-                    // 13 saniye doldu, kimse gelmedi -> BOT SAVAŞINI TETİKLE
-                    triggerBotBattle();
+                    arenaSocket.emit('start-bot-battle', { multiplier: selectedMultiplier, userId: myId });
                 }
             }, 1000);
         }
 
-        function triggerBotBattle() {
-            arenaSocket.emit('start-bot-battle', { 
-                multiplier: selectedMultiplier, 
-                userId: myId 
-            });
-        }
-
-        // --- PVP EŞLEŞME BULUNDUĞUNDA ---
         arenaSocket.on('pvp-found', (data) => {
             isMatchFound = true;
             clearInterval(timerInt);
-            
-            // Rakibi belirle (Ben olmayan kişi)
-            const opponent = data.players.find(p => p.nick !== myNick);
-            
-            document.getElementById('matching-ui').querySelector('h3').innerText = "RAKİP BULUNDU! DÜELLO BAŞLIYOR...";
+            const opponent = data.players.find(p => p.id !== arenaSocket.id);
+            document.getElementById('matching-ui').querySelector('h3').innerText = "RAKİP BULUNDU!";
             
             setTimeout(() => {
                 document.getElementById('matching-ui').style.display = 'none';
                 document.getElementById('opp-name').innerText = opponent.nick;
                 document.getElementById('opp-img').src = `/caracter/profile/${opponent.animal}.png`;
                 document.getElementById('opp-type').innerText = "GERÇEK OYUNCU";
-                
-                // PVP Sonucu (Şimdilik test için rastgele, server'dan gelmeli)
-                const pvpResult = Math.random() > 0.5;
-                runBattleSequence(myAnimal, opponent.animal, pvpResult, 50);
+                runBattleSequence(myAnimal, opponent.animal, Math.random() > 0.5, 50);
             }, 2000);
         });
 
-        // --- BOT SAVAŞI SONUCU ---
         arenaSocket.on('battle-result', (data) => {
             isMatchFound = true;
             clearInterval(timerInt);
             document.getElementById('matching-ui').style.display = 'none';
-            
             document.getElementById('opp-name').innerText = data.opponentName;
             document.getElementById('opp-img').src = `/caracter/profile/${data.opponentAnimal}.png`;
             document.getElementById('opp-type').innerText = "ELITE BOT";
-
             runBattleSequence(myAnimal, data.opponentAnimal, data.isWin, data.prize);
         });
 
-        // --- VİDEO AKIŞI ---
         async function runBattleSequence(player, enemy, isWin, prize) {
             document.getElementById('video-overlay').style.display = 'flex';
-
-            // 1. Oyuncu Saldırısı
             await playVideoAsync(player, player + "1", "SALDIRI BAŞLADI!");
-            
-            // 2. Rakip Karşı Atak
             await playVideoAsync(enemy, enemy + "1", "RAKİP KARŞI HAMLE YAPIYOR!");
-
-            // 3. Final Kararı
-            const winner = isWin ? player : enemy;
-            const finalStatus = isWin ? `ZAFER! (+${prize} BPL)` : "BOZGUN! (-25 BPL)";
             
+            const winner = isWin ? player : enemy;
             resultBanner.innerText = isWin ? "VICTORY" : "DEFEAT";
             resultBanner.style.color = isWin ? "var(--neon-green)" : "var(--neon-red)";
             
-            await playVideoAsync(winner, winner, finalStatus);
-            
+            await playVideoAsync(winner, winner, isWin ? `ZAFER! (+${prize} BPL)` : "BOZGUN!");
             resultBanner.classList.add('banner-active');
-            
-            setTimeout(() => { window.location.href = "/profil"; }, 5000);
+            setTimeout(() => { window.location.href = "/profil"; }, 4000);
         }
 
         function playVideoAsync(animal, file, text) {
@@ -248,84 +183,11 @@ const arenaSocket = io();
                 statusMsg.innerText = text;
                 videoElement.src = `/caracter/move/${animal}/${file}.mp4`;
                 videoElement.onended = resolve;
-                videoElement.onerror = () => setTimeout(resolve, 1000);
+                videoElement.onerror = () => { console.error("Video yok:", file); resolve(); };
                 videoElement.load();
                 videoElement.play().catch(resolve);
             });
         }
-
-        arenaSocket.on('error-msg', (msg) => {
-            Swal.fire('Hata', msg, 'error').then(() => { window.location.href = "/profil"; });
-        });
-
-app.get('/arena', isLoggedIn, async (req, res) => {
-    const opponentNick = req.query.opponent || null;
-    const customRoom = req.query.room || null;
-    
-    res.render('arena', { 
-        user: req.user, 
-        opponentNick: opponentNick, 
-        customRoom: customRoom 
-    });
-});
-
-function startSearch() {
-    const urlParams = new URLSearchParams(window.location.search);
-    const customRoom = urlParams.get('room');
-    const targetOpponent = urlParams.get('opponent');
-
-    document.getElementById('bet-selection').style.display = 'none';
-    document.getElementById('matching-ui').style.display = 'block';
-
-    if (customRoom && targetOpponent) {
-        // ÖZEL DAVETLE GELDİ: Doğrudan odaya bağlan
-        arenaSocket.emit('join-private-match', {
-            roomId: customRoom,
-            myNick: myNick,
-            myAnimal: myAnimal
-        });
-    } else {
-        // RASTGELE EŞLEŞME: Havuza gir
-        arenaSocket.emit('find-match', { 
-            myNick: myNick, 
-            myAnimal: myAnimal 
-        });
-        runTimer(); // 13 saniye sayacı
-    }
-}
-
-
     </script>
-
-
-<script src="/socket.io/socket.io.js"></script>
-
-<script>
-    // 2. Bağlantıyı porta bakmaksızın ana sunucuya kur
-    const arenaSocket = io(); 
-
-    function startSearch() {
-        // ... önceki kodların ...
-        
-        // Önemli: Önce bağlantı kontrolü yapalım
-        if (!arenaSocket.connected) {
-            console.error("Sunucuya bağlanılamadı!");
-            return;
-        }
-
-        arenaSocket.emit('find-match', { 
-            myNick: "<%= user.nickname %>", 
-            myAnimal: "<%= user.selectedAnimal %>" 
-        });
-        
-        runTimer(); // Bağlantı kurulduğu için artık bu çalışacak
-    }
-</script>
-
-
-
 </body>
-
 </html>
-
-
