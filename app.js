@@ -386,7 +386,68 @@ socket.on('start-bot-battle', async (data) => {
     } catch (e) { console.log("Arena Bot Hatası:", e); }
 });
 
+// --- VIP TOPLANTI HEDİYE SİSTEMİ (5500 SINIRI) ---
+socket.on('send-gift-vip', async (data) => {
+    try {
+        if (!socket.userId) return;
 
+        const { targetNick, amount, room } = data;
+        const sender = await User.findById(socket.userId);
+        const receiver = await User.findOne({ nickname: targetNick });
+
+        // Güvenlik Kontrolleri
+        if (!receiver) {
+            return socket.emit('new-message', { sender: "SİSTEM", text: "❌ Alıcı bulunamadı!" });
+        }
+
+        if (sender.nickname === targetNick) {
+            return socket.emit('new-message', { sender: "SİSTEM", text: "❌ Kendinize hediye gönderemezsiniz!" });
+        }
+
+        // ANA KURAL: Bakiye 5500'ün altına düşemez
+        if (sender.bpl - amount < 5500) {
+            return socket.emit('new-message', { 
+                sender: "SİSTEM", 
+                text: `❌ İşlem başarısız. Bakiyeniz 5500 BPL altına düşemez! (Mevcut: ${sender.bpl})` 
+            });
+        }
+
+        // Geçerli hediye miktarları kontrolü (Opsiyonel ama güvenlik için iyi)
+        const validAmounts = [50, 100, 150];
+        if (!validAmounts.includes(amount)) {
+            return socket.emit('new-message', { sender: "SİSTEM", text: "❌ Geçersiz hediye miktarı!" });
+        }
+
+        // İŞLEMİ GERÇEKLEŞTİR
+        sender.bpl -= amount;
+        // %10 vergi kesintisi ile alıcıya ekle (İstersen vergiyi kaldırabilirsin)
+        const netAmount = amount * 0.9; 
+        receiver.bpl += netAmount;
+
+        await sender.save();
+        await receiver.save();
+
+        // 1. Gönderene yeni bakiyesini bildir
+        socket.emit('update-bpl', sender.bpl);
+
+        // 2. Odadaki herkese duyur
+        io.to(room || "GENEL_KONSEY").emit('new-message', {
+            sender: "SİSTEM",
+            text: `🎁 ${sender.nickname}, ${receiver.nickname} kullanıcısına ${amount} BPL hediye gönderdi!`
+        });
+
+        // 3. Alıcıya (eğer online ise) özel bildirim gönder
+        // Alıcının socket'ini bulup ona güncel bakiyesini yollayabilirsin
+        const receiverSocket = Array.from(io.sockets.sockets.values()).find(s => s.nickname === targetNick);
+        if (receiverSocket) {
+            receiverSocket.emit('update-bpl', receiver.bpl);
+        }
+
+    } catch (err) {
+        console.error("Hediye Hatası:", err);
+        socket.emit('new-message', { sender: "SİSTEM", text: "❌ Hediye gönderilirken bir hata oluştu." });
+    }
+});
 });
 
 // --- 6. BAŞLAT ---
@@ -395,3 +456,4 @@ httpServer.listen(PORT, () => {
     console.log(`🌍 Sunucu Yayında: http://localhost:${PORT}`);
 
 });
+
