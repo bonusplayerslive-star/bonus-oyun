@@ -146,7 +146,7 @@
 
 <script>
     // ... mevcut socket ve peer tanımlamaları ...
-
+const socket = io(window.location.origin, { query: { nickname: myNick } });
     function showMenu(e, nick) {
         if(nick === "SİZ" || nick === myNick) return;
         selectedUserNick = nick;
@@ -329,4 +329,5 @@
 </script>
 </body>
 </html>
+
 
