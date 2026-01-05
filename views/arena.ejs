@@ -296,7 +296,36 @@ function startSearch() {
 
 
     </script>
+
+
+<script src="/socket.io/socket.io.js"></script>
+
+<script>
+    // 2. Bağlantıyı porta bakmaksızın ana sunucuya kur
+    const arenaSocket = io(); 
+
+    function startSearch() {
+        // ... önceki kodların ...
+        
+        // Önemli: Önce bağlantı kontrolü yapalım
+        if (!arenaSocket.connected) {
+            console.error("Sunucuya bağlanılamadı!");
+            return;
+        }
+
+        arenaSocket.emit('find-match', { 
+            myNick: "<%= user.nickname %>", 
+            myAnimal: "<%= user.selectedAnimal %>" 
+        });
+        
+        runTimer(); // Bağlantı kurulduğu için artık bu çalışacak
+    }
+</script>
+
+
+
 </body>
 
 </html>
+
 
