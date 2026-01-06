@@ -17,18 +17,16 @@
             --panel-bg: rgba(10, 11, 12, 0.98);
         }
 
-        /* MOBİL DÜZELTME: height: 100dvh ile klavye ve tarayıcı çubuğu sorunlarını çözer */
         body { 
             background: radial-gradient(circle at center, #1a1a1a 0%, #000 100%); 
             color: #e0e0e0; 
             font-family: 'Rajdhani', sans-serif; 
-            height: 100vh;
             height: 100dvh; 
             display: flex; 
             flex-direction: column; 
             margin: 0;
             overflow: hidden;
-            position: fixed; /* Mobilde gövdenin kaymasını önler */
+            position: fixed;
             width: 100%;
         }
 
@@ -50,7 +48,7 @@
             flex-direction: column; 
             padding: 10px; 
             background: url('https://www.transparenttextures.com/patterns/carbon-fibre.png');
-            min-height: 0; /* İçeriğin taşmasını önlemek için kritik */
+            min-height: 0;
             position: relative;
         }
 
@@ -70,7 +68,10 @@
             background: rgba(255, 255, 255, 0.03); 
             border-left: 3px solid transparent;
             word-wrap: break-word;
+            animation: fadeIn 0.3s ease-in;
         }
+        @keyframes fadeIn { from { opacity: 0; transform: translateX(-5px); } to { opacity: 1; transform: translateX(0); } }
+
         .msg-entry:hover { background: rgba(57, 255, 20, 0.05); border-left-color: var(--neon-green); }
         
         .sender-tag { 
@@ -83,7 +84,6 @@
             margin-right: 8px;
         }
 
-        /* MOBİL UYUMLU PANEL */
         #userActionPanel { 
             display: none; 
             position: fixed; 
@@ -112,7 +112,6 @@
             padding: 15px; 
             background: #000; 
             border-top: 1px solid #222;
-            /* iPhone alt çubuk boşluğu */
             padding-bottom: calc(15px + env(safe-area-inset-bottom));
         }
         
@@ -130,7 +129,6 @@
 
 <div class="header-status d-flex justify-content-between">
     <div class="status-item text-muted">USER: <span class="val-neon"><%= user.nickname %></span></div>
-    <div class="status-item text-muted d-none d-sm-block">STATUS: <span id="peer-status" class="text-danger">...</span></div>
     <div class="status-item text-muted">BPL: <span id="myBpl" class="text-warning"><%= user.bpl %></span></div>
 </div>
 
@@ -138,7 +136,7 @@
     <div id="chatMessages">
         <div class="msg-entry">
             <span class="sender-tag" style="color:var(--neon-blue)">[SİSTEM]:</span>
-            <span class="text-info small">Bağlantı güvenli. Komutlarınızı bekliyorum.</span>
+            <span class="text-info small">Bağlantı şifreli. Hedef seçmek için kullanıcı adına tıklayın.</span>
         </div>
     </div>
 </div>
@@ -147,14 +145,14 @@
     <h5 id="selectedUserLabel" class="text-center text-white mb-4 fs-6">HEDEF SEÇİLDİ</h5>
     <button id="giftBtn" class="btn btn-action btn-gift">🎁 LOJİSTİK DESTEK</button>
     <button id="fightBtn" class="btn btn-action btn-fight">⚔️ ARENA DAVETİ</button>
-    <button id="meetBtn" class="btn btn-action btn-meeting">🏛️ ÖZEL ODA DAVETİ</button>
+    <button id="meetBtn" class="btn btn-action btn-meeting">🏛️ KONSEY DAVETİ</button>
     <button onclick="closePanel()" class="btn btn-sm text-muted w-100 mt-2">İPTAL</button>
 </div>
 
 <div class="input-footer">
     <form id="chatForm" onsubmit="sendMessage(); return false;">
         <div class="input-group">
-            <input type="text" id="messageInput" class="form-control terminal-input" placeholder="Mesaj..." autocomplete="off">
+            <input type="text" id="messageInput" class="form-control terminal-input" placeholder="Komut satırı..." autocomplete="off">
             <button type="submit" class="btn btn-send px-3"><i class="fas fa-paper-plane"></i></button>
         </div>
     </form>
@@ -162,7 +160,6 @@
 
 <script src="/socket.io/socket.io.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
-<script src="https://unpkg.com/peerjs@1.5.2/dist/peerjs.min.js"></script>
 
 <script>
     const socket = io(); 
@@ -170,24 +167,15 @@
     let myBpl = parseInt("<%= user.bpl %>");
     let selectedUser = "";
 
-    const peer = new Peer(); 
-    let myVideoId = null;
-
-    peer.on('open', (id) => {
-        myVideoId = id;
-        document.getElementById('peer-status').innerText = "ONLINE";
-        document.getElementById('peer-status').className = "text-success";
-        socket.emit('register-user', { nickname: myNick, videoId: id });
-    });
-
+    // 1. Kullanıcı Menüsü ve Yetki Kontrolü
     function openUserMenu(nick) {
-        if(nick === myNick || nick === "SİSTEM") return;
+        if(nick === myNick || nick === "SİSTEM" || nick === "Bilinmeyen") return;
         selectedUser = nick;
         document.getElementById('selectedUserLabel').innerText = "HEDEF: " + nick;
         document.getElementById('userActionPanel').style.display = 'block';
         
         const giftBtn = document.getElementById('giftBtn');
-        // Hediye gönderebilmek için en az 5550 (5500 limit + 50 hediye) olmalı
+        // VIP Hediye Sınırı: 5500 + Gönderilecek Miktar
         if(myBpl < 5550) {
             giftBtn.disabled = true;
             giftBtn.classList.add('opacity-50');
@@ -205,9 +193,10 @@
 
     function closePanel() { document.getElementById('userActionPanel').style.display = 'none'; }
 
+    // 2. VIP Hediye İşlemi
     function sendBplGift(nick) {
         Swal.fire({
-            title: 'HEDİYE MİKTARI',
+            title: 'DESTEK MİKTARI',
             background: '#0a0b0c', color: '#fff',
             showConfirmButton: false,
             html: `
@@ -224,22 +213,19 @@
             Swal.fire({ icon: 'error', title: 'Limit', text: 'Bakiyeniz 5500 altına düşemez!', background: '#0a0a0a', color: '#fff' });
             return;
         }
-        socket.emit('transfer-bpl', { to: nick, amount: amount });
+        socket.emit('send-gift-vip', { targetNick: nick, amount: amount, room: "GENEL_KONSEY" });
         Swal.close();
         closePanel();
     }
 
+    // 3. Düello Daveti Gönder
     function challengeToFight(nick) {
         socket.emit('send-challenge', { target: nick });
         Swal.fire({ toast: true, position: 'top-end', icon: 'info', title: 'Düello daveti iletildi.', showConfirmButton: false, timer: 2000 });
         closePanel();
     }
 
-    function inviteToMeeting(nick) {
-        socket.emit('invite-meeting', { target: nick, senderVideoId: myVideoId });
-        closePanel();
-    }
-
+    // 4. Sohbet İşlemleri
     function sendMessage() {
         const input = document.getElementById('messageInput');
         const text = input.value.trim();
@@ -249,6 +235,9 @@
         }
     }
 
+    // --- SOCKET DİNLEYİCİLERİ ---
+
+    // Yeni Mesaj Alındığında
     socket.on('new-message', (data) => {
         const box = document.getElementById('chatMessages');
         const div = document.createElement('div');
@@ -259,20 +248,48 @@
         box.scrollTop = box.scrollHeight;
     });
 
-    socket.on('gift-result', (data) => {
-        if(data.newBalance !== undefined) {
-            myBpl = data.newBalance;
-            document.getElementById('myBpl').innerText = myBpl;
+    // Bakiye Güncellemesi (Hediye geldiğinde veya gittiğinde)
+    socket.on('update-bpl', (newBpl) => {
+        myBpl = newBpl;
+        document.getElementById('myBpl').innerText = myBpl;
+    });
+
+    // Düello Daveti Geldiğinde
+    socket.on('challenge-received', (data) => {
+        if(data.target === myNick) {
+            Swal.fire({
+                title: 'DÜELLO TALEBİ!',
+                text: `${data.from} sana meydan okuyor! Kabul ediyor musun?`,
+                icon: 'warning',
+                showCancelButton: true,
+                confirmButtonColor: '#00f3ff',
+                cancelButtonColor: '#ff003c',
+                confirmButtonText: 'KABUL ET',
+                cancelButtonText: 'REDDET',
+                background: '#0a0b0c',
+                color: '#fff'
+            }).then((result) => {
+                if (result.isConfirmed) {
+                    // Arena sayfasına rakip ve oda bilgisiyle git
+                    window.location.href = `/arena?opponent=${data.from}&room=${data.room}`;
+                }
+            });
         }
-        Swal.fire({ toast: true, position: 'top-end', icon: data.success ? 'success' : 'error', title: data.message, showConfirmButton: false, timer: 3000 });
     });
 
-    // Mobil Klavye Odaklanma Düzeltmesi
+    // Klavye açıldığında mesajların en alta kayması için
     document.getElementById('messageInput').addEventListener('focus', () => {
-        setTimeout(() => { document.getElementById('chatMessages').scrollTop = 1000000; }, 300);
+        setTimeout(() => { 
+            const box = document.getElementById('chatMessages');
+            box.scrollTop = box.scrollHeight; 
+        }, 300);
     });
 
-    window.onclick = (e) => { if(e.target.id === 'userActionPanel') closePanel(); };
+    // Panel dışına tıklandığında kapat
+    window.onclick = (e) => { 
+        const panel = document.getElementById('userActionPanel');
+        if(e.target === panel) closePanel(); 
+    };
 </script>
 </body>
 </html>
