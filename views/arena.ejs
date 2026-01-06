@@ -12,7 +12,6 @@
     <style>
         :root { --neon-green: #39FF14; --neon-red: #ff003c; --neon-yellow: #ffc107; }
         
-        /* Mobil uyumlu scroll ayarı */
         body { 
             background: #000; 
             color: #fff; 
@@ -20,10 +19,9 @@
             min-height: 100vh;
             margin: 0;
             overflow-x: hidden;
-            overflow-y: auto; /* Mobilde butonların görünmesi için kaydırmaya izin ver */
+            overflow-y: auto;
         }
 
-        /* Savaş Sinematiği Overlay */
         #video-overlay { 
             display: none; 
             position: fixed; 
@@ -46,7 +44,6 @@
 
         video { width: 100%; display: block; filter: contrast(1.1) brightness(1.1); }
 
-        /* Karakter Panelleri Mobil Revize */
         .player-header { 
             display: flex; 
             justify-content: space-between; 
@@ -71,7 +68,6 @@
             align-self: center; 
         }
 
-        /* Bahis Kartları Mobil Optimizasyon */
         .bet-card { 
             background: rgba(20,20,20,0.8); 
             border: 1px solid #333; 
@@ -92,10 +88,6 @@
             background: #111; 
         }
 
-        /* Başlık Küçültme */
-        h1 { font-size: 1.5rem !important; }
-        h4 { font-size: 1rem !important; }
-
         .win-banner { 
             position: absolute; top: 50%; left: 50%; 
             transform: translate(-50%, -50%) scale(0); 
@@ -108,12 +100,6 @@
         .banner-active { transform: translate(-50%, -50%) scale(1); }
         #timer { font-size: 4rem; color: var(--neon-red); text-shadow: 0 0 20px var(--neon-red); }
         .status-text { margin-top: 10px; color: var(--neon-green); font-size: 0.9rem; font-weight: bold; }
-
-        /* Mobilde Butonu Sabitleme Opsiyonu */
-        @media (max-width: 768px) {
-            .container { padding-bottom: 100px; }
-            .btn-lg { width: 100%; }
-        }
     </style>
 </head>
 <body>
@@ -159,7 +145,7 @@
                 </div>
                 
                 <div class="mt-5">
-                    <button onclick="startSearch()" class="btn btn-danger btn-lg px-5 py-3 fw-bold w-100 w-md-auto">
+                    <button id="start-btn" onclick="startSearch()" class="btn btn-danger btn-lg px-5 py-3 fw-bold w-100">
                         SALDIRIYI BAŞLAT
                     </button>
                 </div>
@@ -169,6 +155,7 @@
                 <div id="timer">13</div>
                 <h3 class="mt-3" style="color:var(--neon-green); font-size: 1.2rem;">RAKİP ARANIYOR...</h3>
                 <div class="spinner-border text-success mt-3" role="status"></div>
+                <div class="mt-3 text-white-50 small">Rastgele eşleşme veya Bot bekleniyor...</div>
             </div>
         </div>
     </div>
@@ -183,26 +170,49 @@
         const myNick = "<%= user.nickname %>";
         const myAnimal = "<%= user.selectedAnimal %>";
 
+        // URL Parametrelerini Al (Davetle gelmişse)
+        const urlParams = new URLSearchParams(window.location.search);
+        const inviteRoom = urlParams.get('room');
+        const inviteOpponent = urlParams.get('opponent');
+
         let selectedMultiplier = 1;
         let timerInt;
         let isMatchFound = false;
 
+        // Davetle gelmişse butonu otomatik "Odaya Katıl" yap
+        if(inviteRoom) {
+            document.getElementById('start-btn').innerText = "DÜELLOYA KATIL";
+            document.getElementById('start-btn').classList.replace('btn-danger', 'btn-warning');
+        }
+
         function setMultiplier(val, el) {
             selectedMultiplier = val;
             document.querySelectorAll('.bet-card').forEach(c => c.classList.remove('active'));
-            // Tıklanan sütunun içindeki kartı bul
             el.querySelector('.bet-card').classList.add('active');
         }
 
         function startSearch() {
             if (!arenaSocket.connected) {
-                Swal.fire('Hata', 'Bağlantı yok!', 'error');
-                return;
+                Swal.fire('Hata', 'Bağlantı yok!', 'error'); return;
             }
+
             document.getElementById('bet-selection').style.display = 'none';
             document.getElementById('matching-ui').style.display = 'block';
-            arenaSocket.emit('find-match', { myNick, myAnimal });
-            runTimer();
+
+            if(inviteRoom) {
+                // Davet odasına katıl
+                arenaSocket.emit('join-invite-room', { 
+                    room: inviteRoom, 
+                    nick: myNick, 
+                    animal: myAnimal,
+                    multiplier: selectedMultiplier 
+                });
+                addLog("Özel odaya bağlanılıyor...");
+            } else {
+                // Rastgele eşleşme başlat
+                arenaSocket.emit('find-match', { myNick, myAnimal, multiplier: selectedMultiplier });
+                runTimer();
+            }
         }
 
         function runTimer() {
@@ -213,50 +223,85 @@
                 document.getElementById('timer').innerText = count;
                 if(count <= 0) {
                     clearInterval(timerInt);
+                    // Kimse bulunamazsa botla savaşı başlat
                     arenaSocket.emit('start-bot-battle', { multiplier: selectedMultiplier, userId: myId });
                 }
             }, 1000);
         }
 
+        // --- SOCKET OLAYLARI ---
+
+        // PvP Eşleşmesi Kurulduğunda (Hem davet hem rastgele için)
         arenaSocket.on('pvp-found', (data) => {
             isMatchFound = true;
-            const opponent = data.players.find(p => p.id !== arenaSocket.id);
+            clearInterval(timerInt);
+            
+            const opponent = data.players.find(p => p.nick !== myNick);
+            
             document.getElementById('matching-ui').style.display = 'none';
             document.getElementById('opp-name').innerText = opponent.nick;
             document.getElementById('opp-img').src = `/caracter/profile/${opponent.animal}.png`;
-            runBattleSequence(myAnimal, opponent.animal, Math.random() > 0.5, 50);
+            
+            // Savaş sekansı başlasın (isWin sunucudan gelmeli, yoksa burada belirlenir)
+            runBattleSequence(myAnimal, opponent.animal, data.isWin, data.prize);
         });
 
+        // Bot Savaşı veya Sonuç Kesinleştiğinde
         arenaSocket.on('battle-result', (data) => {
             isMatchFound = true;
+            clearInterval(timerInt);
             document.getElementById('matching-ui').style.display = 'none';
             document.getElementById('opp-name').innerText = data.opponentName;
             document.getElementById('opp-img').src = `/caracter/profile/${data.opponentAnimal}.png`;
+            
             runBattleSequence(myAnimal, data.opponentAnimal, data.isWin, data.prize);
         });
 
+        function addLog(msg) { console.log("> Arena:", msg); }
+
+        // --- SAVAŞ SİNEMATİĞİ ---
+
         async function runBattleSequence(player, enemy, isWin, prize) {
             document.getElementById('video-overlay').style.display = 'flex';
-            await playVideoAsync(player, player + "1", "SALDIRI!");
+            
+            // 1. Oyuncu Saldırısı
+            await playVideoAsync(player, player + "1", "SENİN ATAĞIN!");
+            
+            // 2. Rakip Saldırısı
             await playVideoAsync(enemy, enemy + "1", "RAKİP ATAĞI!");
             
+            // 3. Final Sahnesi
             const winner = isWin ? player : enemy;
             resultBanner.innerText = isWin ? "ZAFER" : "KAYIP";
             resultBanner.style.color = isWin ? "var(--neon-green)" : "var(--neon-red)";
             
-            await playVideoAsync(winner, winner, isWin ? `KAZANDIN! +${prize}` : "YENİLDİN!");
+            // Kazananın kutlama videosu veya rakibin darbe aldığı video
+            await playVideoAsync(winner, winner, isWin ? `KAZANDIN! +${prize} BPL` : "YENİLDİN!");
+            
             resultBanner.classList.add('banner-active');
-            setTimeout(() => { window.location.href = "/profil"; }, 3000);
+            
+            setTimeout(() => { 
+                window.location.href = "/profil"; 
+            }, 4000);
         }
 
         function playVideoAsync(animal, file, text) {
             return new Promise((resolve) => {
                 statusMsg.innerText = text;
-                videoElement.src = `/caracter/move/${animal}/${file}.mp4`;
+                // Dosya yapısı: /caracter/move/tiger/tiger1.mp4 gibi
+                videoElement.src = `/caracter/move/${animal.toLowerCase()}/${file.toLowerCase()}.mp4`;
+                
                 videoElement.onended = resolve;
-                videoElement.onerror = () => resolve();
+                videoElement.onerror = () => {
+                    console.error("Video bulunamadı:", videoElement.src);
+                    resolve(); 
+                };
+                
                 videoElement.load();
-                videoElement.play().catch(resolve);
+                videoElement.play().catch(e => {
+                    console.warn("Otomatik oynatma engellendi, manuel geçiliyor");
+                    resolve();
+                });
             });
         }
     </script>
