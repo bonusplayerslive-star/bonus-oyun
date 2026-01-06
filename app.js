@@ -6,7 +6,7 @@ const { createServer } = require('http');
 const { Server } = require('socket.io');
 const mongoose = require('mongoose');
 const session = require('express-session');
-const MongoStore = require('connect-mongo'); // .default hatası giderildi
+const MongoStore = require('connect-mongo').default; // .default hatası giderildi
 const path = require('path');
 require('dotenv').config();
 
