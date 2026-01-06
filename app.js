@@ -6,7 +6,7 @@ const { createServer } = require('http');
 const { Server } = require('socket.io');
 const mongoose = require('mongoose');
 const session = require('express-session');
-const MongoStore = require('connect-mongo').default;
+const MongoStore = require('connect-mongo');
 const path = require('path');
 require('dotenv').config();
 
@@ -33,7 +33,6 @@ app.use(express.static(path.join(__dirname, 'public')));
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
 
-// Render ve Yerel ortamda hata vermeyen akıllı MongoStore yapılandırması
 const sessionMiddleware = session({
     secret: process.env.SESSION_SECRET || 'bpl_cyber_secret_2025',
     resave: false,
@@ -42,7 +41,7 @@ const sessionMiddleware = session({
         ? MongoStore.create({ mongoUrl: MONGO_URI, collectionName: 'sessions' })
         : new MongoStore({ mongoUrl: MONGO_URI, collectionName: 'sessions' }),
     cookie: { 
-        secure: false, // Render HTTPS kullanıyorsa 'false' kalması başlangıçta daha güvenlidir (hata vermez)
+        secure: false, 
         maxAge: 1000 * 60 * 60 * 24 
     }
 });
@@ -60,7 +59,7 @@ async function isLoggedIn(req, res, next) {
                 res.locals.user = user;
                 return next();
             }
-        } catch (err) { console.error("Session User Find Error:", err); }
+        } catch (err) { console.error("Session hatası:", err); }
     }
     res.redirect('/login');
 }
@@ -74,12 +73,52 @@ app.get('/', (req, res) => {
 
 app.get('/login', (req, res) => res.render('index'));
 
+app.get('/profil', isLoggedIn, (req, res) => {
+    res.render('profil', { user: req.user });
+});
+
+// Arena Sistemi (Büyük harf duyarlılığı için optimize edildi)
+app.get('/arena', isLoggedIn, (req, res) => {
+    // Karakter isminin ilk harfini büyük yaparak gönder (Örn: lion -> Lion)
+    const charName = req.user.selectedAnimal || "Tiger";
+    const formattedChar = charName.charAt(0).toUpperCase() + charName.slice(1).toLowerCase();
+    res.render('arena', { user: req.user, formattedChar });
+});
+
+// Yeni Eklenen Rotalar (404 Hatalarını Çözer)
+app.get('/market', isLoggedIn, (req, res) => res.render('market', { user: req.user }));
+app.get('/wallet', isLoggedIn, (req, res) => res.render('wallet', { user: req.user }));
+app.get('/development', isLoggedIn, (req, res) => res.render('development', { user: req.user }));
+app.get('/chat', isLoggedIn, (req, res) => res.render('chat', { user: req.user }));
+app.get('/meeting', isLoggedIn, (req, res) => res.render('meeting', { user: req.user }));
+
+// Karakter Geliştirme (POST API)
+app.post('/upgrade-character', isLoggedIn, async (req, res) => {
+    try {
+        const user = await User.findById(req.user._id);
+        const cost = 500; 
+        if (user.bpl >= cost) {
+            user.bpl -= cost;
+            user.level = (user.level || 1) + 1;
+            await user.save();
+            return res.json({ success: true, newBpl: user.bpl, newLevel: user.level });
+        }
+        res.status(400).json({ success: false, message: "Yetersiz bakiye!" });
+    } catch (err) { res.status(500).json({ success: false }); }
+});
+
+// AUTH İŞLEMLERİ
 app.post('/register', async (req, res) => {
     try {
         const { nickname, email, password } = req.body;
         const existingUser = await User.findOne({ email });
         if (existingUser) return res.send("<script>alert('E-posta kayıtlı!'); window.location='/';</script>");
-        const newUser = new User({ nickname, email, password, bpl: 2500, inventory: [], selectedAnimal: 'Tiger' });
+        
+        // Başlangıç değerleri (İlk harf büyük: Tiger)
+        const newUser = new User({ 
+            nickname, email, password, 
+            bpl: 2500, inventory: [], selectedAnimal: 'Tiger', level: 1 
+        });
         await newUser.save();
         req.session.userId = newUser._id;
         res.redirect('/profil');
@@ -99,144 +138,52 @@ app.post('/login', async (req, res) => {
     } catch (err) { res.status(500).send("Giriş başarısız."); }
 });
 
-app.get('/profil', isLoggedIn, async (req, res) => {
-    const user = await User.findById(req.user._id);
-    res.render('profil', { user });
-});
-
-app.get('/arena', isLoggedIn, (req, res) => res.render('arena', { user: req.user }));
-app.get('/market', isLoggedIn, (req, res) => res.render('market', { user: req.user }));
-app.get('/chat', isLoggedIn, (req, res) => res.render('chat', { user: req.user }));
-app.get('/meeting', isLoggedIn, (req, res) => res.render('meeting', { user: req.user }));
-
 app.get('/logout', (req, res) => { req.session.destroy(); res.redirect('/'); });
 
-// --- 5. SOCKET.IO İŞLEMLERİ ---
-let arenaWaitingPool = [];
-
+// --- 5. SOCKET.IO (GERÇEK ZAMANLI İŞLEMLER) ---
 io.on('connection', async (socket) => {
     const session = socket.request.session;
     if (session && session.userId) {
-        try {
-            const user = await User.findById(session.userId);
-            if (user) {
-                socket.userId = user._id;
-                socket.nickname = user.nickname;
-                socket.animal = user.selectedAnimal || "Tiger";
-            }
-        } catch (e) { console.log("Socket Session Find Error:", e); }
+        const user = await User.findById(session.userId);
+        if (user) {
+            socket.userId = user._id;
+            socket.nickname = user.nickname;
+        }
     }
 
-    // --- GENEL CHAT ---
     socket.on('chat-message', (data) => {
         io.emit('new-message', {
-            sender: socket.nickname || "Bilinmeyen",
+            sender: socket.nickname || "Misafir",
             text: data.text,
             time: new Date().toLocaleTimeString('tr-TR', { hour: '2-digit', minute: '2-digit' })
         });
     });
 
-    // --- VIP KONSEY (MEETING) SİSTEMİ ---
-    socket.on('join-meeting', (data) => {
-        const roomId = data.roomId || "GENEL_KONSEY";
-        socket.join(roomId);
-        socket.currentRoom = roomId;
-        socket.peerId = data.peerId; 
-        
-        socket.to(roomId).emit('user-connected', { 
-            nickname: socket.nickname, 
-            id: socket.id,
-            peerId: data.peerId 
-        });
-    });
-
-    socket.on('send-meeting-message', (data) => {
-        const room = socket.currentRoom || "GENEL_KONSEY";
-        io.to(room).emit('new-meeting-message', {
-            sender: socket.nickname,
-            text: data.text
-        });
-    });
-
-    // --- VIP HEDİYE SİSTEMİ (5500 SINIRI) ---
-    socket.on('send-gift-vip', async (data) => {
-        try {
-            const { targetNick, amount, room } = data;
-            const sender = await User.findById(socket.userId);
-            const receiver = await User.findOne({ nickname: targetNick });
-
-            if (!receiver || sender.nickname === targetNick) return;
-            
-            if (sender.bpl - amount < 5500) {
-                return socket.emit('new-message', { sender: "SİSTEM", text: "❌ İşlem başarısız: Bakiyeniz 5500 BPL altına düşemez!" });
-            }
-
-            sender.bpl -= amount;
-            receiver.bpl += (amount * 0.9);
-            await sender.save(); await receiver.save();
-
-            socket.emit('update-bpl', sender.bpl);
-            const receiverSocket = Array.from(io.sockets.sockets.values()).find(s => s.nickname === targetNick);
-            if (receiverSocket) receiverSocket.emit('update-bpl', receiver.bpl);
-
-            io.to(room || "GENEL_KONSEY").emit('new-message', {
-                sender: "SİSTEM",
-                text: `🎁 ${sender.nickname}, ${receiver.nickname} kullanıcısına ${amount} BPL gönderdi!`
-            });
-        } catch (err) { console.error(err); }
-    });
-
-    // --- DÜELLO & CHALLENGE ---
-    socket.on('send-challenge', async (data) => {
-        try {
-            const sender = await User.findById(socket.userId);
-            if (sender && sender.bpl >= 5505) { 
-                sender.bpl -= 5; await sender.save();
-                const challengeRoom = `arena_${Date.now()}`;
-                io.emit('challenge-received', { 
-                    from: socket.nickname, 
-                    target: data.target, 
-                    room: challengeRoom 
-                });
-                socket.emit('update-bpl', sender.bpl);
-            }
-        } catch (e) { console.log(e); }
-    });
-
-    // --- ARENA / BOT BATTLE ---
+    // Arena Savaş Mantığı
     socket.on('start-bot-battle', async (data) => {
         try {
             const user = await User.findById(socket.userId);
-            const isWin = Math.random() > 0.6;
-            const prize = isWin ? (50 * (data.multiplier || 1)) : -25;
-            
-            if(user) {
-                user.bpl += prize;
-                await user.save();
-                socket.emit('update-bpl', user.bpl);
-            }
+            if(!user) return;
 
-            socket.emit('battle-result', {
-                isWin,
-                opponentName: "Cyber_Bot_Alpha",
-                opponentAnimal: "Lion",
-                prize: isWin ? prize : 25
+            const isWin = Math.random() > 0.5;
+            const prize = isWin ? 100 : -50;
+            
+            user.bpl += prize;
+            if (user.bpl < 0) user.bpl = 0;
+            await user.save();
+
+            socket.emit('update-bpl', user.bpl);
+            // Savaş bittiğinde sonucu büyük harf formatıyla döndür
+            socket.emit('battle-result', { 
+                isWin, 
+                prize, 
+                newBpl: user.bpl,
+                charName: user.selectedAnimal // "Lion", "Tiger" vb.
             });
         } catch (e) { console.log(e); }
-    });
-
-    socket.on('disconnect', () => {
-        if (socket.currentRoom) {
-            socket.to(socket.currentRoom).emit('user-disconnected', socket.peerId);
-        }
-        arenaWaitingPool = arenaWaitingPool.filter(s => s.id !== socket.id);
     });
 });
 
 // --- 6. BAŞLAT ---
-// Render için Port 10000 varsayılanı ve 0.0.0.0 dinlemesi
 const PORT = process.env.PORT || 10000;
-httpServer.listen(PORT, '0.0.0.0', () => {
-    console.log(`🌍 Bonus Players Live Yayında: Port ${PORT}`);
-});
-
+httpServer.listen(PORT, '0.0.0.0', () => console.log(`🚀 BPL Sistemi Yayında: Port ${PORT}`));
