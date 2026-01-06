@@ -19,7 +19,7 @@
         body { 
             background: #000; 
             color: #fff; 
-            height: 100dvh; /* Dinamik viewport height */
+            height: 100dvh; 
             display: flex; 
             flex-direction: row; 
             margin: 0; 
@@ -61,7 +61,7 @@
             width: 100px; 
             height: 100px; 
             border: 2px solid var(--gold-dark); 
-            border-radius: 12px; /* Daire yerine daha modern rounded corner */
+            border-radius: 12px; 
             overflow: hidden; 
             position: relative; 
             cursor: pointer; 
@@ -100,8 +100,6 @@
             padding: 20px; 
             overflow-y: auto; 
             font-size: 0.95rem; 
-            scrollbar-width: thin;
-            scrollbar-color: var(--gold-dark) transparent;
         }
 
         .input-bar { 
@@ -145,7 +143,7 @@
         }
         .menu-item:hover { background: var(--gold-dark); color: #000; font-weight: bold; }
 
-        .sys-msg { color: #ff4444; font-weight: bold; font-size: 0.8rem; border-left: 2px solid #ff4444; padding-left: 8px; margin: 5px 0; }
+        .sys-msg { color: #39FF14; font-weight: bold; font-size: 0.8rem; border-left: 2px solid #39FF14; padding-left: 8px; margin: 5px 0; }
     </style>
 </head>
 <body>
@@ -159,7 +157,7 @@
 
 <div class="main-content">
     <div id="vip-chat">
-        <div class="sys-msg">SİSTEM: VIP Konseyine hoş geldiniz. Bağlantı şifreli ve güvenli.</div>
+        <div class="sys-msg">SİSTEM: VIP Konseyine hoş geldiniz. Bağlantı güvenli.</div>
     </div>
     
     <div class="input-bar">
@@ -167,7 +165,7 @@
             <span id="my-bpl"><%= user.bpl %></span> <small>BPL</small>
         </div>
         <input type="text" id="chat-input" class="form-control bg-dark text-white border-secondary" placeholder="Konseye hitap et..." autocomplete="off">
-        <button onclick="sendMessage()" class="btn btn-warning fw-bold px-4">GÖNDER</button>
+        <button onclick="sendMeetingMessage()" class="btn btn-warning fw-bold px-4">GÖNDER</button>
     </div>
 </div>
 
@@ -186,8 +184,9 @@
 
 <script>
     const myNick = "<%= user.nickname %>";
+    // Oda ID'sini URL'den al yoksa GENEL_KONSEY kullan
     const currentRoom = new URLSearchParams(window.location.search).get('room') || "GENEL_KONSEY";
-    const socket = io(window.location.origin, { query: { nickname: myNick } });
+    const socket = io();
     const myPeer = new Peer(); 
     let myStream;
     let selectedUserNick = null;
@@ -199,33 +198,36 @@
             myStream = await navigator.mediaDevices.getUserMedia({ video: true, audio: true });
             document.getElementById('localVideo').srcObject = myStream;
         } catch (e) { 
-            appendMsg("SİSTEM", "⚠️ Medya cihazlarına erişilemedi. Sadece izleyici modundasınız."); 
+            appendMsg("SİSTEM", "⚠️ Kamera erişimi reddedildi. Sadece izleyicisin."); 
         }
     }
 
-    myPeer.on('open', id => {
-        socket.emit('join-meeting', { roomId: currentRoom, peerId: id });
+    myPeer.on('open', peerId => {
+        // app.js'deki join-meeting dinleyicisine uygun gönderim
+        socket.emit('join-meeting', { roomId: currentRoom, peerId: peerId });
     });
 
-    // Gelen Aramayı Cevapla
+    // Gelen aramayı yanıtla
     myPeer.on('call', call => {
         call.answer(myStream);
-        call.on('stream', userStream => {
-            // Arayan kişinin nickini socket üzerinden eşleştirmek gerekebilir, 
-            // Şimdilik "ÜYE" olarak işaretliyoruz.
-            addVideoSlot(call.peer, userStream, "KATILIMCI");
+        call.on('stream', remoteStream => {
+            // Arayan kişinin peerId'sini kullanarak slot oluştur
+            addVideoSlot(call.peer, remoteStream, "KATILIMCI");
         });
     });
 
-    // Yeni Kullanıcı Bağlandığında Onu Ara
+    // Yeni kullanıcı bağlandığında onu ara
     socket.on('user-connected', (data) => {
-        const { id, nickname } = data;
+        const { id, nickname } = data; // app.js'den gelen socket.id veya peerId
         appendMsg("SİSTEM", `👤 ${nickname} konseye katıldı.`);
         
-        if (myStream) {
+        if (myStream && data.id !== socket.id) {
+            // Biraz bekle (Peer'in hazır olması için)
             setTimeout(() => {
-                const call = myPeer.call(id, myStream);
-                call.on('stream', userStream => addVideoSlot(id, userStream, nickname));
+                const call = myPeer.call(data.peerId, myStream);
+                call.on('stream', remoteStream => {
+                    addVideoSlot(data.peerId, remoteStream, nickname);
+                });
             }, 1000);
         }
     });
@@ -256,20 +258,37 @@
         if(el) el.remove();
     });
 
+    // SOHBET İŞLEMLERİ (Meeting'e Özel)
+    function sendMeetingMessage() {
+        const input = document.getElementById('chat-input');
+        const text = input.value.trim();
+        if(!text) return;
+        // app.js'deki send-meeting-message dinleyicisine gönder
+        socket.emit('send-meeting-message', { text: text });
+        input.value = '';
+    }
+
+    // app.js'den gelen yeni konsey mesajı
+    socket.on('new-meeting-message', d => appendMsg(d.sender, d.text));
+
+    // BPL Güncellemesi
+    socket.on('update-bpl', (newBpl) => {
+        myBpl = newBpl;
+        document.getElementById('my-bpl').innerText = newBpl;
+    });
+
+    // AKSİYON MENÜSÜ (Hediye/Arena)
     function showMenu(e, nick) {
         if(nick === "SİZ (KOMUTAN)" || nick === myNick) return;
         selectedUserNick = nick;
         const menu = document.getElementById('user-menu');
         document.getElementById('menu-target-name').innerText = nick.toUpperCase();
-        
         menu.style.display = 'block';
         
-        // Menü pozisyonu ayarı (Ekran dışına taşmayı önler)
         let posX = e.clientX;
         let posY = e.clientY;
         if (posX + 200 > window.innerWidth) posX -= 200;
         if (posY + 250 > window.innerHeight) posY -= 250;
-
         menu.style.left = posX + 'px';
         menu.style.top = posY + 'px';
     }
@@ -278,20 +297,11 @@
 
     function executeAction(action, amount = 0) {
         if(action === 'gift') {
-            // 5500 BPL Koruması
-            if (myBpl - amount < 300) {
-                Swal.fire({ 
-                    icon: 'error', 
-                    title: 'LIMIT ENGELI', 
-                    text: 'Bakiyeniz 300 BPL altına düşemez!',
-                    background: '#111', color: '#fff'
-                });
+            // 5500 BPL VIP Kuralı
+            if (myBpl - amount < 5500) {
+                Swal.fire({ icon: 'error', title: 'LIMIT', text: '5500 BPL altına düşemezsin!', background: '#111', color: '#fff' });
             } else {
-                socket.emit('send-gift-vip', { 
-                    targetNick: selectedUserNick, 
-                    amount: amount, 
-                    room: currentRoom 
-                });
+                socket.emit('send-gift-vip', { targetNick: selectedUserNick, amount: amount, room: currentRoom });
             }
         } else if(action === 'arena') {
             window.location.href = `/arena?target=${selectedUserNick}`;
@@ -299,50 +309,18 @@
         hideMenu();
     }
 
-    function sendMessage() {
-        const input = document.getElementById('chat-input');
-        if(!input.value.trim()) return;
-        socket.emit('chat-message', { room: currentRoom, text: input.value });
-        input.value = '';
-    }
-
-    socket.on('new-message', d => appendMsg(d.sender, d.text));
-    
-    socket.on('update-bpl', (newBpl) => {
-        myBpl = newBpl;
-        document.getElementById('my-bpl').innerText = newBpl;
-    });
-
     function appendMsg(s, t) {
         const chat = document.getElementById('vip-chat');
         const div = document.createElement('div');
-        const isSys = s === "SİSTEM";
-        div.className = isSys ? "sys-msg" : "mb-2";
-        
-        if(!isSys) {
-            div.innerHTML = `<b style="color:var(--gold)">${s}:</b> <span style="color:#eee">${t}</span>`;
-        } else {
-            div.innerText = `${s}: ${t}`;
-        }
-        
+        div.className = "mb-2";
+        div.innerHTML = `<b style="color:var(--gold)">${s}:</b> <span style="color:#eee">${t}</span>`;
         chat.appendChild(div);
         chat.scrollTop = chat.scrollHeight;
     }
 
-    // Enter tuşu desteği
-    document.getElementById('chat-input').addEventListener('keypress', (e) => { 
-        if(e.key === 'Enter') sendMessage(); 
-    });
-
-    // Mobilde klavye açılınca sohbeti aşağı kaydır
-    document.getElementById('chat-input').addEventListener('focus', () => {
-        setTimeout(() => {
-            const chat = document.getElementById('vip-chat');
-            chat.scrollTop = chat.scrollHeight;
-        }, 300);
-    });
-
+    document.getElementById('chat-input').addEventListener('keypress', (e) => { if(e.key === 'Enter') sendMeetingMessage(); });
     window.onclick = () => hideMenu();
+    
     initCamera();
 </script>
 </body>
