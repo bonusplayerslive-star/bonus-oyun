@@ -6,7 +6,7 @@ const { createServer } = require('http');
 const { Server } = require('socket.io');
 const mongoose = require('mongoose');
 const session = require('express-session');
-const MongoStore = require('connect-mongo').default;
+const MongoStore = require('connect-mongo'); // .default hatası giderildi
 const path = require('path');
 require('dotenv').config();
 
@@ -20,7 +20,7 @@ const io = new Server(httpServer, {
 });
 
 // --- 2. VERİTABANI BAĞLANTISI ---
-const MONGO_URI = process.env.MONGO_URI || "mongodb+srv://bonusplayerslive_db_user:1nB1QyAsh3qVafpE@bonus.x39zlzq.mongodb.net/?appName=Bonus";
+const MONGO_URI = process.env.MONGO_URI;
 
 mongoose.connect(MONGO_URI)
     .then(() => console.log('✅ MongoDB Bağlantısı Başarılı'))
@@ -34,12 +34,10 @@ app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
 
 const sessionMiddleware = session({
-    secret: process.env.SESSION_SECRET || 'bpl_cyber_secret_2025',
+    secret: process.env.SESSION_SECRET || 'bpl_gizli_anahtar_2025',
     resave: false,
     saveUninitialized: false,
-    store: (typeof MongoStore.create === 'function') 
-        ? MongoStore.create({ mongoUrl: MONGO_URI, collectionName: 'sessions' })
-        : new MongoStore({ mongoUrl: MONGO_URI, collectionName: 'sessions' }),
+    store: MongoStore.create({ mongoUrl: MONGO_URI, collectionName: 'sessions' }),
     cookie: { 
         secure: false, 
         maxAge: 1000 * 60 * 60 * 24 
@@ -77,34 +75,56 @@ app.get('/profil', isLoggedIn, (req, res) => {
     res.render('profil', { user: req.user });
 });
 
-// Arena Sistemi (Büyük harf duyarlılığı için optimize edildi)
+// Arena Sistemi (Resim 4 ve 8'deki Video Mantığı)
 app.get('/arena', isLoggedIn, (req, res) => {
-    // Karakter isminin ilk harfini büyük yaparak gönder (Örn: lion -> Lion)
-    const charName = req.user.selectedAnimal || "Tiger";
-    const formattedChar = charName.charAt(0).toUpperCase() + charName.slice(1).toLowerCase();
-    res.render('arena', { user: req.user, formattedChar });
+    let charName = req.user.selectedAnimal || "Tiger";
+    // Linux için ilk harfi büyük yap (Lion, Tiger, etc.)
+    const formattedChar = charName.charAt(0).toUpperCase() + charName.slice(1);
+    
+    res.render('arena', { 
+        user: req.user, 
+        formattedChar,
+        // Savaş başlangıç videosu: Lion1.mp4, Galibiyet: Lion.mp4
+        moveVideo: `/caracter/move/${formattedChar}/${formattedChar}1.mp4`,
+        winVideo: `/caracter/move/${formattedChar}/${formattedChar}.mp4`
+    });
 });
 
-// Yeni Eklenen Rotalar (404 Hatalarını Çözer)
+// 404 Hatalarını Çözen Rotalar (Resim 1 ve 5)
 app.get('/market', isLoggedIn, (req, res) => res.render('market', { user: req.user }));
-app.get('/wallet', isLoggedIn, (req, res) => res.render('wallet', { user: req.user }));
+app.get('/wallet', isLoggedIn, (req, res) => res.render('wallet', { 
+    user: req.user,
+    contract: process.env.CONTRACT_ADDRESS,
+    wallet: process.env.WALLET_ADDRESS 
+}));
 app.get('/development', isLoggedIn, (req, res) => res.render('development', { user: req.user }));
 app.get('/chat', isLoggedIn, (req, res) => res.render('chat', { user: req.user }));
 app.get('/meeting', isLoggedIn, (req, res) => res.render('meeting', { user: req.user }));
 
-// Karakter Geliştirme (POST API)
+// KARAKTER GELİŞTİRME & ENVANTER KAYDI
 app.post('/upgrade-character', isLoggedIn, async (req, res) => {
     try {
+        const { statType, cost } = req.body; // 'hp', 'atk', 'def'
         const user = await User.findById(req.user._id);
-        const cost = 500; 
+        
         if (user.bpl >= cost) {
             user.bpl -= cost;
-            user.level = (user.level || 1) + 1;
+            
+            // Veritabanındaki stats objesini güncelle (Resimdeki modele uygun)
+            if (!user.stats) user.stats = { hp: 100, atk: 10, def: 10 };
+            user.stats[statType] = (user.stats[statType] || 0) + 10;
+            
+            // Mongoose'a objenin değiştiğini bildir (Gelişmeme sorunu çözümü)
+            user.markModified('stats');
             await user.save();
-            return res.json({ success: true, newBpl: user.bpl, newLevel: user.level });
+            
+            return res.json({ success: true, newBpl: user.bpl, newStats: user.stats });
         }
-        res.status(400).json({ success: false, message: "Yetersiz bakiye!" });
-    } catch (err) { res.status(500).json({ success: false }); }
+        res.status(400).json({ success: false, message: "Yetersiz BPL!" });
+    } catch (err) { 
+        console.error(err);
+        res.status(500).json({ success: false }); 
+    }
 });
 
 // AUTH İŞLEMLERİ
@@ -114,10 +134,11 @@ app.post('/register', async (req, res) => {
         const existingUser = await User.findOne({ email });
         if (existingUser) return res.send("<script>alert('E-posta kayıtlı!'); window.location='/';</script>");
         
-        // Başlangıç değerleri (İlk harf büyük: Tiger)
         const newUser = new User({ 
             nickname, email, password, 
-            bpl: 2500, inventory: [], selectedAnimal: 'Tiger', level: 1 
+            bpl: 2500, 
+            selectedAnimal: 'Tiger',
+            stats: { hp: 100, atk: 10, def: 10 }
         });
         await newUser.save();
         req.session.userId = newUser._id;
@@ -140,7 +161,7 @@ app.post('/login', async (req, res) => {
 
 app.get('/logout', (req, res) => { req.session.destroy(); res.redirect('/'); });
 
-// --- 5. SOCKET.IO (GERÇEK ZAMANLI İŞLEMLER) ---
+// --- 5. SOCKET.IO (GERÇEK ZAMANLI SAVAŞ & VERİ) ---
 io.on('connection', async (socket) => {
     const session = socket.request.session;
     if (session && session.userId) {
@@ -151,6 +172,35 @@ io.on('connection', async (socket) => {
         }
     }
 
+    // Arena Savaş Mantığı & Bakiye Güncelleme
+    socket.on('start-bot-battle', async (data) => {
+        try {
+            const user = await User.findById(socket.userId);
+            if(!user) return;
+
+            const isWin = Math.random() > 0.45; // %55 kazanma şansı
+            const prize = isWin ? 100 : -50;
+            
+            user.bpl += prize;
+            if (user.bpl < 0) user.bpl = 0;
+            
+            await user.save(); // Veritabanına kalıcı kayıt
+
+            let char = user.selectedAnimal || "Tiger";
+            const formattedChar = char.charAt(0).toUpperCase() + char.slice(1);
+
+            socket.emit('update-bpl', user.bpl);
+            socket.emit('battle-result', { 
+                isWin, 
+                prize, 
+                newBpl: user.bpl,
+                charName: formattedChar,
+                attackVid: `/caracter/move/${formattedChar}/${formattedChar}1.mp4`,
+                winVid: `/caracter/move/${formattedChar}/${formattedChar}.mp4`
+            });
+        } catch (e) { console.error("Savaş hatası:", e); }
+    });
+
     socket.on('chat-message', (data) => {
         io.emit('new-message', {
             sender: socket.nickname || "Misafir",
@@ -158,33 +208,8 @@ io.on('connection', async (socket) => {
             time: new Date().toLocaleTimeString('tr-TR', { hour: '2-digit', minute: '2-digit' })
         });
     });
-
-    // Arena Savaş Mantığı
-    socket.on('start-bot-battle', async (data) => {
-        try {
-            const user = await User.findById(socket.userId);
-            if(!user) return;
-
-            const isWin = Math.random() > 0.5;
-            const prize = isWin ? 100 : -50;
-            
-            user.bpl += prize;
-            if (user.bpl < 0) user.bpl = 0;
-            await user.save();
-
-            socket.emit('update-bpl', user.bpl);
-            // Savaş bittiğinde sonucu büyük harf formatıyla döndür
-            socket.emit('battle-result', { 
-                isWin, 
-                prize, 
-                newBpl: user.bpl,
-                charName: user.selectedAnimal // "Lion", "Tiger" vb.
-            });
-        } catch (e) { console.log(e); }
-    });
 });
 
 // --- 6. BAŞLAT ---
 const PORT = process.env.PORT || 10000;
 httpServer.listen(PORT, '0.0.0.0', () => console.log(`🚀 BPL Sistemi Yayında: Port ${PORT}`));
-
