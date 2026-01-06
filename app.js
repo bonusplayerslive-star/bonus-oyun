@@ -33,16 +33,16 @@ app.use(express.static(path.join(__dirname, 'public')));
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
 
+// MongoStore Sürüm Hatalarını Önleyen Güvenli Yapılandırma
 const sessionMiddleware = session({
     secret: process.env.SESSION_SECRET || 'bpl_cyber_secret_2025',
     resave: false,
     saveUninitialized: false,
-    store: MongoStore.create({ 
-        mongoUrl: MONGO_URI,
-        collectionName: 'sessions'
-    }),
+    store: (typeof MongoStore.create === 'function') 
+        ? MongoStore.create({ mongoUrl: MONGO_URI, collectionName: 'sessions' })
+        : new MongoStore({ mongoUrl: MONGO_URI, collectionName: 'sessions' }),
     cookie: { 
-        secure: false, // HTTPS kullanıyorsanız true yapın
+        secure: false, // Render HTTPS kullanıyorsanız true yapılabilir
         maxAge: 1000 * 60 * 60 * 24 
     }
 });
@@ -137,9 +137,8 @@ io.on('connection', async (socket) => {
         const roomId = data.roomId || "GENEL_KONSEY";
         socket.join(roomId);
         socket.currentRoom = roomId;
-        socket.peerId = data.peerId; // WebRTC için Peer ID sakla
+        socket.peerId = data.peerId; 
         
-        // Diğer üyelere yeni birinin katıldığını bildir
         socket.to(roomId).emit('user-connected', { 
             nickname: socket.nickname, 
             id: socket.id,
@@ -164,19 +163,16 @@ io.on('connection', async (socket) => {
 
             if (!receiver || sender.nickname === targetNick) return;
             
-            // Limit Kontrolü
             if (sender.bpl - amount < 5500) {
                 return socket.emit('new-message', { sender: "SİSTEM", text: "❌ İşlem başarısız: Bakiyeniz 5500 BPL altına düşemez!" });
             }
 
             sender.bpl -= amount;
-            receiver.bpl += (amount * 0.9); // %10 Komisyon
+            receiver.bpl += (amount * 0.9);
             await sender.save(); await receiver.save();
 
-            // Bakiyeleri anlık güncelle (Sadece ilgili iki kişiye)
             socket.emit('update-bpl', sender.bpl);
             
-            // Eğer alıcı o an online ise onun bakiyesini de güncelle
             const receiverSocket = Array.from(io.sockets.sockets.values()).find(s => s.nickname === targetNick);
             if (receiverSocket) {
                 receiverSocket.emit('update-bpl', receiver.bpl);
@@ -184,7 +180,7 @@ io.on('connection', async (socket) => {
 
             io.to(room || "GENEL_KONSEY").emit('new-message', {
                 sender: "SİSTEM",
-                text: `🎁 ${sender.nickname}, ${receiver.nickname} kullanıcısına ${amount} BPL lojistik destek sağladı!`
+                text: `🎁 ${sender.nickname}, ${receiver.nickname} kullanıcısına ${amount} BPL gönderdi!`
             });
         } catch (err) { console.error(err); }
     });
@@ -236,5 +232,4 @@ io.on('connection', async (socket) => {
 
 // --- 6. BAŞLAT ---
 const PORT = process.env.PORT || 3000;
-httpServer.listen(PORT, () => console.log(`🌍 Bonus Players Live Yayında: http://localhost:${PORT}`));
-
+httpServer.listen(PORT, '0.0.0.0', () => console.log(`🌍 Bonus Players Live Yayında: Port ${PORT}`));
