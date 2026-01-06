@@ -33,7 +33,7 @@ app.use(express.static(path.join(__dirname, 'public')));
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
 
-// MongoStore Sürüm Hatalarını Önleyen Güvenli Yapılandırma
+// Render ve Yerel ortamda hata vermeyen akıllı MongoStore yapılandırması
 const sessionMiddleware = session({
     secret: process.env.SESSION_SECRET || 'bpl_cyber_secret_2025',
     resave: false,
@@ -42,23 +42,25 @@ const sessionMiddleware = session({
         ? MongoStore.create({ mongoUrl: MONGO_URI, collectionName: 'sessions' })
         : new MongoStore({ mongoUrl: MONGO_URI, collectionName: 'sessions' }),
     cookie: { 
-        secure: false, // Render HTTPS kullanıyorsanız true yapılabilir
+        secure: false, // Render HTTPS kullanıyorsa 'false' kalması başlangıçta daha güvenlidir (hata vermez)
         maxAge: 1000 * 60 * 60 * 24 
     }
 });
 
 app.use(sessionMiddleware);
-io.engine.use(sessionMiddleware); // Socket.io'nun session'a erişmesini sağlar
+io.engine.use(sessionMiddleware); 
 
 // Güvenlik Kapısı (Middleware)
 async function isLoggedIn(req, res, next) {
     if (req.session && req.session.userId) {
-        const user = await User.findById(req.session.userId);
-        if (user) {
-            req.user = user;
-            res.locals.user = user;
-            return next();
-        }
+        try {
+            const user = await User.findById(req.session.userId);
+            if (user) {
+                req.user = user;
+                res.locals.user = user;
+                return next();
+            }
+        } catch (err) { console.error("Session User Find Error:", err); }
     }
     res.redirect('/login');
 }
@@ -115,12 +117,14 @@ let arenaWaitingPool = [];
 io.on('connection', async (socket) => {
     const session = socket.request.session;
     if (session && session.userId) {
-        const user = await User.findById(session.userId);
-        if (user) {
-            socket.userId = user._id;
-            socket.nickname = user.nickname;
-            socket.animal = user.selectedAnimal || "Tiger";
-        }
+        try {
+            const user = await User.findById(session.userId);
+            if (user) {
+                socket.userId = user._id;
+                socket.nickname = user.nickname;
+                socket.animal = user.selectedAnimal || "Tiger";
+            }
+        } catch (e) { console.log("Socket Session Find Error:", e); }
     }
 
     // --- GENEL CHAT ---
@@ -172,11 +176,8 @@ io.on('connection', async (socket) => {
             await sender.save(); await receiver.save();
 
             socket.emit('update-bpl', sender.bpl);
-            
             const receiverSocket = Array.from(io.sockets.sockets.values()).find(s => s.nickname === targetNick);
-            if (receiverSocket) {
-                receiverSocket.emit('update-bpl', receiver.bpl);
-            }
+            if (receiverSocket) receiverSocket.emit('update-bpl', receiver.bpl);
 
             io.to(room || "GENEL_KONSEY").emit('new-message', {
                 sender: "SİSTEM",
@@ -187,17 +188,19 @@ io.on('connection', async (socket) => {
 
     // --- DÜELLO & CHALLENGE ---
     socket.on('send-challenge', async (data) => {
-        const sender = await User.findById(socket.userId);
-        if (sender && sender.bpl >= 5505) { 
-            sender.bpl -= 5; await sender.save();
-            const challengeRoom = `arena_${Date.now()}`;
-            io.emit('challenge-received', { 
-                from: socket.nickname, 
-                target: data.target, 
-                room: challengeRoom 
-            });
-            socket.emit('update-bpl', sender.bpl);
-        }
+        try {
+            const sender = await User.findById(socket.userId);
+            if (sender && sender.bpl >= 5505) { 
+                sender.bpl -= 5; await sender.save();
+                const challengeRoom = `arena_${Date.now()}`;
+                io.emit('challenge-received', { 
+                    from: socket.nickname, 
+                    target: data.target, 
+                    room: challengeRoom 
+                });
+                socket.emit('update-bpl', sender.bpl);
+            }
+        } catch (e) { console.log(e); }
     });
 
     // --- ARENA / BOT BATTLE ---
@@ -231,5 +234,8 @@ io.on('connection', async (socket) => {
 });
 
 // --- 6. BAŞLAT ---
-const PORT = process.env.PORT || 3000;
-httpServer.listen(PORT, '0.0.0.0', () => console.log(`🌍 Bonus Players Live Yayında: Port ${PORT}`));
+// Render için Port 10000 varsayılanı ve 0.0.0.0 dinlemesi
+const PORT = process.env.PORT || 10000;
+httpServer.listen(PORT, '0.0.0.0', () => {
+    console.log(`🌍 Bonus Players Live Yayında: Port ${PORT}`);
+});
