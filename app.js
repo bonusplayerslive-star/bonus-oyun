@@ -65,14 +65,102 @@ app.get('/chat', isLoggedIn, (req, res) => {
     res.render('chat', { user: req.user });
 });
 
-// 4. Market (500 Hatasını Önlemek İçin Veri Gönderimi)
+// --- MARKET ROTASI ---
 app.get('/market', isLoggedIn, (req, res) => {
-    const shopItems = [
-        { id: "p1", name: "Enerji İksiri", price: 500, type: "powerup" },
-        { id: "p2", name: "Hız Botu", price: 1000, type: "boost" }
+    // Profil resimlerinin klasör yapısıyla (image_7891cc.png) tam uyumlu listesi
+    const animals = [
+        { id: "a1", name: "Lion", price: 2500, hp: 100, atk: 90 },
+        { id: "a2", name: "Tiger", price: 2000, hp: 90, atk: 95 },
+        { id: "a3", name: "Bear", price: 1000, hp: 120, atk: 70 },
+        { id: "a4", name: "Falcon", price: 1000, hp: 60, atk: 95 },
+        { id: "a5", name: "Gorilla", price: 5000, hp: 150, atk: 85 },
+        { id: "a6", name: "Crocodile", price: 1000, hp: 110, atk: 80 },
+        { id: "a7", name: "Rhino", price: 3000, hp: 180, atk: 60 },
+        { id: "a8", name: "Snake", price: 800, hp: 50, atk: 100 }
     ];
-    res.render('market', { user: req.user, items: shopItems });
+
+    // Resim yollarını GitHub klasör yapına göre düzeltiyoruz (Büyük Harf Uyumu)
+    const processedAnimals = animals.map(animal => ({
+        ...animal,
+        // image_7a497c'deki 404 hatasını çözmek için dosya yolunu tam eşliyoruz
+        image: `/caracter/move/${animal.name}/${animal.name.toLowerCase()}.jpg` 
+    }));
+
+    res.render('market', { 
+        user: req.user, 
+        animals: processedAnimals 
+    });
 });
+
+// Hayvan Satın Alma API
+app.post('/api/market/buy-animal', isLoggedIn, async (req, res) => {
+    try {
+        const { animalName, price } = req.body;
+        const user = await User.findById(req.user._id);
+
+        if (user.bpl >= price) {
+            user.bpl -= price;
+            // Kullanıcının envanterine ekle veya seçili hayvanı değiştir
+            user.selectedAnimal = animalName; 
+            user.inventory.push({ name: animalName, type: 'animal' });
+            await user.save();
+            return res.json({ success: true, newBpl: user.bpl });
+        }
+        res.status(400).json({ success: false, message: "BPL yetersiz!" });
+    } catch (err) { res.status(500).json({ success: false }); }
+});
+// --- GELİŞTİRME MERKEZİ ROTASI ---
+app.get('/development', isLoggedIn, (req, res) => {
+    res.render('development', { user: req.user });
+});
+
+// İstatistik Yükseltme API
+app.post('/api/upgrade', isLoggedIn, async (req, res) => {
+    try {
+        const { statType, cost } = req.body; // hp, atk, def
+        const user = await User.findById(req.user._id);
+
+        if (user.bpl >= cost) {
+            user.bpl -= cost;
+            
+            // Stats objesinin varlığını kontrol et (image_7a4c43'teki hataları önler)
+            if (!user.stats) {
+                user.stats = { hp: 100, atk: 10, def: 10 };
+            }
+
+            // Stat tipine göre artır
+            if (statType === 'hp') user.stats.hp += 10;
+            else if (statType === 'atk') user.stats.atk += 2;
+            else if (statType === 'def') user.stats.def += 2;
+
+            user.markModified('stats'); // MongoDB'ye objenin değiştiğini bildir
+            await user.save();
+
+            return res.json({ 
+                success: true, 
+                newBpl: user.bpl, 
+                newStats: user.stats 
+            });
+        }
+        res.status(400).json({ success: false, message: "Bakiye yetersiz!" });
+    } catch (err) {
+        console.error("Upgrade Hatası:", err);
+        res.status(500).json({ success: false });
+    }
+});
+
+// --- WALLET ROTASI ---
+app.get('/wallet', isLoggedIn, (req, res) => {
+    res.render('wallet', { 
+        user: req.user,
+        // image_78ec5a'daki ENV verilerini buraya aktarıyoruz
+        walletAddress: process.env.WALLET_ADDRESS,
+        contractAddress: process.env.CONTRACT_ADDRESS
+    });
+});
+
+
+
 
 // --- AUTH İŞLEMLERİ ---
 app.post('/login', async (req, res) => {
@@ -89,4 +177,5 @@ app.post('/login', async (req, res) => {
 // Sunucuyu Başlat
 const PORT = process.env.PORT || 10000;
 httpServer.listen(PORT, '0.0.0.0', () => console.log(`🚀 Port ${PORT} aktif.`));
+
 
