@@ -1,23 +1,11 @@
-// Path: models\Payment.js
-// Çekim Talepleri Şeması
-const withdrawSchema = new mongoose.Schema({
-    userId: String,
-    email: String,
-    amount: Number, // Brüt
-    netAmount: Number, // %30 kesilmiş hali
-    usdtAddress: String,
-    status: { type: String, default: 'pending' }, // pending, completed, rejected
-    createdAt: { type: Date, default: Date.now }
-});
-const Withdraw = mongoose.model('Withdraw', withdrawSchema);
+const mongoose = require('mongoose'); // Bu satırı en üste EKLEYİN
 
-// Ödeme Bildirimleri Şeması
-const paymentSchema = new mongoose.Schema({
-    userId: String,
-    txid: String,
-    usd: Number,
-    bpl: Number,
-    status: { type: String, default: 'pending' },
+const withdrawSchema = new mongoose.Schema({
+    userId: { type: mongoose.Schema.Types.ObjectId, ref: 'User' },
+    txid: { type: String, unique: true },
+    amountUSD: Number,
+    status: { type: String, default: 'PENDING' },
     createdAt: { type: Date, default: Date.now }
 });
-const Payment = mongoose.model('Payment', paymentSchema);
+
+module.exports = mongoose.model('Payment', withdrawSchema);
