@@ -5,24 +5,26 @@ const UserSchema = new mongoose.Schema({
     email: { type: String, required: true, unique: true },
     password: { type: String, required: true },
     bpl: { type: Number, default: 2500 },
-    selectedAnimal: { type: String, default: 'Tiger' },
     
-    // Geliştirme Merkezi için gerekli alanlar
-    stats: {
-        hp: { type: Number, default: 100 },
-        atk: { type: Number, default: 10 },
-        def: { type: Number, default: 10 }
-    },
+    // Arena'da o an hangi hayvanla savaşıyor?
+    selectedAnimal: { type: String, default: 'Tiger' },
 
-    // Market sistemi için envanter
+    // Market sistemi için detaylandırılmış envanter
     inventory: [{
-        name: String,
+        name: String,      // Örn: 'Lion'
+        img: String,       // Örn: '/caracter/profile/Lion.jpg'
+        level: { type: Number, default: 1 },
+        stats: {
+            hp: { type: Number, default: 100 },
+            atk: { type: Number, default: 20 },
+            def: { type: Number, default: 10 }
+        },
         purchasedAt: { type: Date, default: Date.now }
     }],
 
-    // Cüzdan için kripto adresleri
+    // Cüzdan ve Güvenlik işlemleri
     bnb_address: { type: String, default: '' },
-    usedHashes: { type: [String], default: [] }
+    usedHashes: { type: [String], default: [] } // Tekrar eden ödemeleri engellemek için
 });
 
 module.exports = mongoose.model('User', UserSchema);
