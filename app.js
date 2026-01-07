@@ -49,7 +49,9 @@ app.get('/profil', isLoggedIn, (req, res) => {
 // 2. Arena Sayfası (404 Video Hatalarını Çözen Dinamik Yapı)
 app.get('/arena', isLoggedIn, (req, res) => {
     // GitHub yapındaki büyük harf klasör isimlerine uyum sağlamak için:
-    const char = req.user.selectedAnimal || "Tiger";
+const char = req.user.selectedAnimal || "Tiger"; // Örn: "Tiger"
+// Klasör adı: Tiger, Dosya adı: tiger1.mp4 (Eğer GitHub'da böyleyse)
+const videoPath = `/caracter/move/${char}/${char.toLowerCase()}1.mp4`;
     const formattedChar = char.charAt(0).toUpperCase() + char.slice(1);
     
     res.render('arena', { 
@@ -65,33 +67,27 @@ app.get('/chat', isLoggedIn, (req, res) => {
     res.render('chat', { user: req.user });
 });
 
-// --- MARKET ROTASI ---
+// --- MARKET SAYFASI ---
 app.get('/market', isLoggedIn, (req, res) => {
-    // Profil resimlerinin klasör yapısıyla (image_7891cc.png) tam uyumlu listesi
+    // GitHub klasör isimlerinle (image_7891cc.png) birebir aynı liste
     const animals = [
-        { id: "a1", name: "Lion", price: 2500, hp: 100, atk: 90 },
-        { id: "a2", name: "Tiger", price: 2000, hp: 90, atk: 95 },
-        { id: "a3", name: "Bear", price: 1000, hp: 120, atk: 70 },
-        { id: "a4", name: "Falcon", price: 1000, hp: 60, atk: 95 },
-        { id: "a5", name: "Gorilla", price: 5000, hp: 150, atk: 85 },
-        { id: "a6", name: "Crocodile", price: 1000, hp: 110, atk: 80 },
-        { id: "a7", name: "Rhino", price: 3000, hp: 180, atk: 60 },
-        { id: "a8", name: "Snake", price: 800, hp: 50, atk: 100 }
+        { name: "Lion", price: 2500, hp: "85%", atk: "90%" },
+        { name: "Tiger", price: 2000, hp: "80%", atk: "95%" },
+        { name: "Bear", price: 1000, hp: "95%", atk: "75%" },
+        { name: "Crocodile", price: 1500, hp: "90%", atk: "80%" },
+        { name: "Falcon", price: 1200, hp: "40%", atk: "95%" },
+        { name: "Gorilla", price: 3000, hp: "100%", atk: "85%" },
+        { name: "Rhino", price: 2800, hp: "100%", atk: "60%" },
+        { name: "Snake", price: 800, hp: "30%", atk: "100%" }
     ];
 
-    // Resim yollarını GitHub klasör yapına göre düzeltiyoruz (Büyük Harf Uyumu)
-    const processedAnimals = animals.map(animal => ({
-        ...animal,
-        // image_7a497c'deki 404 hatasını çözmek için dosya yolunu tam eşliyoruz
-        image: `public/caracter/profile${animal.name}/${animal.name.toLowerCase()}.jpg` 
-    }));
-
+    // EJS'ye gönderirken resim yollarını klasör yapına göre kuruyoruz
+    // Örnek: /caracter/move/Tiger/tiger.png (veya .jpg)
     res.render('market', { 
         user: req.user, 
-        animals: processedAnimals 
+        animals: animals 
     });
 });
-
 // Hayvan Satın Alma API
 app.post('/api/market/buy-animal', isLoggedIn, async (req, res) => {
     try {
@@ -109,9 +105,36 @@ app.post('/api/market/buy-animal', isLoggedIn, async (req, res) => {
         res.status(400).json({ success: false, message: "BPL yetersiz!" });
     } catch (err) { res.status(500).json({ success: false }); }
 });
-// --- GELİŞTİRME MERKEZİ ROTASI ---
+// --- GELİŞTİRME MERKEZİ ---
 app.get('/development', isLoggedIn, (req, res) => {
     res.render('development', { user: req.user });
+});
+
+// İstatistik Yükseltme API (Bağlantı Hatası Almamak İçin)
+app.post('/api/upgrade', isLoggedIn, async (req, res) => {
+    try {
+        const { statType, cost } = req.body;
+        const user = await User.findById(req.user._id);
+
+        if (user.bpl >= cost) {
+            user.bpl -= cost;
+            
+            if (!user.stats) user.stats = { hp: 100, atk: 10, def: 10 };
+            
+            // Stat artırımı
+            if (statType === 'hp') user.stats.hp += 10;
+            else if (statType === 'atk') user.stats.atk += 2;
+            else if (statType === 'def') user.stats.def += 2;
+
+            user.markModified('stats');
+            await user.save();
+
+            return res.json({ success: true, newBpl: user.bpl, newStats: user.stats });
+        }
+        res.status(400).json({ success: false, message: "Bakiye yetersiz!" });
+    } catch (err) {
+        res.status(500).json({ success: false });
+    }
 });
 
 // İstatistik Yükseltme API
@@ -149,13 +172,13 @@ app.post('/api/upgrade', isLoggedIn, async (req, res) => {
     }
 });
 
-// --- WALLET ROTASI ---
+// --- WALLET SAYFASI ---
 app.get('/wallet', isLoggedIn, (req, res) => {
     res.render('wallet', { 
         user: req.user,
-        // image_78ec5a'daki ENV verilerini buraya aktarıyoruz
-        walletAddress: process.env.WALLET_ADDRESS,
-        contractAddress: process.env.CONTRACT_ADDRESS
+        // image_78ec5a.png görselindeki ENV verileri
+        contract: process.env.CONTRACT_ADDRESS,
+        adminWallet: process.env.WALLET_ADDRESS
     });
 });
 
@@ -177,6 +200,7 @@ app.post('/login', async (req, res) => {
 // Sunucuyu Başlat
 const PORT = process.env.PORT || 10000;
 httpServer.listen(PORT, '0.0.0.0', () => console.log(`🚀 Port ${PORT} aktif.`));
+
 
 
 
