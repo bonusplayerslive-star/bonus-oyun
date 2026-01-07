@@ -45,56 +45,53 @@ async function isLoggedIn(req, res, next) {
 
 // --- 2. ROTALAR (EJS SAYFALARI) ---
 
-// PROFİL
-app.get('/profil', isLoggedIn, (req, res) => res.render('profil', { user: req.user }));
-// --- ROTALAR (EJS SAYFALARI) ---
+// 1. PROFİL SAYFASI
+app.get('/profil', isLoggedIn, (req, res) => {
+    res.render('profil', { user: req.user });
+});
 
-// --- ROTALAR ---
-
-// 1. MARKET: Resimlerin 404 vermemesi için büyük harf kuralına göre düzenleme
+// 2. MARKET: Profil klasöründeki Tiger.jpg yapısına uygun
 app.get('/market', isLoggedIn, (req, res) => {
     const animalData = [
-        { name: "Tiger", price: 2000, hp: "90%", atk: "95%" },
-        { name: "Lion", price: 2500, hp: "85%", atk: "90%" },
-        { name: "Bear", price: 1000, hp: "75%", atk: "75%" },
-        { name: "Crocodile", price: 1500, hp: "80%", atk: "80%" },
-        { name: "Falcon", price: 1000, hp: "40%", atk: "95%" },
-        { name: "Gorilla", price: 5000, hp: "95%", atk: "85%" },
-        { name: "Rhino", price: 3000, hp: "100%", atk: "60%" },
-        { name: "Snake", price: 800, hp: "30%", atk: "100%" },
-        { name: "Eagle", price: 1200, hp: "60%", atk: "95%" },
-        { name: "Wolf", price: 1100, hp: "70%", atk: "85%" }
+        { name: "Tiger", price: 2000, hp: 90, atk: 95 },
+        { name: "Lion", price: 2500, hp: 85, atk: 90 },
+        { name: "Bear", price: 1000, hp: 120, atk: 70 },
+        { name: "Crocodile", price: 1500, hp: 110, atk: 80 },
+        { name: "Falcon", price: 1000, hp: 60, atk: 95 },
+        { name: "Gorilla", price: 5000, hp: 150, atk: 85 },
+        { name: "Rhino", price: 3000, hp: 180, atk: 60 },
+        { name: "Snake", price: 800, hp: 50, atk: 100 },
+        { name: "Eagle", price: 1200, hp: 60, atk: 95 },
+        { name: "Wolf", price: 1100, hp: 70, atk: 85 }
     ];
 
-    // GitHub'daki /profile klasöründeki Tiger.jpg yapısına uygun yol oluşturma
     const processedAnimals = animalData.map(a => ({
         ...a,
-        // DİKKAT: Render'da büyük/küçük harf önemlidir. 
-        // GitHub'da 'Tiger.jpg' ise burası tam olarak öyle olmalı.
+        // Büyük harf duyarlı: /caracter/profile/Tiger.jpg
         imagePath: `/caracter/profile/${a.name}.jpg` 
     }));
 
     res.render('market', { user: req.user, animals: processedAnimals });
 });
 
-// 2. GELİŞTİRME MERKEZİ: image_d0aec4'teki boş resim kutusunu düzeltme
-app.get('/development', isLoggedIn, (req, res) => {
-    // Kullanıcının seçili hayvanı yoksa varsayılan Tiger
-    const char = req.user.selectedAnimal || "Tiger"; 
-    // public klasörü zaten tanımlı olduğu için yola 'public' yazılmaz
+// 3. GELİŞTİRME MERKEZİ: "Bağlantı Hatası" ve Boş Resim Çözümü
+app.get('/development', isLoggedIn, async (req, res) => {
+    // Seçili karakteri belirle
+    const char = req.user.selectedAnimal || "Tiger";
+    // .toLowerCase() kullanmıyoruz çünkü dosya Tiger.jpg
     const charImg = `/caracter/profile/${char}.jpg`; 
     
     res.render('development', { user: req.user, charImg });
 });
 
-// 3. ARENA: image_6e9218 Video ve image_788dee undefined.png hatası çözümü
+// 4. ARENA: Video ve Resimlerin Birleşimi
 app.get('/arena', isLoggedIn, (req, res) => {
     const char = req.user.selectedAnimal || "Tiger";
     
-    // Arena'da profil resmi için:
+    // Profil resmi: /caracter/profile/Tiger.jpg
     const profileImg = `/caracter/profile/${char}.jpg`;
     
-    // Arena'da savaş videoları için (Move klasörü):
+    // Savaş videoları (Move klasörü): /caracter/move/Tiger/Tiger.mp4
     const videoData = {
         idle: `/caracter/move/${char}/${char}.mp4`,
         attack: `/caracter/move/${char}/${char}1.mp4`
@@ -102,7 +99,6 @@ app.get('/arena', isLoggedIn, (req, res) => {
     
     res.render('arena', { user: req.user, videoData, profileImg, char });
 });
-
 // 4. WALLET: image_6e8d80 "Cannot GET /wallet" hatası çözümü
 app.get('/wallet', isLoggedIn, (req, res) => {
     res.render('wallet', { 
@@ -181,6 +177,7 @@ io.on('connection', async (socket) => {
 // BAŞLAT
 const PORT = process.env.PORT || 10000;
 httpServer.listen(PORT, '0.0.0.0', () => console.log(`🚀 Sistem Port ${PORT} üzerinde hazır!`));
+
 
 
 
