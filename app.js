@@ -48,6 +48,7 @@ const transporter = nodemailer.createTransport({
 });
 
 // --- 4. GLOBAL DEĞİŞKENLER & VERİLER ---
+// Resim yolları senin belirttiğin gibi büyük harf ve .jpg olarak güncellendi
 const MARKET_ANIMALS = [
     { id: 1, name: 'Bear', price: 1000, img: '/caracter/profile/Bear.jpg' },
     { id: 2, name: 'Crocodile', price: 1000, img: '/caracter/profile/Crocodile.jpg' },
@@ -55,7 +56,7 @@ const MARKET_ANIMALS = [
     { id: 4, name: 'Gorilla', price: 5000, img: '/caracter/profile/Gorilla.jpg' },
     { id: 5, name: 'Kurd', price: 1000, img: '/caracter/profile/Kurd.jpg' },
     { id: 6, name: 'Lion', price: 5000, img: '/caracter/profile/Lion.jpg' },
-    { id: 7, name: 'Falcon', price: 1000, img: '/caracter/profile/Peregrinefalcon.jpg' },
+    { id: 7, name: 'Falcon', price: 1000, img: '/caracter/profile/Falcon.jpg' },
     { id: 8, name: 'Rhino', price: 5000, img: '/caracter/profile/Rhino.jpg' },
     { id: 9, name: 'Snake', price: 1000, img: '/caracter/profile/Snake.jpg' },
     { id: 10, name: 'Tiger', price: 5000, img: '/caracter/profile/Tiger.jpg' }
@@ -85,9 +86,16 @@ app.get('/market', checkAuth, async (req, res) => {
 
 app.get('/arena', checkAuth, async (req, res) => {
     const user = await User.findById(req.session.userId);
+    
+    // Güvenlik: Envanter boşsa sayfayı çökertme, markete yolla
+    const selectedAnimal = user.inventory && user.inventory.length > 0 ? user.inventory[0].name : null;
+    if (!selectedAnimal) {
+        return res.send('<script>alert("Önce marketten bir karakter almalısın!"); window.location.href="/market";</script>');
+    }
+
     res.render('arena', { 
         user, 
-        selectedAnimal: user.inventory[0]?.name || "Karakter Yok",
+        selectedAnimal: selectedAnimal,
         lastVictories: last20Victories 
     });
 });
@@ -99,7 +107,6 @@ app.get('/logout', (req, res) => {
 
 // --- 6. İŞLEM ROTALARI (POST) ---
 
-// Kayıt & Giriş
 app.post('/register', async (req, res) => {
     const { nickname, email, password } = req.body;
     try {
@@ -125,7 +132,6 @@ app.post('/login', async (req, res) => {
     }
 });
 
-// Market & Geliştirme
 app.post('/buy-animal', checkAuth, async (req, res) => {
     const { animalId } = req.body;
     const user = await User.findById(req.session.userId);
@@ -133,7 +139,12 @@ app.post('/buy-animal', checkAuth, async (req, res) => {
     if (!animal || user.bpl < animal.price) return res.json({ status: 'error', msg: 'Yetersiz bakiye!' });
     
     user.bpl -= animal.price;
-    user.inventory.push({ name: animal.name, img: animal.img, level: 1, stats: { hp: 100, atk: 20, def: 10 } });
+    user.inventory.push({ 
+        name: animal.name, 
+        img: animal.img, 
+        level: 1, 
+        stats: { hp: 100, atk: 20, def: 10 } 
+    });
     await user.save();
     res.json({ status: 'success', msg: `${animal.name} alındı!`, newBalance: user.bpl });
 });
@@ -153,27 +164,56 @@ app.post('/upgrade-stat', checkAuth, async (req, res) => {
     res.json({ status: 'success', newBalance: user.bpl.toLocaleString() });
 });
 
-// Arena Bot Savaşı
+// Arena Bot Savaşı - Senin Video İsimlendirme Mantığına Göre Düzenlendi
 app.post('/attack-bot', checkAuth, async (req, res) => {
     try {
         const user = await User.findById(req.session.userId);
-        const animalName = req.query.animal?.toLowerCase() || "bear";
+        
+        // Önemli: Hayvan ismini olduğu gibi (Lion) alıyoruz (Büyük/Küçük harf duyarlı)
+        const selectedAnimal = user.inventory[0] ? user.inventory[0].name : "Tiger";
+        const bot = eliteBots[Math.floor(Math.random() * eliteBots.length)];
         const isWin = Math.random() > 0.5;
+
+        // Video yolları senin kuralın: Hamle Lion1.mp4, Galibiyet Lion.mp4
+        const actionVideo = `/caracter/move/${selectedAnimal}/${selectedAnimal}1.mp4`;
+        const winVideo = `/caracter/move/${selectedAnimal}/${selectedAnimal}.mp4`;
 
         if (isWin) {
             user.bpl += 200;
-            last20Victories.unshift({ winner: user.nickname, opponent: "Elite Bot", reward: 200, time: new Date().toLocaleTimeString() });
+            last20Victories.unshift({ 
+                winner: user.nickname, 
+                opponent: bot.nickname, 
+                reward: 200, 
+                time: new Date().toLocaleTimeString('tr-TR') 
+            });
             if(last20Victories.length > 20) last20Victories.pop();
-            io.emit('new-message', { sender: "ARENA", text: `🏆 ${user.nickname} kazandı!`, isBattleWin: true, winnerNick: user.nickname });
+            io.emit('new-message', { 
+                sender: "ARENA", 
+                text: `🏆 ${user.nickname} kazandı!`, 
+                isBattleWin: true, 
+                winnerNick: user.nickname 
+            });
         } else {
             if (user.bpl >= 200) user.bpl -= 200;
         }
         await user.save();
-        res.json({ status: 'success', animation: { isWin, actionVideo: `/caracter/move/${animalName}/${animalName}1.mp4` }, newBalance: user.bpl });
-    } catch (e) { res.status(500).json({ status: 'error' }); }
+        
+        res.json({ 
+            status: 'success', 
+            opponent: bot.nickname,
+            animation: { 
+                isWin, 
+                actionVideo: actionVideo, 
+                winVideo: winVideo 
+            }, 
+            newBalance: user.bpl 
+        });
+    } catch (e) { 
+        console.error("Arena hatası:", e);
+        res.status(500).json({ status: 'error' }); 
+    }
 });
 
-// Ödeme Doğrulama (BSCScan)
 app.post('/verify-payment', checkAuth, async (req, res) => {
     const { txid, usd, bpl } = req.body;
     try {
@@ -205,7 +245,6 @@ io.on('connection', (socket) => {
         io.to('Global').emit('new-message', { sender: socket.nickname, text: data.text });
     });
 
-    // Transfer & Yakım Sitemi
     socket.on('transfer-bpl', async (data) => {
         const sender = await User.findById(socket.userId);
         const receiver = await User.findOne({ nickname: data.to });
@@ -219,7 +258,6 @@ io.on('connection', (socket) => {
         }
     });
 
-    // Tebrik Sistemi
     socket.on('tebrik-et', async (data) => {
         const sender = await User.findById(socket.userId);
         const receiver = await User.findOne({ nickname: data.winnerNick });
