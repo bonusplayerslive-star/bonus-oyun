@@ -47,10 +47,10 @@ async function isLoggedIn(req, res, next) {
 
 // PROFİL
 app.get('/profil', isLoggedIn, (req, res) => res.render('profil', { user: req.user }));
+// --- ROTALAR (EJS SAYFALARI) ---
 
-// MARKET (Görsel Yollarını Düzelten Bölüm)
+// 1. MARKET SAYFASI: Resim yollarını GitHub klasör yapınla tam eşliyoruz
 app.get('/market', isLoggedIn, (req, res) => {
-    // GitHub yapındaki klasör isimleriyle birebir aynı (image_7891cc.png)
     const animalData = [
         { name: "Tiger", price: 2000, hp: 90, atk: 95 },
         { name: "Lion", price: 2500, hp: 85, atk: 90 },
@@ -62,27 +62,29 @@ app.get('/market', isLoggedIn, (req, res) => {
         { name: "Eagle", price: 1200, hp: 60, atk: 95 }
     ];
 
-    // ÖNEMLİ: Dosya adını Tiger.jpg (Büyük T) yapıyoruz (image_95a660 hatası çözümü)
+    // image_95a660'daki 404 hatasını çözmek için:
+    // Klasör: /caracter/move/Tiger/ -> Dosya: Tiger.jpg (veya Tiger.png)
     const processedAnimals = animalData.map(a => ({
         ...a,
-        imagePath: `/caracter/move/${a.name}/${a.name}.jpg` 
+        // DİKKAT: GitHub'daki uzantın .png mi .jpg mi kontrol et, ona göre güncelle
+        imagePath: `/caracter/move/${a.name}/${a.name}.png` 
     }));
 
     res.render('market', { user: req.user, animals: processedAnimals });
 });
 
-// GELİŞTİRME MERKEZİ (image_7889cc Bağlantı Hatası Çözümü)
+// 2. GELİŞTİRME MERKEZİ: "Bağlantı Hatası" ve "Cannot GET" çözümü
 app.get('/development', isLoggedIn, (req, res) => {
-    // Kullanıcının mevcut hayvanının resmini büyük harf kuralına göre ayarla
     const char = req.user.selectedAnimal || "Tiger";
-    const charImg = `public/caracter/profile${char}/${char}.jpg`;
+    // image_d0aec4'teki boş resim kutusunu doldurmak için doğru yol:
+    const charImg = `/caracter/move/${char}/${char}.png`; 
     res.render('development', { user: req.user, charImg });
 });
 
-// ARENA (image_6e9218 Video Hatası Çözümü)
+// 3. ARENA: Savaş sahneleri ve video yolları
 app.get('/arena', isLoggedIn, (req, res) => {
     const char = req.user.selectedAnimal || "Tiger";
-    // Video yollarını klasör yapısına göre tam eşliyoruz
+    // image_6e9218'deki lion.mp4 hatasını önlemek için:
     const videoData = {
         idle: `/caracter/move/${char}/${char}.mp4`,
         attack: `/caracter/move/${char}/${char}1.mp4`
@@ -90,15 +92,14 @@ app.get('/arena', isLoggedIn, (req, res) => {
     res.render('arena', { user: req.user, videoData, char });
 });
 
-// CÜZDAN (image_6e8d80 Hatası Çözümü)
+// 4. WALLET: image_6e8d80 "Cannot GET /wallet" hatası çözümü
 app.get('/wallet', isLoggedIn, (req, res) => {
     res.render('wallet', { 
         user: req.user,
-        contract: process.env.CONTRACT_ADDRESS,
+        contract: process.env.CONTRACT_ADDRESS, // image_78ec5a'daki ENV verisi
         wallet: process.env.WALLET_ADDRESS 
     });
 });
-
 // GLOBAL CHAT
 app.get('/chat', isLoggedIn, (req, res) => res.render('chat', { user: req.user }));
 
@@ -141,5 +142,6 @@ io.on('connection', async (socket) => {
 // BAŞLAT
 const PORT = process.env.PORT || 10000;
 httpServer.listen(PORT, '0.0.0.0', () => console.log(`🚀 Sistem Port ${PORT} üzerinde hazır!`));
+
 
 
