@@ -42,7 +42,9 @@ async function isLoggedIn(req, res, next) {
     }
     res.redirect('/login');
 }
-
+app.get('/', (req, res) => {
+    res.render('index'); // veya hangi sayfayı göstermek istiyorsan
+});
 // --- 2. ROTALAR (EJS SAYFALARI) ---
 
 // 1. PROFİL SAYFASI
@@ -83,7 +85,29 @@ app.get('/development', isLoggedIn, async (req, res) => {
     
     res.render('development', { user: req.user, charImg });
 });
+// --- GELİŞTİRME API ROTASI ---
+app.post('/api/upgrade-stat', isLoggedIn, async (req, res) => {
+    try {
+        const { statType, cost } = req.body;
+        const user = req.user;
 
+        if (user.bpl >= cost) {
+            user.bpl -= cost;
+            
+            // İstatistik artırma mantığı
+            if (statType === 'hp') user.stats.hp += 10;
+            else if (statType === 'atk') user.stats.atk += 5;
+            else if (statType === 'def') user.stats.def += 5;
+
+            await user.save();
+            return res.json({ success: true, newBpl: user.bpl });
+        } else {
+            return res.json({ success: false, message: "Yetersiz BPL!" });
+        }
+    } catch (error) {
+        res.status(500).json({ success: false, message: "Sunucu hatası!" });
+    }
+});
 // 4. ARENA: Video ve Resimlerin Birleşimi
 app.get('/arena', isLoggedIn, (req, res) => {
     const char = req.user.selectedAnimal || "Tiger";
@@ -177,6 +201,7 @@ io.on('connection', async (socket) => {
 // BAŞLAT
 const PORT = process.env.PORT || 10000;
 httpServer.listen(PORT, '0.0.0.0', () => console.log(`🚀 Sistem Port ${PORT} üzerinde hazır!`));
+
 
 
 
