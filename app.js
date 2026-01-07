@@ -75,7 +75,7 @@ app.get('/market', isLoggedIn, (req, res) => {
 app.get('/development', isLoggedIn, (req, res) => {
     // Kullanıcının mevcut hayvanının resmini büyük harf kuralına göre ayarla
     const char = req.user.selectedAnimal || "Tiger";
-    const charImg = `/caracter/move/${char}/${char}.jpg`;
+    const charImg = `public/caracter/profile${char}/${char}.jpg`;
     res.render('development', { user: req.user, charImg });
 });
 
@@ -141,4 +141,5 @@ io.on('connection', async (socket) => {
 // BAŞLAT
 const PORT = process.env.PORT || 10000;
 httpServer.listen(PORT, '0.0.0.0', () => console.log(`🚀 Sistem Port ${PORT} üzerinde hazır!`));
+
 
