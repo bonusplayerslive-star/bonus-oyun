@@ -12,7 +12,7 @@ const app = express();
 const httpServer = createServer(app);
 const io = new Server(httpServer, { cors: { origin: "*" } });
 
-// --- 1. VERİTABANI VE AYARLAR ---
+// --- 1. AYARLAR VE VERİTABANI ---
 mongoose.connect(process.env.MONGO_URI)
     .then(() => console.log('✅ MongoDB Bağlantısı Başarılı'))
     .catch(err => console.error('❌ MongoDB Hatası:', err));
@@ -30,7 +30,7 @@ app.use(session({
     cookie: { maxAge: 1000 * 60 * 60 * 24 }
 }));
 
-// Giriş Kontrolü
+// Giriş Kontrol Middleware
 async function isLoggedIn(req, res, next) {
     if (req.session.userId) {
         const user = await User.findById(req.session.userId);
@@ -42,17 +42,16 @@ async function isLoggedIn(req, res, next) {
     }
     res.redirect('/login');
 }
-app.get('/', (req, res) => {
-    res.render('index'); // veya hangi sayfayı göstermek istiyorsan
-});
-// --- 2. ROTALAR (EJS SAYFALARI) ---
 
-// 1. PROFİL SAYFASI
-app.get('/profil', isLoggedIn, (req, res) => {
-    res.render('profil', { user: req.user });
-});
+// --- 2. SAYFA ROTALARI (EJS) ---
 
-// 2. MARKET: Profil klasöründeki Tiger.jpg yapısına uygun
+// ANA SAYFA
+app.get('/', (req, res) => res.render('index'));
+
+// PROFİL
+app.get('/profil', isLoggedIn, (req, res) => res.render('profil', { user: req.user }));
+
+// MARKET
 app.get('/market', isLoggedIn, (req, res) => {
     const animalData = [
         { name: "Tiger", price: 2000, hp: 90, atk: 95 },
@@ -69,142 +68,99 @@ app.get('/market', isLoggedIn, (req, res) => {
 
     const processedAnimals = animalData.map(a => ({
         ...a,
-        // Büyük harf duyarlı: /caracter/profile/Tiger.jpg
         imagePath: `/caracter/profile/${a.name}.jpg` 
     }));
-
     res.render('market', { user: req.user, animals: processedAnimals });
 });
 
-// 3. GELİŞTİRME MERKEZİ: "Bağlantı Hatası" ve Boş Resim Çözümü
-app.get('/development', isLoggedIn, async (req, res) => {
-    // Seçili karakteri belirle
-    const char = req.user.selectedAnimal || "Tiger";
-    // .toLowerCase() kullanmıyoruz çünkü dosya Tiger.jpg
-    const charImg = `/caracter/profile/${char}.jpg`; 
-    
-    res.render('development', { user: req.user, charImg });
-});
-// --- GELİŞTİRME API ROTASI ---
-app.post('/api/upgrade-stat', isLoggedIn, async (req, res) => {
-    try {
-        const { statType, cost } = req.body;
-        const user = req.user;
-
-        if (user.bpl >= cost) {
-            user.bpl -= cost;
-            
-            // İstatistik artırma mantığı
-            if (statType === 'hp') user.stats.hp += 10;
-            else if (statType === 'atk') user.stats.atk += 5;
-            else if (statType === 'def') user.stats.def += 5;
-
-            await user.save();
-            return res.json({ success: true, newBpl: user.bpl });
-        } else {
-            return res.json({ success: false, message: "Yetersiz BPL!" });
-        }
-    } catch (error) {
-        res.status(500).json({ success: false, message: "Sunucu hatası!" });
-    }
-});
-// 4. ARENA: Video ve Resimlerin Birleşimi
-app.get('/arena', isLoggedIn, (req, res) => {
-    const char = req.user.selectedAnimal || "Tiger";
-    
-    // Profil resmi: /caracter/profile/Tiger.jpg
-    const profileImg = `/caracter/profile/${char}.jpg`;
-    
-    // Savaş videoları (Move klasörü): /caracter/move/Tiger/Tiger.mp4
-    const videoData = {
-        idle: `/caracter/move/${char}/${char}.mp4`,
-        attack: `/caracter/move/${char}/${char}1.mp4`
-    };
-    
-    res.render('arena', { user: req.user, videoData, profileImg, char });
-});
-// 4. WALLET: image_6e8d80 "Cannot GET /wallet" hatası çözümü
-app.get('/wallet', isLoggedIn, (req, res) => {
-    res.render('wallet', { 
-        user: req.user,
-        contract: process.env.CONTRACT_ADDRESS, // image_78ec5a'daki veri
-        wallet: process.env.WALLET_ADDRESS 
-    });
-});
-
-// 2. GELİŞTİRME MERKEZİ: "Bağlantı Hatası" ve "Cannot GET" çözümü
+// GELİŞTİRME MERKEZİ
 app.get('/development', isLoggedIn, (req, res) => {
     const char = req.user.selectedAnimal || "Tiger";
-    // image_d0aec4'teki boş resim kutusunu doldurmak için doğru yol:
-    const charImg = `/caracter/profile${char}/${char}.jpg`; 
+    // ÖNEMLİ: Dosya yolu hatası düzeltildi (Slash eklendi)
+    const charImg = `/caracter/profile/${char}.jpg`; 
     res.render('development', { user: req.user, charImg });
 });
 
-// 3. ARENA: Savaş sahneleri ve video yolları
+// ARENA
 app.get('/arena', isLoggedIn, (req, res) => {
     const char = req.user.selectedAnimal || "Tiger";
-    // image_6e9218'deki lion.mp4 hatasını önlemek için:
+    const profileImg = `/caracter/profile/${char}.jpg`;
     const videoData = {
         idle: `/caracter/move/${char}/${char}.mp4`,
         attack: `/caracter/move/${char}/${char}1.mp4`
     };
-    res.render('arena', { user: req.user, videoData, char });
+    res.render('arena', { user: req.user, videoData, profileImg, char });
 });
 
-// 4. WALLET: image_6e8d80 "Cannot GET /wallet" hatası çözümü
+// CÜZDAN & ÖDEME
 app.get('/wallet', isLoggedIn, (req, res) => {
     res.render('wallet', { 
         user: req.user,
-        contract: process.env.CONTRACT_ADDRESS, // image_78ec5a'daki ENV verisi
-        wallet: process.env.WALLET_ADDRESS 
+        contract: process.env.CONTRACT_ADDRESS || '0x...',
+        wallet: process.env.WALLET_ADDRESS || '0x...'
     });
 });
-// GLOBAL CHAT
+
+// DİĞER SAYFALAR
 app.get('/chat', isLoggedIn, (req, res) => res.render('chat', { user: req.user }));
+app.get('/meeting', isLoggedIn, (req, res) => res.render('meeting', { user: req.user }));
 
-// --- 3. API İŞLEMLERİ (STAT VE MARKET) ---
+// --- 3. API İŞLEMLERİ ---
 
-app.post('/api/upgrade', isLoggedIn, async (req, res) => {
+// Geliştirme (Stat Upgrade)
+app.post('/api/upgrade-stat', isLoggedIn, async (req, res) => {
     try {
-        const { statType, cost } = req.body;
+        const { statType, animalName } = req.body;
         const user = await User.findById(req.user._id);
+        const cost = (statType === 'def') ? 10 : 15;
+
         if (user.bpl >= cost) {
             user.bpl -= cost;
-            if (!user.stats) user.stats = { hp: 100, atk: 10, def: 10 };
-            user.stats[statType] += 5;
-            user.markModified('stats');
-            await user.save();
-            return res.json({ success: true, newBpl: user.bpl, newStats: user.stats });
+            // Envanterdeki ilgili hayvanın statlarını bul ve artır
+            const animal = user.inventory.find(a => a.name === animalName);
+            if (animal) {
+                if (!animal.stats) animal.stats = { hp: 100, atk: 10, def: 10 };
+                
+                if (statType === 'hp') animal.hp += 10;
+                else if (statType === 'atk') animal.atk += 5;
+                else if (statType === 'def') animal.def += 5;
+
+                user.markModified('inventory');
+                await user.save();
+                return res.json({ success: true, newBalance: user.bpl });
+            }
         }
-        res.status(400).json({ success: false, message: "Yetersiz BPL!" });
+        res.status(400).json({ success: false, message: "Yetersiz BPL veya Hayvan Bulunamadı!" });
     } catch (err) { res.status(500).json({ success: false }); }
 });
 
-// --- 4. SOCKET.IO (CHAT VE ARENA SAVAŞI) ---
-
-io.on('connection', async (socket) => {
-    const session = socket.request.session;
-    if (session && session.userId) {
-        const user = await User.findById(session.userId);
-        if (user) { socket.nickname = user.nickname; socket.userId = user._id; }
-    }
+// --- 4. SOCKET.IO (CHAT SİSTEMİ) ---
+io.on('connection', (socket) => {
+    socket.on('register-user', (data) => {
+        socket.nickname = data.nickname;
+        console.log(`👤 ${data.nickname} bağlandı.`);
+    });
 
     socket.on('send-global-msg', (data) => {
         io.emit('receive-global-msg', {
-            sender: socket.nickname,
+            sender: socket.nickname || 'Misafir',
             text: data.text,
             time: new Date().toLocaleTimeString()
         });
     });
+
+    socket.on('disconnect', () => {
+        console.log('❌ Bir kullanıcı ayrıldı.');
+    });
 });
 
-// BAŞLAT
+// --- BAŞLAT ---
 const PORT = process.env.PORT || 10000;
-httpServer.listen(PORT, '0.0.0.0', () => console.log(`🚀 Sistem Port ${PORT} üzerinde hazır!`));
-
-
-
-
-
-
-
+httpServer.listen(PORT, '0.0.0.0', () => {
+    console.log(`
+    🚀 ============================================
+       BPL SISTEM PORT ${PORT} ÜZERİNDE AKTİF
+       MOD: Üretim (Production)
+    ===============================================
+    `);
+});
