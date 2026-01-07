@@ -83,7 +83,7 @@ app.get('/market', isLoggedIn, (req, res) => {
     const processedAnimals = animals.map(animal => ({
         ...animal,
         // image_7a497c'deki 404 hatasını çözmek için dosya yolunu tam eşliyoruz
-        image: `/caracter/move/${animal.name}/${animal.name.toLowerCase()}.jpg` 
+        image: `public/caracter/profile${animal.name}/${animal.name.toLowerCase()}.jpg` 
     }));
 
     res.render('market', { 
@@ -177,5 +177,6 @@ app.post('/login', async (req, res) => {
 // Sunucuyu Başlat
 const PORT = process.env.PORT || 10000;
 httpServer.listen(PORT, '0.0.0.0', () => console.log(`🚀 Port ${PORT} aktif.`));
+
 
 
