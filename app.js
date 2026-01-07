@@ -67,7 +67,7 @@ app.get('/market', isLoggedIn, (req, res) => {
     const processedAnimals = animalData.map(a => ({
         ...a,
         // DİKKAT: GitHub'daki uzantın .png mi .jpg mi kontrol et, ona göre güncelle
-        imagePath: `/caracter/move/${a.name}/${a.name}.png` 
+        imagePath: `/caracter/profile/${a.name}/${a.name}.jpg` 
     }));
 
     res.render('market', { user: req.user, animals: processedAnimals });
@@ -77,7 +77,7 @@ app.get('/market', isLoggedIn, (req, res) => {
 app.get('/development', isLoggedIn, (req, res) => {
     const char = req.user.selectedAnimal || "Tiger";
     // image_d0aec4'teki boş resim kutusunu doldurmak için doğru yol:
-    const charImg = `/caracter/move/${char}/${char}.png`; 
+    const charImg = `/caracter/profile${char}/${char}.jpg`; 
     res.render('development', { user: req.user, charImg });
 });
 
@@ -142,6 +142,7 @@ io.on('connection', async (socket) => {
 // BAŞLAT
 const PORT = process.env.PORT || 10000;
 httpServer.listen(PORT, '0.0.0.0', () => console.log(`🚀 Sistem Port ${PORT} üzerinde hazır!`));
+
 
 
 
