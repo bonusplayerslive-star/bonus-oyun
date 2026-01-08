@@ -171,13 +171,15 @@ app.post('/api/buy-item', async (req, res) => {
         if (user.inventory.some(item => item.name === itemName)) return res.status(400).json({ success: false, error: 'Zaten sahipsiniz.' });
 
         user.bpl -= price;
-        user.inventory.push({
-            name: itemName,
-            img: `/caracter/profile/${itemName.toLowerCase()}.jpg`,
-            stamina: 100,
-            level: 1,
-            stats: { hp: 100, atk: 70, def: 50 }
-        });
+        // app.js içindeki /api/buy-item kısmında bul ve değiştir:
+user.inventory.push({
+    name: itemName,
+    // itemName 'Tiger' olarak geliyorsa, yol tam olarak /caracter/profile/Tiger.jpg olur
+    img: `/caracter/profile/${itemName}.jpg`, 
+    stamina: 100,
+    level: 1,
+    stats: { hp: 100, atk: 70, def: 50 }
+});
         await user.save();
         res.json({ success: true, newBpl: user.bpl });
     } catch (err) { res.status(500).json({ success: false }); }
@@ -262,4 +264,5 @@ const PORT = process.env.PORT || 10000;
 server.listen(PORT, () => {
     console.log(`🚀 Sunucu ${PORT} portunda operasyona hazır.`);
 });
+
 
