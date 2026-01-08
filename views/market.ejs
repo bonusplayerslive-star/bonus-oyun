@@ -147,7 +147,8 @@
         %>
             <div class="col-6 col-md-4 col-lg-3">
                 <div class="animal-card">
-                    <img src="/caracter/profile/<%= animal.name.toLowerCase() %>.jpg" 
+                   // app.js - 218. Satır civarı
+img: `/caracter/profile/${itemName}.jpg`, // itemName 'Tiger' ise 'Tiger.jpg' arayacak.
                          alt="<%= animal.name %>" 
                          class="animal-img"
                          onerror="this.src='/caracter/profile/logo.jpeg'">
@@ -250,4 +251,5 @@
 </script>
 </body>
 </html>
+
 
