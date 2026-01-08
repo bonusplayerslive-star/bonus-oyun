@@ -406,7 +406,9 @@ io.on('connection', (socket) => {
         }
     });
 });
-
+socket.on('gift-success', (data) => {
+    appendMsg("BİLGİ", `🛡️ ${data.amount} BPL değerinde lojistik destek başarıyla aktarıldı.`);
+});
 
 
 
@@ -531,6 +533,7 @@ const PORT = process.env.PORT || 10000;
 server.listen(PORT, () => {
     console.log(`Sunucu ${PORT} portunda çalışıyor.`);
 });
+
 
 
 
