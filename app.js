@@ -167,7 +167,63 @@ app.post('/refill-stamina', async (req, res) => {
 
 
 
+// app.js içine eklenecek satın alma API'si
+app.post('/api/buy-item', async (req, res) => {
+    if (!req.session.userId) return res.status(401).json({ success: false, error: 'Oturum açılmadı.' });
 
+    const { itemName, price } = req.body;
+    const SAFETY_LIMIT = 5500; // Senin belirlediğin stratejik alt limit
+
+    // Sunucu tarafı fiyat doğrulaması (Güvenlik için şart!)
+    const highTier = ['Lion', 'Tiger', 'Rhino', 'Gorilla'];
+    const expectedPrice = highTier.includes(itemName) ? 5000 : 1000;
+
+    if (price !== expectedPrice) {
+        return res.status(400).json({ success: false, error: 'Geçersiz fiyat verisi!' });
+    }
+
+    try {
+        const user = await User.findById(req.session.userId);
+
+        // Bakiye ve Limit Kontrolü
+        if (user.bpl - price < SAFETY_LIMIT) {
+            return res.status(400).json({ success: false, error: `Limit engeli! Minimum ${SAFETY_LIMIT} BPL kalmalı.` });
+        }
+
+        // Zaten sahip mi?
+        const isOwned = user.inventory.some(item => item.name === itemName);
+        if (isOwned) {
+            return res.status(400).json({ success: false, error: 'Bu karaktere zaten sahipsiniz.' });
+        }
+
+        // Satın Alma İşlemi
+        user.bpl -= price;
+        user.inventory.push({
+            name: itemName,
+            img: `/caracter/profile/${itemName.toLowerCase()}.jpg`,
+            stamina: 100,
+            level: 1,
+            stats: { 
+                hp: 100, 
+                atk: itemName === 'Tiger' ? 95 : 70, // İsteğe göre özelleştirilebilir
+                def: 50 
+            }
+        });
+
+        await user.save();
+
+        // Log Kaydı
+        await Log.create({
+            type: 'MARKET',
+            content: `${itemName} satın alındı. Harcanan: ${price} BPL`,
+            userEmail: user.email
+        });
+
+        res.json({ success: true, newBpl: user.bpl });
+    } catch (err) {
+        res.status(500).json({ success: false, error: 'İşlem sırasında hata oluştu.' });
+    }
+});
 
 
 
@@ -207,4 +263,5 @@ const PORT = process.env.PORT || 10000;
 server.listen(PORT, () => {
     console.log(`Sunucu ${PORT} portunda çalışıyor.`);
 });
+
 
