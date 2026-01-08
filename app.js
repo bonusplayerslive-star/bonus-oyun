@@ -289,6 +289,32 @@ app.post('/withdraw-request', async (req, res) => {
     res.json({ status: 'success', msg: "Talebiniz alındı. 24 saat içinde incelenecektir." });
 });
 
+// Ödeme Bildirimi Alımı
+app.post('/verify-payment', async (req, res) => {
+    const { txid, usd, bpl } = req.body;
+    const userId = req.session.userId;
+
+    if (!userId) return res.status(401).json({ status: 'error', msg: 'Oturum geçersiz.' });
+    if (!txid || txid.length < 20) return res.status(400).json({ status: 'error', msg: 'Geçersiz TxID formatı.' });
+
+    try {
+        // Burada gerçek projelerde TxID'nin daha önce kullanılıp kullanılmadığı kontrol edilir
+        // Örnek: const existing = await Payment.findOne({ txid });
+        
+        console.log(`[ÖDEME TALEBİ] Kullanıcı: ${userId}, Miktar: ${usd} USDT, TxID: ${txid}`);
+
+        // Admin onayına düşecek bir yapı kurana kadar talebi loglayabilir 
+        // veya kullanıcıya "İncelemeye alındı" mesajı dönebilirsin.
+        
+        res.json({ 
+            status: 'success', 
+            msg: 'Transfer bildiriminiz sisteme ulaştı. Blokzincir onayından sonra (yaklaşık 5-30 dk) bakiyeniz güncellenecektir.' 
+        });
+    } catch (err) {
+        res.status(500).json({ status: 'error', msg: 'Protokol hatası oluştu.' });
+    }
+});
+
 
 
 
@@ -418,6 +444,7 @@ const PORT = process.env.PORT || 10000;
 server.listen(PORT, () => {
     console.log(`Sunucu ${PORT} portunda çalışıyor.`);
 });
+
 
 
 
