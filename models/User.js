@@ -25,12 +25,11 @@ const UserSchema = new mongoose.Schema({
 
     // Cüzdan ve Güvenlik işlemleri
     bnb_address: { type: String, default: '' },
-    usedHashes: { type: [String], default: [] } // Tekrar eden ödemeleri engellemek için
+    usedHashes: { type: [String], default: [] }, // Tekrar eden ödemeleri engellemek için
+
+    // Şifre Sıfırlama Alanları (BURASI DÜZELTİLDİ)
+    resetPasswordToken: String,
+    resetPasswordExpires: Date
 });
-// models/User.js içine ekle
-resetPasswordToken: String,
-resetPasswordExpires: Date
 
 module.exports = mongoose.model('User', UserSchema);
-
-
