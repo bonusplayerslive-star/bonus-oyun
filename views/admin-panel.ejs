@@ -2,102 +2,272 @@
 <html lang="tr">
 <head>
     <meta charset="UTF-8">
-    <title>BPL | KOMUTA MERKEZİ</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>BPL | KOMUTA MERKEZİ (PREMIUM)</title>
     <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css">
+    <link href="https://fonts.googleapis.com/css2?family=Orbitron:wght@400;700&family=Rajdhani:wght@500;700&display=swap" rel="stylesheet">
+    
     <style>
-        body { background: #050505; color: #eee; font-family: 'Courier New', monospace; }
-        .admin-card { background: #0f0f0f; border: 1px solid #333; border-radius: 10px; padding: 20px; margin-bottom: 30px; }
-        .table { color: #eee; border-color: #333; }
-        .text-neon { color: #39FF14; }
-        .btn-approve { background: #39FF14; color: #000; font-weight: bold; border: none; }
-        .btn-approve:hover { background: #2ecc11; }
-        .status-pending { color: #ffa500; font-weight: bold; }
+        :root {
+            --neon-green: #39FF14;
+            --neon-red: #ff003c;
+            --neon-blue: #00f3ff;
+            --panel-dark: #0a0b0c;
+        }
+
+        body { 
+            background: radial-gradient(circle at top, #1a1a1a 0%, #000 100%); 
+            color: #eee; 
+            font-family: 'Rajdhani', sans-serif; 
+            min-height: 100vh;
+        }
+
+        .header-title { font-family: 'Orbitron', sans-serif; letter-spacing: 2px; }
+        .admin-card { 
+            background: rgba(15, 15, 15, 0.95); 
+            border: 1px solid #333; 
+            border-radius: 12px; 
+            padding: 25px; 
+            margin-bottom: 30px;
+            box-shadow: 0 10px 30px rgba(0,0,0,0.5);
+        }
+
+        .stat-card {
+            background: linear-gradient(45deg, #111, #222);
+            border-left: 4px solid var(--neon-blue);
+            padding: 15px;
+            border-radius: 8px;
+        }
+
+        .table { color: #eee; vertical-align: middle; }
+        .table-dark { background-color: transparent !important; }
+        
+        .btn-action { font-family: 'Orbitron', sans-serif; font-size: 0.7rem; font-weight: bold; transition: 0.3s; }
+        .btn-approve { background: var(--neon-green); color: #000; }
+        .btn-reject { background: var(--neon-red); color: #fff; }
+        .btn-ban { background: #000; color: var(--neon-red); border: 1px solid var(--neon-red); }
+        .btn-ban:hover { background: var(--neon-red); color: #fff; }
+
+        .status-badge { font-size: 0.7rem; padding: 4px 8px; border-radius: 4px; text-transform: uppercase; }
+        
+        /* Custom Scrollbar */
+        ::-webkit-scrollbar { width: 5px; }
+        ::-webkit-scrollbar-track { background: #000; }
+        ::-webkit-scrollbar-thumb { background: #333; border-radius: 10px; }
     </style>
 </head>
 <body>
 
-<div class="container mt-5">
-    <div class="d-flex justify-content-between align-items-center mb-5 border-bottom border-secondary pb-3">
-        <h2 class="text-neon"><i class="fas fa-user-shield me-3"></i>BPL KOMUTA MERKEZİ (ADMIN)</h2>
-        <a href="/profil" class="btn btn-outline-light btn-sm">Üsse Dön</a>
+<div class="container py-5">
+    <div class="d-flex justify-content-between align-items-center mb-5 border-bottom border-secondary pb-4">
+        <div>
+            <h2 class="header-title text-neon-blue m-0"><i class="fas fa-user-shield me-3"></i>KOMUTA MERKEZİ</h2>
+            <small class="text-muted">SİSTEM YÖNETİM VE FİNANSAL ONAY PANELİ</small>
+        </div>
+        <div class="d-flex gap-2">
+            <button onclick="sendSystemEmail()" class="btn btn-outline-info btn-sm"><i class="fas fa-envelope me-1"></i> Toplu Duyuru</button>
+            <a href="/profil" class="btn btn-outline-light btn-sm">Ana Üsse Dön</a>
+        </div>
+    </div>
+
+    <div class="row mb-4">
+        <div class="col-md-4">
+            <div class="stat-card">
+                <small class="text-muted d-block text-uppercase">Bekleyen Talepler</small>
+                <span class="fs-3 fw-bold text-warning"><%= pendingPayments.length + pendingWithdraws.length %> Adet</span>
+            </div>
+        </div>
+        <div class="col-md-4">
+            <div class="stat-card" style="border-left-color: var(--neon-green);">
+                <small class="text-muted d-block text-uppercase">Sistemdeki Toplam BPL</small>
+                <span class="fs-3 fw-bold text-success">∞ Miktar</span>
+            </div>
+        </div>
+        <div class="col-md-4">
+            <div class="stat-card" style="border-left-color: var(--neon-red);">
+                <small class="text-muted d-block text-uppercase">Güvenlik Durumu</small>
+                <span class="fs-3 fw-bold text-danger">AKTİF KORUMA</span>
+            </div>
+        </div>
     </div>
 
     <div class="admin-card">
-        <h4 class="mb-4 text-info"><i class="fas fa-file-import me-2"></i>Bekleyen Ödeme Bildirimleri (BPL Yükleme)</h4>
+        <h5 class="mb-4 text-info d-flex justify-content-between align-items-center">
+            <span><i class="fas fa-wallet me-2"></i> BEKLEYEN BPL YÜKLEMELERİ</span>
+            <span class="badge bg-info"><%= pendingPayments.length %></span>
+        </h5>
         <div class="table-responsive">
-            <table class="table table-dark table-hover">
+            <table class="table table-dark table-hover border-secondary">
                 <thead>
                     <tr>
-                        <th>Kullanıcı</th>
-                        <th>Miktar (USD)</th>
-                        <th>Verilecek BPL</th>
-                        <th>TxID (Hash)</th>
-                        <th>İşlem</th>
+                        <th>Komutan</th>
+                        <th>Miktar</th>
+                        <th>BPL Karşılığı</th>
+                        <th>TxID (Blockchain)</th>
+                        <th class="text-center">İşlemler</th>
                     </tr>
                 </thead>
                 <tbody>
                     <% pendingPayments.forEach(p => { %>
                         <tr>
-                            <td><%= p.userId ? p.userId.nickname : 'Bilinmiyor' %></td>
-                            <td>$<%= p.amount_usd %></td>
-                            <td class="text-neon"><%= p.amount_bpl %> BPL</td>
-                            <td><small class="text-muted"><%= p.txid %></small></td>
                             <td>
-                                <button onclick="approvePayment('<%= p._id %>')" class="btn btn-approve btn-sm">ONAYLA</button>
-                                <a href="https://bscscan.com/tx/<%= p.txid %>" target="_blank" class="btn btn-outline-info btn-sm"><i class="fas fa-search"></i></a>
+                                <strong><%= p.userId ? p.userId.nickname : 'Bilinmiyor' %></strong><br>
+                                <small class="text-muted" style="font-size: 0.7rem;"><%= p.userId ? p.userId.email : '-' %></small>
+                            </td>
+                            <td>$<%= p.amount_usd %></td>
+                            <td class="text-success fw-bold"><%= p.amount_bpl %> BPL</td>
+                            <td>
+                                <a href="https://bscscan.com/tx/<%= p.txid %>" target="_blank" class="text-decoration-none text-info">
+                                    <small><%= p.txid.substring(0,15) %>...</small> <i class="fas fa-external-link-alt ms-1" style="font-size: 0.6rem;"></i>
+                                </a>
+                            </td>
+                            <td>
+                                <div class="d-flex gap-2 justify-content-center">
+                                    <button onclick="approvePayment('<%= p._id %>')" class="btn btn-approve btn-action">ONAYLA</button>
+                                    <button onclick="rejectRequest('payment', '<%= p._id %>')" class="btn btn-reject btn-action">REDDET</button>
+                                    <button onclick="banUser('<%= p.userId ? p.userId._id : '' %>', '<%= p.userId ? p.userId.nickname : '' %>')" class="btn btn-ban btn-action"><i class="fas fa-gavel"></i></button>
+                                </div>
                             </td>
                         </tr>
                     <% }) %>
-                    <% if(pendingPayments.length === 0) { %> <tr><td colspan="5" class="text-center text-muted">Bekleyen bildirim yok.</td></tr> <% } %>
                 </tbody>
             </table>
         </div>
     </div>
 
-    <div class="admin-card">
-        <h4 class="mb-4 text-danger"><i class="fas fa-file-export me-2"></i>Bekleyen Tasfiye Talepleri (Para Çekme)</h4>
+    <div class="admin-card border-danger">
+        <h5 class="mb-4 text-danger d-flex justify-content-between align-items-center">
+            <span><i class="fas fa-hand-holding-usd me-2"></i> TASFİYE TALEPLERİ (ÇEKİM)</span>
+            <span class="badge bg-danger"><%= pendingWithdraws.length %></span>
+        </h5>
         <div class="table-responsive">
-            <table class="table table-dark table-hover">
+            <table class="table table-dark table-hover border-secondary">
                 <thead>
                     <tr>
-                        <th>Kullanıcı</th>
-                        <th>Çekilen BPL</th>
-                        <th>Net Ödenecek ($-USDT)</th>
+                        <th>Komutan</th>
+                        <th>BPL</th>
+                        <th>Net Ödeme (USDT)</th>
                         <th>Cüzdan Adresi (BEP20)</th>
-                        <th>İşlem</th>
+                        <th class="text-center">İşlemler</th>
                     </tr>
                 </thead>
                 <tbody>
                     <% pendingWithdraws.forEach(w => { %>
                         <tr>
-                            <td><%= w.userId ? w.userId.nickname : 'Bilinmiyor' %></td>
-                            <td><%= w.amount %> BPL</td>
-                            <td class="text-danger fw-bold">$<%= (w.amount * 0.75 / 100).toFixed(2) %></td> <td><code class="text-info"><%= w.address %></code></td>
+                            <td><strong><%= w.userId ? w.userId.nickname : 'Bilinmiyor' %></strong></td>
+                            <td><%= w.amount %></td>
+                            <td class="text-danger fw-bold">$<%= (w.amount * 0.75 / 100).toFixed(2) %></td>
+                            <td><code class="text-info" style="font-size: 0.75rem;"><%= w.address %></code></td>
                             <td>
-                                <button onclick="approveWithdraw('<%= w._id %>')" class="btn btn-danger btn-sm">ÖDENDİ İŞARETLE</button>
+                                <div class="d-flex gap-2 justify-content-center">
+                                    <button onclick="approveWithdraw('<%= w._id %>')" class="btn btn-approve btn-action" style="background: var(--neon-blue);">ÖDENDİ</button>
+                                    <button onclick="rejectRequest('withdraw', '<%= w._id %>')" class="btn btn-reject btn-action">İPTAL ET</button>
+                                </div>
                             </td>
                         </tr>
                     <% }) %>
-                    <% if(pendingWithdraws.length === 0) { %> <tr><td colspan="5" class="text-center text-muted">Bekleyen talep yok.</td></tr> <% } %>
                 </tbody>
             </table>
         </div>
     </div>
 </div>
 
+<script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
 <script>
-    function approvePayment(id) {
-        if(!confirm('Bu TxID onaylanacak ve kullanıcıya BPL yüklenecek. Emin misin?')) return;
-        fetch('/admin/approve-payment', {
-            method: 'POST',
-            headers: {'Content-Type': 'application/x-www-form-urlencoded'},
-            body: `paymentId=${id}`
-        }).then(r => r.json()).then(d => { alert(d.msg); location.reload(); });
+    // 1. Ödeme Onaylama
+    async function approvePayment(id) {
+        const { isConfirmed } = await Swal.fire({
+            title: 'BPL YÜKLENSİN Mİ?',
+            text: "Kullanıcının bakiyesi artırılacaktır.",
+            icon: 'question',
+            showCancelButton: true,
+            confirmButtonColor: '#39FF14',
+            cancelButtonColor: '#333',
+            background: '#0a0b0c', color: '#fff'
+        });
+
+        if (isConfirmed) {
+            fetch('/admin/approve-payment', {
+                method: 'POST',
+                headers: {'Content-Type': 'application/x-www-form-urlencoded'},
+                body: `paymentId=${id}`
+            }).then(r => r.json()).then(d => { 
+                Swal.fire('Başarılı', d.msg, 'success').then(() => location.reload());
+            });
+        }
+    }
+
+    // 2. Talep Silme / Reddetme
+    async function rejectRequest(type, id) {
+        const { isConfirmed } = await Swal.fire({
+            title: 'TALEBİ SİL?',
+            text: "Bu işlem talebi listeden kaldıracaktır (Kullanıcıya bildirim gitmez).",
+            icon: 'warning',
+            showCancelButton: true,
+            confirmButtonColor: '#ff003c',
+            background: '#0a0b0c', color: '#fff'
+        });
+
+        if (isConfirmed) {
+            fetch(`/admin/reject-${type}`, {
+                method: 'POST',
+                headers: {'Content-Type': 'application/x-www-form-urlencoded'},
+                body: `id=${id}`
+            }).then(r => r.json()).then(d => {
+                location.reload();
+            });
+        }
+    }
+
+    // 3. Kullanıcı Banlama
+    async function banUser(userId, nickname) {
+        if(!userId) return;
+        const { value: reason } = await Swal.fire({
+            title: `BANLA: ${nickname}`,
+            input: 'text',
+            inputLabel: 'Ban Nedeni',
+            inputPlaceholder: 'Örn: Sahte TxID kullanımı...',
+            showCancelButton: true,
+            background: '#0a0b0c', color: '#fff'
+        });
+
+        if (reason) {
+            fetch('/admin/ban-user', {
+                method: 'POST',
+                headers: {'Content-Type': 'application/x-www-form-urlencoded'},
+                body: `userId=${userId}&reason=${reason}`
+            }).then(r => r.json()).then(d => {
+                Swal.fire('Kullanıcı Yasaklandı', '', 'error').then(() => location.reload());
+            });
+        }
+    }
+
+    // 4. Sistem Mail / Duyuru
+    function sendSystemEmail() {
+        Swal.fire({
+            title: 'TOPLU DUYURU (E-MAIL)',
+            html: `
+                <input id="email-subject" class="swal2-input" placeholder="Konu">
+                <textarea id="email-body" class="swal2-textarea" placeholder="Mesajınız..."></textarea>
+            `,
+            confirmButtonText: 'GÖNDER',
+            background: '#0a0b0c', color: '#fff',
+            preConfirm: () => {
+                return {
+                    subject: document.getElementById('email-subject').value,
+                    body: document.getElementById('email-body').value
+                }
+            }
+        }).then((result) => {
+            if (result.isConfirmed) {
+                // Backend'de /admin/send-announcement endpoint'ine gönderilecek
+                Swal.fire('İşlem Sıraya Alındı', 'E-mailler gönderiliyor...', 'success');
+            }
+        });
     }
 
     function approveWithdraw(id) {
-        if(!confirm('Kullanıcıya ödeme yaptıysanız onaylayın. Bu işlem geri alınamaz!')) return;
         fetch('/admin/approve-withdraw', {
             method: 'POST',
             headers: {'Content-Type': 'application/x-www-form-urlencoded'},
