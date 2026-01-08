@@ -260,6 +260,87 @@ app.post('/api/buy-item', async (req, res) => {
 
 
 
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+// app.js içine eklenecek geliştirme API'si
+app.post('/api/upgrade-stat', async (req, res) => {
+    if (!req.session.userId) return res.status(401).json({ success: false, error: 'Oturum kapalı.' });
+
+    const { animalName, statType } = req.body;
+    const SAFETY_LIMIT = 300; // development.ejs'deki limitinle uyumlu
+
+    // Stat bazlı ücretler ve artış miktarları
+    const costs = { hp: 15, atk: 15, def: 10 };
+    const gains = { hp: 10, atk: 5, def: 5 };
+    const limits = { hp: 1000, atk: 200, def: 200 }; // Maksimum geliştirme sınırları
+
+    try {
+        const user = await User.findById(req.session.userId);
+        const animalIndex = user.inventory.findIndex(a => a.name === animalName);
+
+        if (animalIndex === -1) return res.status(404).json({ success: false, error: 'Hayvan bulunamadı.' });
+        if (user.bpl - costs[statType] < SAFETY_LIMIT) {
+            return res.status(400).json({ success: false, error: 'Stratejik bakiye sınırı!' });
+        }
+
+        let animal = user.inventory[animalIndex];
+
+        // Sınır Kontrolü (Zaten max seviyedeyse geliştirme yapma)
+        if (animal[statType] >= limits[statType]) {
+            return res.status(400).json({ success: false, error: 'Maksimum seviyeye ulaşıldı!' });
+        }
+
+        // Güncelleme İşlemi
+        user.bpl -= costs[statType];
+        animal[statType] += gains[statType];
+        
+        // Opsiyonel: Her 5 geliştirmede bir LVL artışı yapabilirsin
+        const totalStats = animal.hp + animal.atk + animal.def;
+        animal.level = Math.floor(totalStats / 50); // Örnek level hesabı
+
+        // MongoDB'ye "bu dizi değişti" haberi veriyoruz
+        user.markModified('inventory');
+        await user.save();
+
+        res.json({ 
+            success: true, 
+            newBalance: user.bpl, 
+            newStat: animal[statType],
+            newLevel: animal.level 
+        });
+
+    } catch (err) {
+        console.error(err);
+        res.status(500).json({ success: false, error: 'Sunucu hatası.' });
+    }
+});
+
+
+
+
+
 // Çıkış Yap
 app.get('/logout', (req, res) => {
     req.session.destroy();
@@ -277,6 +358,7 @@ const PORT = process.env.PORT || 10000;
 server.listen(PORT, () => {
     console.log(`Sunucu ${PORT} portunda çalışıyor.`);
 });
+
 
 
 
