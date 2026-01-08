@@ -561,16 +561,16 @@ io.on('connection', (socket) => {
             });
         }
     });
-
+socket.on('gift-success', (data) => {
+    appendMsg("BİLGİ", `🛡️ ${data.amount} BPL değerinde lojistik destek başarıyla aktarıldı.`);
+});
     socket.on('disconnect', () => {
         if (socket.currentRoom) {
             socket.to(socket.currentRoom).emit('user-disconnected', socket.peerId);
         }
     });
 });
-socket.on('gift-success', (data) => {
-    appendMsg("BİLGİ", `🛡️ ${data.amount} BPL değerinde lojistik destek başarıyla aktarıldı.`);
-});
+
 
 // --- ARENA AYARLARI ---
 const BPL_BETS = { 1: 25, 2: 55, 4: 75, 6: 85 }; // Multiplier -> Giriş Ücreti
@@ -812,6 +812,7 @@ const PORT = process.env.PORT || 10000;
 server.listen(PORT, () => {
     console.log(`Sunucu ${PORT} portunda çalışıyor.`);
 });
+
 
 
 
