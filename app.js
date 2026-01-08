@@ -90,6 +90,12 @@ app.post('/login', async (req, res) => {
         if (!user || !(await bcrypt.compare(password, user.password))) {
             return res.send('<script>alert("Hatalı Bilgiler!"); window.location="/";</script>');
         }
+           if (user.role === 'banned') {
+        return res.send(`SÜRGÜN EDİLDİNİZ! Neden: ${user.banReason}`);
+    }
+    req.session.user = user;
+    res.redirect('/profil');
+});
         req.session.userId = user._id;
         res.redirect('/profil');
     } catch (err) {
@@ -160,36 +166,97 @@ app.post('/refill-stamina', async (req, res) => {
         res.status(500).json({ status: 'error' });
     }
 });
-
-// Admin Middleware: Sadece admin olanlar girebilir
+// --- ADMIN MIDDLEWARE ---
 const isAdmin = (req, res, next) => {
     if (req.session.user && req.session.user.role === 'admin') {
         return next();
     }
-    res.status(403).send('Erişim Reddedildi: Komuta Merkezi yetkisi gerekiyor.');
+    res.status(403).json({ msg: 'Erişim Engellendi: Komuta Merkezi yetkisi gerekiyor.' });
 };
 
-// Ödeme Onaylama
+// --- 1. ÖDEME ONAYLAMA (BPL YÜKLEME) ---
 app.post('/admin/approve-payment', isAdmin, async (req, res) => {
     const { paymentId } = req.body;
     try {
-        const payment = await Payment.findById(paymentId);
-        if (!payment || payment.status !== 'pending') return res.json({ msg: 'İşlem zaten onaylanmış veya bulunamadı.' });
+        const payment = await Payment.findById(paymentId).populate('userId');
+        if (!payment || payment.status !== 'pending') return res.json({ msg: 'İşlem geçersiz veya zaten onaylanmış.' });
 
-        const user = await User.findById(payment.userId);
-        user.bpl += payment.amount_bpl; // Kullanıcıya BPL ekle
-        payment.status = 'approved';    // İşlemi onayla
-        
-        await user.save();
+        // Bakiyeyi Güncelle
+        payment.userId.bpl += payment.amount_bpl;
+        payment.status = 'approved';
+
+        await payment.userId.save();
         await payment.save();
 
-        res.json({ msg: `${user.nickname} kullanıcısına ${payment.amount_bpl} BPL başarıyla yüklendi.` });
-    } catch (err) {
-        res.status(500).json({ msg: 'Onay hatası!' });
-    }
+        // Socket üzerinden kullanıcıya anlık haber ver (Eğer online ise)
+        io.to(payment.userId.socketId).emit('update-bpl', payment.userId.bpl);
+        io.to(payment.userId.socketId).emit('new-message', { 
+            sender: 'SİSTEM', 
+            text: `🛡️ Lojistik destek onaylandı: +${payment.amount_bpl} BPL hesabınıza eklendi.` 
+        });
+
+        res.json({ msg: 'Ödeme başarıyla onaylandı.' });
+    } catch (err) { res.status(500).json({ msg: 'Hata oluştu.' }); }
 });
 
+// --- 2. TALEP SİLME / REDDETME ---
+app.post(['/admin/reject-payment', '/admin/reject-withdraw'], isAdmin, async (req, res) => {
+    const { id } = req.body;
+    try {
+        // Talebi tamamen siler (İsteğe bağlı olarak status='rejected' da yapabilirsin)
+        await Payment.findByIdAndDelete(id);
+        await Withdraw.findByIdAndDelete(id); 
+        res.json({ msg: 'Talep sistemden temizlendi.' });
+    } catch (err) { res.json({ msg: 'Hata.' }); }
+});
 
+// --- 3. BAN SİSTEMİ (YASAKLAMA) ---
+app.post('/admin/ban-user', isAdmin, async (req, res) => {
+    const { userId, reason } = req.body;
+    try {
+        const user = await User.findById(userId);
+        if (!user) return res.json({ msg: 'Kullanıcı bulunamadı.' });
+
+        user.role = 'banned'; // Rolü banlı olarak değiştir
+        user.banReason = reason;
+        await user.save();
+
+        // Eğer kullanıcı o an online ise bağlantısını kopar
+        const sockets = await io.fetchSockets();
+        for (const s of sockets) {
+            if (s.request.session.user._id == userId) {
+                s.emit('force-logout', { reason: reason });
+                s.disconnect();
+            }
+        }
+        res.json({ msg: 'Kullanıcı sürgün edildi.' });
+    } catch (err) { res.json({ msg: 'Ban hatası.' }); }
+});
+
+// --- 4. TOPLU EMAIL DUYURU (BOMBA ÖZELLİK) ---
+const nodemailer = require('nodemailer'); // npm install nodemailer
+app.post('/admin/send-announcement', isAdmin, async (req, res) => {
+    const { subject, body } = req.body;
+    try {
+        const users = await User.find({}, 'email');
+        const transporter = nodemailer.createTransport({
+            service: 'gmail',
+            auth: { user: 'seninmail@gmail.com', pass: 'uygulama-sifresi' }
+        });
+
+        // Tüm kullanıcılara gönderim
+        const emails = users.map(u => u.email).join(',');
+        await transporter.sendMail({
+            from: '"BPL MERKEZ" <seninmail@gmail.com>',
+            to: emails,
+            subject: `🚨 BPL DUYURU: ${subject}`,
+            text: body,
+            html: `<div style="background:#000; color:#eee; padding:20px; border:2px solid #39FF14;">${body}</div>`
+        });
+
+        res.json({ msg: 'Tüm komutanlara email iletildi.' });
+    } catch (err) { res.json({ msg: 'Email gönderilemedi.' }); }
+});
 
 
 
@@ -559,6 +626,7 @@ const PORT = process.env.PORT || 10000;
 server.listen(PORT, () => {
     console.log(`Sunucu ${PORT} portunda çalışıyor.`);
 });
+
 
 
 
