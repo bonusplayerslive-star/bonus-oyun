@@ -56,10 +56,130 @@ app.use(async (req, res, next) => {
 
 // --- ROUTER - TEMEL YÖNLENDİRMELER ---
 
-// Ana Sayfa
+// --- ANA SAYFA ---
 app.get('/', (req, res) => {
-    res.render('index');
+    if (req.session.userId) return res.redirect('/profil');
+    res.render('index'); // index.ejs (Giriş/Kayıt sayfası)
 });
+
+// --- PROFİL SAYFASI ---
+app.get('/profil', async (req, res) => {
+    if (!req.session.userId) return res.redirect('/');
+    try {
+        const user = await User.findById(req.session.userId);
+        res.render('profil', { user });
+    } catch (err) {
+        res.status(500).send("Profil yüklenemedi.");
+    }
+});
+
+// --- MARKET SAYFASI ---
+app.get('/market', async (req, res) => {
+    if (!req.session.userId) return res.redirect('/');
+    try {
+        const user = await User.findById(req.session.userId);
+        res.render('market', { user });
+    } catch (err) {
+        res.status(500).send("Market şu an kapalı.");
+    }
+});
+
+// --- ARENA (SAVAŞ) SAYFASI ---
+app.get('/arena', async (req, res) => {
+    if (!req.session.userId) return res.redirect('/');
+    try {
+        const user = await User.findById(req.session.userId);
+        res.render('arena', { user });
+    } catch (err) {
+        res.status(500).send("Arena hazırlanamadı.");
+    }
+});
+
+// --- ADMIN PANELİ (SADECE YETKİLİLER) ---
+app.get('/admin', isAdmin, async (req, res) => {
+    try {
+        const payments = await Payment.find({ status: 'pending' }).populate('userId');
+        res.render('admin', { payments });
+    } catch (err) {
+        res.status(500).send("Admin paneli yüklenemedi.");
+    }
+});
+
+// --- CÜZDAN & ÖDEME SAYFASI ---
+app.get('/wallet', async (req, res) => {
+    if (!req.session.userId) return res.redirect('/');
+    try {
+        const user = await User.findById(req.session.userId);
+        // Kullanıcının geçmiş ödemelerini de çekelim
+        const payments = await Payment.find({ userId: user._id }).sort({ createdAt: -1 });
+        res.render('wallet', { user, payments });
+    } catch (err) {
+        res.status(500).send("Cüzdan bilgileri yüklenemedi.");
+    }
+});
+
+// --- LİDERLİK SIRALAMASI (LEADERBOARD) ---
+app.get('/leaderboard', async (req, res) => {
+    try {
+        // En çok BPL'si olan ilk 10 oyuncuyu getir
+        const topPlayers = await User.find({})
+            .sort({ bpl: -1 })
+            .limit(10)
+            .select('nickname bpl selectedAnimal');
+        
+        let user = null;
+        if (req.session.userId) {
+            user = await User.findById(req.session.userId);
+        }
+        
+        res.render('leaderboard', { topPlayers, user });
+    } catch (err) {
+        res.status(500).send("Sıralama listesi alınamadı.");
+    }
+});
+
+// --- ŞİFREMİ UNUTTUM SAYFASI ---
+app.get('/forgot-password', (req, res) => {
+    res.render('forgot-password');
+});
+
+// --- ŞİFRE SIFIRLAMA FORMU (E-POSTADAKİ LİNK İÇİN) ---
+app.get('/reset/:token', async (req, res) => {
+    try {
+        const user = await User.findOne({
+            resetPasswordToken: req.params.token,
+            resetPasswordExpires: { $gt: Date.now() } // Süresi geçmemiş olmalı
+        });
+
+        if (!user) {
+            return res.send('<script>alert("Şifre sıfırlama linki geçersiz veya süresi dolmuş."); window.location="/forgot-password";</script>');
+        }
+
+        res.render('reset-password', { token: req.params.token });
+    } catch (err) {
+        res.status(500).send("Bir hata oluştu.");
+    }
+});
+
+// --- ÇIKIŞ YAP (LOGOUT) ---
+app.get('/logout', (req, res) => {
+    req.session.destroy((err) => {
+        if (err) return res.send("Çıkış yapılamadı.");
+        res.redirect('/');
+    });
+});
+
+// --- HATA SAYFASI (404) ---
+// Not: Bu rota her zaman en sonda olmalıdır!
+app.get('*', (req, res) => {
+    res.status(404).render('404'); 
+});
+
+
+
+
+
+
 
 // Kayıt Ol (POST)
 app.post('/register', async (req, res) => {
@@ -824,6 +944,7 @@ const PORT = process.env.PORT || 10000;
 server.listen(PORT, () => {
     console.log(`Sunucu ${PORT} portunda çalışıyor.`);
 });
+
 
 
 
