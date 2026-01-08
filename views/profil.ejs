@@ -1,4 +1,4 @@
-// Path: views\profil.ejs
+
 <!DOCTYPE html>
 <html lang="tr">
 <head>
@@ -187,9 +187,27 @@
         }
 
         async function refillStamina(name) {
-            // Buraya stamina yenileme fetch isteğini ekleyebilirsin
-            alert(name + " enerjisi yenileniyor...");
+    if(!confirm(name + " enerjisini 10 BPL karşılığında yenilemek istiyor musunuz?")) return;
+
+    try {
+        const res = await fetch('/refill-stamina', {
+            method: 'POST',
+            headers: {'Content-Type': 'application/json'},
+            body: JSON.stringify({ animalName: name })
+        });
+        const data = await res.json();
+        
+        if(data.status === 'success') {
+            alert("Enerji Fullendi! Kalan BPL: " + data.newBpl);
+            location.reload(); // Sayfayı yenile ki barlar güncellensin
+        } else if(data.status === 'low_balance') {
+            alert("Yetersiz BPL bakiyesi!");
         }
+    } catch (err) {
+        console.error("Hata:", err);
+    }
+}
     </script>
 </body>
 </html>
+
