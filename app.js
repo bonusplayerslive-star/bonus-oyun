@@ -369,7 +369,43 @@ io.on('connection', (socket) => {
 });
 
 
+io.on('connection', (socket) => {
+    // ... user session kontrolleri ...
 
+    socket.on('join-meeting', ({ roomId, peerId }) => {
+        // Oda isimlerinin karışmaması için bir ön ek ekliyoruz (GÜVENLİK ÖNLEMİ)
+        const secureRoomId = `MEET_ROOM_${roomId}`;
+        
+        socket.join(secureRoomId);
+        socket.currentRoom = secureRoomId; // Socket üzerinde odayı sakla
+        socket.peerId = peerId;
+
+        // Odadaki diğer kişilere yeni birinin geldiğini ve PeerID'sini bildir
+        socket.to(secureRoomId).emit('user-connected', {
+            id: socket.id,
+            peerId: peerId,
+            nickname: socket.request.session.user.nickname
+        });
+
+        console.log(`[KONSEY] ${socket.request.session.user.nickname} odaya katıldı: ${secureRoomId}`);
+    });
+
+    // Sadece bulunulan odaya mesaj gönder (Çakışmayı önleyen asıl kısım)
+    socket.on('send-meeting-message', (data) => {
+        if (socket.currentRoom) {
+            io.to(socket.currentRoom).emit('new-meeting-message', {
+                sender: socket.request.session.user.nickname,
+                text: data.text
+            });
+        }
+    });
+
+    socket.on('disconnect', () => {
+        if (socket.currentRoom) {
+            socket.to(socket.currentRoom).emit('user-disconnected', socket.peerId);
+        }
+    });
+});
 
 
 
@@ -495,6 +531,7 @@ const PORT = process.env.PORT || 10000;
 server.listen(PORT, () => {
     console.log(`Sunucu ${PORT} portunda çalışıyor.`);
 });
+
 
 
 
