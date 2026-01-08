@@ -290,6 +290,42 @@
         const panel = document.getElementById('userActionPanel');
         if(e.target === panel) closePanel(); 
     };
+
+
+// Konsey (Özel Oda) Daveti Gönder
+function inviteToMeeting(nick) {
+    socket.emit('send-meeting-invite', { target: nick });
+    Swal.fire({ 
+        toast: true, 
+        position: 'top-end', 
+        icon: 'success', 
+        title: 'Konsey daveti gönderildi.', 
+        showConfirmButton: false, 
+        timer: 2000 
+    });
+    closePanel();
+}
+
+// Konsey Daveti Geldiğinde Dinle
+socket.on('meeting-request', (data) => {
+    if(data.target === myNick) {
+        Swal.fire({
+            title: 'KONSEY ÇAĞRISI',
+            text: `${data.from} seni özel bir görüşmeye çağırıyor.`,
+            icon: 'info',
+            showCancelButton: true,
+            confirmButtonText: 'KATIL',
+            cancelButtonText: 'REDDET',
+            background: '#0a0b0c', color: '#fff'
+        }).then((res) => {
+            if(res.isConfirmed) {
+                window.location.href = `/private-chat?room=${data.room}&with=${data.from}`;
+            }
+        });
+    }
+});
+
 </script>
 </body>
 </html>
+
