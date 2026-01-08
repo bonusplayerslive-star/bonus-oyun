@@ -227,7 +227,67 @@ app.post('/api/buy-item', async (req, res) => {
 
 
 
+// 1. Cüzdan Adresi Kaydı
+app.post('/save-wallet-address', async (req, res) => {
+    const { userId, usdtAddress } = req.body;
+    try {
+        if (!usdtAddress.startsWith('0x') || usdtAddress.length < 40) {
+            return res.status(400).json({ msg: "Geçersiz BEP20 adresi!" });
+        }
+        await User.findByIdAndUpdate(userId, { usdt_address: usdtAddress });
+        res.json({ status: 'success', msg: "Adres başarıyla protokolüne işlendi." });
+    } catch (err) {
+        res.status(500).json({ msg: "Sunucu hatası." });
+    }
+});
 
+// 2. Karakter Satışı (%30 Yakım ile)
+app.post('/sell-character', async (req, res) => {
+    const { userId, animalIndex, fiyat } = req.body;
+    try {
+        const user = await User.findById(userId);
+        
+        if (user.inventory.length <= 1) {
+            return res.json({ status: 'error', msg: "Son kalan ana varlığınızı satamazsınız!" });
+        }
+
+        // Gelen fiyatı doğrula (Güvenlik)
+        const highTier = ['LION', 'RHINO', 'GORILLA', 'TIGER'];
+        const animal = user.inventory[animalIndex];
+        const originalPrice = highTier.includes(animal.name.toUpperCase()) ? 5000 : 1000;
+        
+        const refund = originalPrice * 0.70; // %30 yakım, %70 iade
+        
+        // Envanterden kaldır ve bakiyeyi ekle
+        user.inventory.splice(animalIndex, 1);
+        user.bpl += refund;
+        
+        user.markModified('inventory');
+        await user.save();
+
+        res.json({ status: 'success', msg: `${refund} BPL bakiyenize eklendi.` });
+    } catch (err) {
+        res.status(500).json({ msg: "İşlem sırasında bir hata oluştu." });
+    }
+});
+
+// 3. Tasfiye (Withdraw) Talebi
+app.post('/withdraw-request', async (req, res) => {
+    const { amount } = req.body; // Miktar frontend'den alınır
+    const user = await User.findById(req.session.userId);
+
+    if (amount < 7500) return res.json({ msg: "Minimum eşik 7.500 BPL!" });
+    if (user.bpl < amount) return res.json({ msg: "Yetersiz bakiye!" });
+    if (!user.usdt_address) return res.json({ msg: "Lütfen önce BEP20 adresinizi kaydedin!" });
+
+    // Talebi bir 'Withdrawals' koleksiyonuna kaydet (Admin onayı için)
+    // await Withdrawal.create({ userId: user._id, amount, netAmount: amount * 0.70 });
+    
+    user.bpl -= amount;
+    await user.save();
+    
+    res.json({ status: 'success', msg: "Talebiniz alındı. 24 saat içinde incelenecektir." });
+});
 
 
 
@@ -358,6 +418,7 @@ const PORT = process.env.PORT || 10000;
 server.listen(PORT, () => {
     console.log(`Sunucu ${PORT} portunda çalışıyor.`);
 });
+
 
 
 
