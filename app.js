@@ -218,23 +218,40 @@ app.post('/admin/approve-payment', isAdmin, async (req, res) => {
         console.error(err);
         res.status(500).send("Onaylama işlemi sırasında hata oluştu!");
     }
-});
+});// --- 1. ÖDEME ONAYLAMA (BPL YÜKLEME) ---
+// BURADAKİ "async" KELİMESİ KRİTİK!
+app.post('/admin/approve-payment', isAdmin, async (req, res) => {
+    const { paymentId } = req.body;
+    try {
+        const payment = await Payment.findById(paymentId).populate('userId');
+        
+        if (!payment || payment.status !== 'pending') {
+            return res.json({ msg: 'İşlem geçersiz veya zaten onaylanmış.' });
+        }
+
         // Bakiyeyi Güncelle
         payment.userId.bpl += payment.amount_bpl;
         payment.status = 'approved';
 
+        // Veritabanına kaydet
         await payment.userId.save();
         await payment.save();
 
-        // Socket üzerinden kullanıcıya anlık haber ver (Eğer online ise)
-        io.to(payment.userId.socketId).emit('update-bpl', payment.userId.bpl);
-        io.to(payment.userId.socketId).emit('new-message', { 
-            sender: 'SİSTEM', 
-            text: `🛡️ Lojistik destek onaylandı: +${payment.amount_bpl} BPL hesabınıza eklendi.` 
-        });
+        // Socket üzerinden kullanıcıya anlık haber ver
+        if (payment.userId.socketId) {
+            io.to(payment.userId.socketId).emit('update-bpl', payment.userId.bpl);
+            io.to(payment.userId.socketId).emit('new-message', { 
+                sender: 'SİSTEM', 
+                text: `🛡️ Lojistik destek onaylandı: +${payment.amount_bpl} BPL hesabınıza eklendi.` 
+            });
+        }
 
         res.json({ msg: 'Ödeme başarıyla onaylandı.' });
-    } catch (err) { res.status(500).json({ msg: 'Hata oluştu.' }); }
+        
+    } catch (err) { 
+        console.error(err);
+        res.status(500).json({ msg: 'Onay hatası oluştu.' }); 
+    }
 });
 
 // --- 2. TALEP SİLME / REDDETME ---
@@ -781,6 +798,7 @@ const PORT = process.env.PORT || 10000;
 server.listen(PORT, () => {
     console.log(`Sunucu ${PORT} portunda çalışıyor.`);
 });
+
 
 
 
