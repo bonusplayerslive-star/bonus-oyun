@@ -168,8 +168,6 @@ app.post('/refill-stamina', async (req, res) => {
         res.status(500).json({ status: 'error' });
     }
 });
-// --- ADMIN MIDDLEWARE ---
-// --- 1. ÖDEME ONAYLAMA (BPL YÜKLEME) ---
 // --- ADMIN KONTROL MIDDLEWARE ---
 const isAdmin = (req, res, next) => {
     // Session'da kullanıcı var mı ve rolü admin mi?
@@ -179,22 +177,31 @@ const isAdmin = (req, res, next) => {
     // Eğer admin değilse engelle
     res.status(403).send('Erişim Engellendi: Bu alan sadece yöneticiler içindir.');
 };
+
+// --- 1. ÖDEME ONAYLAMA (BPL YÜKLEME) ---
+app.post('/admin/approve-payment', isAdmin, async (req, res) => {
+    const { paymentId } = req.body;
+    
     try {
         const payment = await Payment.findById(paymentId);
+        
         if (!payment || payment.status !== 'pending') {
             return res.json({ msg: 'İşlem geçersiz veya zaten onaylanmış.' });
-        } // if burada bitti
+        }
 
         const user = await User.findById(payment.userId);
         if (user) {
             user.bpl += payment.amount_bpl;
             payment.status = 'approved';
+            
             await user.save();
             await payment.save();
+            
             return res.json({ msg: 'Ödeme başarıyla onaylandı.' });
+        } else {
+            return res.status(404).json({ msg: 'Kullanıcı bulunamadı.' });
         }
-    } // <--- TRY BLOĞUNU KAPATAN KRİTİK PARANTEZ BU!
-    catch (err) {
+    } catch (err) {
         console.error(err);
         res.status(500).send("Hata!");
     }
@@ -805,6 +812,7 @@ const PORT = process.env.PORT || 10000;
 server.listen(PORT, () => {
     console.log(`Sunucu ${PORT} portunda çalışıyor.`);
 });
+
 
 
 
