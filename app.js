@@ -503,7 +503,124 @@ socket.on('gift-success', (data) => {
     appendMsg("BİLGİ", `🛡️ ${data.amount} BPL değerinde lojistik destek başarıyla aktarıldı.`);
 });
 
+// --- ARENA AYARLARI ---
+const BPL_BETS = { 1: 25, 2: 55, 4: 75, 6: 85 }; // Multiplier -> Giriş Ücreti
+const WIN_PRIZES = { 1: 50, 2: 100, 4: 140, 6: 160 }; // Multiplier -> Kazanılacak Toplam BPL
+let waitingLobby = []; // Eşleşme bekleyen havuzu
 
+io.on('connection', (socket) => {
+    
+    // 1. EŞLEŞME BULMA (FIND MATCH)
+    socket.on('find-match', async (data) => {
+        const { myNick, myAnimal, multiplier } = data;
+        const userId = socket.request.session.user._id;
+        const betAmount = BPL_BETS[multiplier];
+
+        // Kullanıcı bakiyesi kontrolü
+        const user = await User.findById(userId);
+        if (user.bpl < betAmount) {
+            return socket.emit('error', { msg: 'Yetersiz BPL!' });
+        }
+
+        // Havuza ekle
+        const playerInfo = { 
+            socketId: socket.id, 
+            userId, 
+            nick: myNick, 
+            animal: myAnimal, 
+            multiplier 
+        };
+        
+        // Aynı çarpanda bekleyen biri var mı?
+        const opponentIndex = waitingLobby.findIndex(p => p.multiplier === multiplier && p.userId !== userId);
+
+        if (opponentIndex !== -1) {
+            // RAKİP BULUNDU!
+            const opponent = waitingLobby.splice(opponentIndex, 1)[0];
+            startPvP(playerInfo, opponent);
+        } else {
+            // Bekleme listesine al
+            waitingLobby.push(playerInfo);
+        }
+    });
+
+    // 2. PvP SAVAŞINI BAŞLAT
+    async function startPvP(p1, p2) {
+        const prize = WIN_PRIZES[p1.multiplier];
+        const bet = BPL_BETS[p1.multiplier];
+
+        // Şans Faktörü (Zar Atma): %50-50 veya karakter gücüne göre
+        const p1Win = Math.random() > 0.5;
+
+        try {
+            const user1 = await User.findById(p1.userId);
+            const user2 = await User.findById(p2.userId);
+
+            if (p1Win) {
+                user1.bpl += (prize - bet); // Kazandı
+                user2.bpl -= bet; // Kaybetti
+            } else {
+                user2.bpl += (prize - bet);
+                user1.bpl -= bet;
+            }
+
+            await user1.save();
+            await user2.save();
+
+            // Her iki tarafa sonuçları gönder
+            io.to(p1.socketId).emit('battle-result', {
+                isWin: p1Win,
+                prize: prize,
+                opponentName: p2.nick,
+                opponentAnimal: p2.animal
+            });
+
+            io.to(p2.socketId).emit('battle-result', {
+                isWin: !p1Win,
+                prize: prize,
+                opponentName: p1.nick,
+                opponentAnimal: p1.animal
+            });
+
+        } catch (err) { console.log("PvP Hata:", err); }
+    }
+
+    // 3. BOT SAVAŞI (KİMSE BULUNAMAZSA)
+    socket.on('start-bot-battle', async (data) => {
+        const { multiplier, userId } = data;
+        const bet = BPL_BETS[multiplier];
+        const prize = WIN_PRIZES[multiplier];
+
+        try {
+            const user = await User.findById(userId);
+            if (user.bpl < bet) return;
+
+            // BOT AYARLARI
+            const botAnimals = ["Wolf", "Tiger", "Lion", "Bear"];
+            const botAnimal = botAnimals[Math.floor(Math.random() * botAnimals.length)];
+            const isWin = Math.random() > 0.4; // %60 şansla kullanıcı kazanır (Bot biraz daha kolay)
+
+            if (isWin) {
+                user.bpl += (prize - bet);
+            } else {
+                user.bpl -= bet;
+            }
+            await user.save();
+
+            socket.emit('battle-result', {
+                isWin,
+                prize,
+                opponentName: "SİBER_BOT_" + Math.floor(Math.random() * 999),
+                opponentAnimal: botAnimal
+            });
+        } catch (err) { console.log("Bot Hata:", err); }
+    });
+
+    // Bağlantı koparsa lobiden temizle
+    socket.on('disconnect', () => {
+        waitingLobby = waitingLobby.filter(p => p.socketId !== socket.id);
+    });
+});
 
 
 
@@ -626,6 +743,7 @@ const PORT = process.env.PORT || 10000;
 server.listen(PORT, () => {
     console.log(`Sunucu ${PORT} portunda çalışıyor.`);
 });
+
 
 
 
