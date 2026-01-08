@@ -97,6 +97,99 @@ app.post('/login', async (req, res) => {
     }
 });
 
+// --- PROFİL VE ENVANTER İŞLEMLERİ ---
+
+// Profil Sayfasını Görüntüle
+app.get('/profil', async (req, res) => {
+    if (!req.session.userId) return res.redirect('/');
+    try {
+        const user = await User.findById(req.session.userId);
+        res.render('profil', { user });
+    } catch (err) {
+        res.status(500).send("Sunucu hatası.");
+    }
+});
+
+// Arena İçin Hayvan Seçimi (POST)
+app.post('/select-animal', async (req, res) => {
+    if (!req.session.userId) return res.status(401).json({ status: 'error' });
+    
+    const { animalName } = req.body;
+    try {
+        await User.findByIdAndUpdate(req.session.userId, {
+            selectedAnimal: animalName
+        });
+        
+        // Log Kaydı
+        await Log.create({
+            type: 'ARENA',
+            content: `Kullanıcı savaş için ${animalName} seçti.`,
+            userEmail: req.session.nickname // session'da sakladığımız nick
+        });
+
+        res.json({ status: 'success', message: `${animalName} seçildi.` });
+    } catch (err) {
+        res.status(500).json({ status: 'error' });
+    }
+});
+
+// Enerji Yenileme (Stamina Refill - 10 BPL)
+app.post('/refill-stamina', async (req, res) => {
+    if (!req.session.userId) return res.status(401).json({ status: 'error' });
+
+    const { animalName } = req.body;
+    try {
+        const user = await User.findById(req.session.userId);
+        
+        if (user.bpl < 10) {
+            return res.json({ status: 'low_balance', message: 'Yetersiz BPL!' });
+        }
+
+        // Envanterdeki ilgili hayvanın enerjisini %100 yap
+        const itemIndex = user.inventory.findIndex(item => item.name === animalName);
+        if (itemIndex > -1) {
+            user.inventory[itemIndex].stamina = 100;
+            user.bpl -= 10; // Ücreti kes
+            await user.save();
+            
+            res.json({ status: 'success', newBpl: user.bpl });
+        } else {
+            res.json({ status: 'not_found' });
+        }
+    } catch (err) {
+        res.status(500).json({ status: 'error' });
+    }
+});
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 // Çıkış Yap
 app.get('/logout', (req, res) => {
     req.session.destroy();
@@ -114,3 +207,4 @@ const PORT = process.env.PORT || 10000;
 server.listen(PORT, () => {
     console.log(`Sunucu ${PORT} portunda çalışıyor.`);
 });
+
