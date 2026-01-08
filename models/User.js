@@ -26,5 +26,9 @@ const UserSchema = new mongoose.Schema({
     bnb_address: { type: String, default: '' },
     usedHashes: { type: [String], default: [] } // Tekrar eden ödemeleri engellemek için
 });
+// models/User.js içine ekle
+resetPasswordToken: String,
+resetPasswordExpires: Date
 
 module.exports = mongoose.model('User', UserSchema);
+
