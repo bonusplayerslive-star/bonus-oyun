@@ -192,17 +192,33 @@ app.post('/admin/approve-payment', isAdmin, async (req, res) => {
         res.status(500).send("Hata!");
     }
 });
-
 // --- 1. ÖDEME ONAYLAMA (BPL YÜKLEME) ---
 app.post('/admin/approve-payment', isAdmin, async (req, res) => {
     const { paymentId } = req.body;
     try {
         const payment = await Payment.findById(paymentId);
-        if (!payment || payment.status !== 'pending') return res.json({ msg: 'İşlem geçersiz veya zaten onaylanmış.' });
-catch (err) {
-    console.error(err);
-    res.status(500).send("Hata!");
-}
+        
+        if (!payment || payment.status !== 'pending') {
+            return res.json({ msg: 'İşlem geçersiz veya zaten onaylanmış.' });
+        }
+
+        const user = await User.findById(payment.userId);
+        if (user) {
+            user.bpl += payment.amount_bpl;
+            payment.status = 'approved';
+            await user.save();
+            await payment.save();
+            res.json({ msg: `${user.nickname} kullanıcısına BPL yüklendi.` });
+        } else {
+            res.json({ msg: 'Kullanıcı bulunamadı.' });
+        }
+
+    } // <--- EKSİK OLAN VE HATAYA SEBEP OLAN PARANTEZ BUYDU!
+    catch (err) {
+        console.error(err);
+        res.status(500).send("Onaylama işlemi sırasında hata oluştu!");
+    }
+});
         // Bakiyeyi Güncelle
         payment.userId.bpl += payment.amount_bpl;
         payment.status = 'approved';
@@ -765,6 +781,7 @@ const PORT = process.env.PORT || 10000;
 server.listen(PORT, () => {
     console.log(`Sunucu ${PORT} portunda çalışıyor.`);
 });
+
 
 
 
