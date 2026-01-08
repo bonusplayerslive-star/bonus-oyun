@@ -161,7 +161,33 @@ app.post('/refill-stamina', async (req, res) => {
     }
 });
 
+// Admin Middleware: Sadece admin olanlar girebilir
+const isAdmin = (req, res, next) => {
+    if (req.session.user && req.session.user.role === 'admin') {
+        return next();
+    }
+    res.status(403).send('Erişim Reddedildi: Komuta Merkezi yetkisi gerekiyor.');
+};
 
+// Ödeme Onaylama
+app.post('/admin/approve-payment', isAdmin, async (req, res) => {
+    const { paymentId } = req.body;
+    try {
+        const payment = await Payment.findById(paymentId);
+        if (!payment || payment.status !== 'pending') return res.json({ msg: 'İşlem zaten onaylanmış veya bulunamadı.' });
+
+        const user = await User.findById(payment.userId);
+        user.bpl += payment.amount_bpl; // Kullanıcıya BPL ekle
+        payment.status = 'approved';    // İşlemi onayla
+        
+        await user.save();
+        await payment.save();
+
+        res.json({ msg: `${user.nickname} kullanıcısına ${payment.amount_bpl} BPL başarıyla yüklendi.` });
+    } catch (err) {
+        res.status(500).json({ msg: 'Onay hatası!' });
+    }
+});
 
 
 
@@ -533,6 +559,7 @@ const PORT = process.env.PORT || 10000;
 server.listen(PORT, () => {
     console.log(`Sunucu ${PORT} portunda çalışıyor.`);
 });
+
 
 
 
