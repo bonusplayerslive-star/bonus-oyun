@@ -246,6 +246,20 @@ app.post('/api/buy-item', async (req, res) => {
 
 
 
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 // Çıkış Yap
 app.get('/logout', (req, res) => {
     req.session.destroy();
@@ -263,5 +277,6 @@ const PORT = process.env.PORT || 10000;
 server.listen(PORT, () => {
     console.log(`Sunucu ${PORT} portunda çalışıyor.`);
 });
+
 
 
