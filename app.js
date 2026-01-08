@@ -10,6 +10,8 @@ const http = require('http');
 const socketIo = require('socket.io');
 const bcrypt = require('bcryptjs');
 const nodemailer = require("nodemailer");
+
+
 // Modeller (Paylaştığın dosya isimlerine göre)
 const User = require('./models/User');
 const Log = require('./models/Log');
@@ -42,7 +44,12 @@ app.use(session({
     store: MongoStore.create({ mongoUrl: process.env.MONGO_URI }),
     cookie: { maxAge: 1000 * 60 * 60 * 24 } // 1 Günlük oturum
 }));
-
+const isAdmin = (req, res, next) => {
+    if (req.session.userId && req.session.user && req.session.user.role === 'admin') {
+        return next();
+    }
+    res.status(403).send('Erişim Engellendi: Bu alan sadece yöneticiler içindir.');
+};
 // EJS Sayfalarına 'user' değişkenini global olarak gönder
 app.use(async (req, res, next) => {
     if (req.session.userId) {
@@ -944,6 +951,7 @@ const PORT = process.env.PORT || 10000;
 server.listen(PORT, () => {
     console.log(`Sunucu ${PORT} portunda çalışıyor.`);
 });
+
 
 
 
