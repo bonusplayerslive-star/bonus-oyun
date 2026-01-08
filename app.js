@@ -93,8 +93,7 @@ app.post('/login', async (req, res) => {
            if (user.role === 'banned') {
         return res.send(`SÜRGÜN EDİLDİNİZ! Neden: ${user.banReason}`);
     }
-    req.session.user = user;
-    res.redirect('/profil');
+
 });
         req.session.userId = user._id;
         res.redirect('/profil');
@@ -766,6 +765,7 @@ const PORT = process.env.PORT || 10000;
 server.listen(PORT, () => {
     console.log(`Sunucu ${PORT} portunda çalışıyor.`);
 });
+
 
 
 
