@@ -102,7 +102,6 @@ app.get('/arena', async (req, res) => {
     }
 });
 
-// --- ADMIN PANELİ (SADECE YETKİLİLER) ---
 app.get('/admin', isAdmin, async (req, res) => {
     try {
         const payments = await Payment.find({ status: 'pending' }).populate('userId');
@@ -951,6 +950,7 @@ const PORT = process.env.PORT || 10000;
 server.listen(PORT, () => {
     console.log(`Sunucu ${PORT} portunda çalışıyor.`);
 });
+
 
 
 
