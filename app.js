@@ -170,8 +170,15 @@ app.post('/refill-stamina', async (req, res) => {
 });
 // --- ADMIN MIDDLEWARE ---
 // --- 1. ÖDEME ONAYLAMA (BPL YÜKLEME) ---
-app.post('/admin/approve-payment', isAdmin, async (req, res) => {
-    const { paymentId } = req.body;
+// --- ADMIN KONTROL MIDDLEWARE ---
+const isAdmin = (req, res, next) => {
+    // Session'da kullanıcı var mı ve rolü admin mi?
+    if (req.session.userId && req.session.user && req.session.user.role === 'admin') {
+        return next();
+    }
+    // Eğer admin değilse engelle
+    res.status(403).send('Erişim Engellendi: Bu alan sadece yöneticiler içindir.');
+};
     try {
         const payment = await Payment.findById(paymentId);
         if (!payment || payment.status !== 'pending') {
@@ -798,6 +805,7 @@ const PORT = process.env.PORT || 10000;
 server.listen(PORT, () => {
     console.log(`Sunucu ${PORT} portunda çalışıyor.`);
 });
+
 
 
 
