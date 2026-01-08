@@ -289,7 +289,7 @@ app.post('/admin/ban-user', isAdmin, async (req, res) => {
 });
 
 // --- 4. TOPLU EMAIL DUYURU (BOMBA ÖZELLİK) ---
-const nodemailer = require('nodemailer'); // npm install nodemailer
+
 app.post('/admin/send-announcement', isAdmin, async (req, res) => {
     const { subject, body } = req.body;
     try {
@@ -798,6 +798,7 @@ const PORT = process.env.PORT || 10000;
 server.listen(PORT, () => {
     console.log(`Sunucu ${PORT} portunda çalışıyor.`);
 });
+
 
 
 
