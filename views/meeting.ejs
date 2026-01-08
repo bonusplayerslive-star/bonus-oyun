@@ -322,6 +322,19 @@
     window.onclick = () => hideMenu();
     
     initCamera();
+
+// meeting.ejs içindeki script kısmına ekle:
+const urlParams = new URLSearchParams(window.location.search);
+const rawRoomId = urlParams.get('room');
+
+// Eğer oda ID'si yoksa veya çok kısaysa ana odaya yönlendir veya hata ver
+if (!rawRoomId || rawRoomId.length < 5) {
+    Swal.fire('Hata', 'Geçersiz Konsey Kodu!', 'error').then(() => window.location.href = '/chat');
+}
+
+const currentRoom = rawRoomId; // Backend zaten secureRoomId prefixini ekliyor.
+
 </script>
 </body>
 </html>
+
