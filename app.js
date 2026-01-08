@@ -167,20 +167,43 @@ app.post('/refill-stamina', async (req, res) => {
     }
 });
 // --- ADMIN MIDDLEWARE ---
-const isAdmin = (req, res, next) => {
-    if (req.session.user && req.session.user.role === 'admin') {
-        return next();
+// --- 1. ÖDEME ONAYLAMA (BPL YÜKLEME) ---
+app.post('/admin/approve-payment', isAdmin, async (req, res) => {
+    const { paymentId } = req.body;
+    try {
+        const payment = await Payment.findById(paymentId);
+        if (!payment || payment.status !== 'pending') {
+            return res.json({ msg: 'İşlem geçersiz veya zaten onaylanmış.' });
+        }
+
+        // --- BURASI EKSİKTİ: İşlemi tamamlayıp try bloğunu kapatıyoruz ---
+        const user = await User.findById(payment.userId);
+        if (user) {
+            user.bpl += payment.amount_bpl;
+            payment.status = 'approved';
+            await user.save();
+            await payment.save();
+            res.json({ msg: 'Ödeme başarıyla onaylandı.' });
+        } else {
+            res.status(404).json({ msg: 'Kullanıcı bulunamadı.' });
+        }
+        
+    } catch (err) { // <--- try'ın bittiği yerdeki süslü parantez eklendi
+        console.error(err);
+        res.status(500).send("Hata!");
     }
-    res.status(403).json({ msg: 'Erişim Engellendi: Komuta Merkezi yetkisi gerekiyor.' });
-};
+});
 
 // --- 1. ÖDEME ONAYLAMA (BPL YÜKLEME) ---
 app.post('/admin/approve-payment', isAdmin, async (req, res) => {
     const { paymentId } = req.body;
     try {
-        const payment = await Payment.findById(paymentId).populate('userId');
+        const payment = await Payment.findById(paymentId);
         if (!payment || payment.status !== 'pending') return res.json({ msg: 'İşlem geçersiz veya zaten onaylanmış.' });
-
+catch (err) {
+    console.error(err);
+    res.status(500).send("Hata!");
+}
         // Bakiyeyi Güncelle
         payment.userId.bpl += payment.amount_bpl;
         payment.status = 'approved';
@@ -743,6 +766,7 @@ const PORT = process.env.PORT || 10000;
 server.listen(PORT, () => {
     console.log(`Sunucu ${PORT} portunda çalışıyor.`);
 });
+
 
 
 
