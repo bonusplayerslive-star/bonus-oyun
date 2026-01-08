@@ -173,21 +173,18 @@ app.post('/admin/approve-payment', isAdmin, async (req, res) => {
         const payment = await Payment.findById(paymentId);
         if (!payment || payment.status !== 'pending') {
             return res.json({ msg: 'İşlem geçersiz veya zaten onaylanmış.' });
-        }
+        } // if burada bitti
 
-        // --- BURASI EKSİKTİ: İşlemi tamamlayıp try bloğunu kapatıyoruz ---
         const user = await User.findById(payment.userId);
         if (user) {
             user.bpl += payment.amount_bpl;
             payment.status = 'approved';
             await user.save();
             await payment.save();
-            res.json({ msg: 'Ödeme başarıyla onaylandı.' });
-        } else {
-            res.status(404).json({ msg: 'Kullanıcı bulunamadı.' });
+            return res.json({ msg: 'Ödeme başarıyla onaylandı.' });
         }
-        
-    } catch (err) { // <--- try'ın bittiği yerdeki süslü parantez eklendi
+    } // <--- TRY BLOĞUNU KAPATAN KRİTİK PARANTEZ BU!
+    catch (err) {
         console.error(err);
         res.status(500).send("Hata!");
     }
