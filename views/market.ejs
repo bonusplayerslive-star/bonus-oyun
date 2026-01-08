@@ -25,7 +25,6 @@
             background: rgba(0,0,0,0.88); z-index: -1;
         }
 
-        /* HEADER MOBİL DÜZENLEME */
         .market-header {
             background: rgba(0,0,0,0.95);
             border-bottom: 2px solid var(--neon-green);
@@ -44,7 +43,6 @@
             padding: 5px 12px;
         }
 
-        /* KART TASARIMI */
         .animal-card {
             background: rgba(20, 20, 20, 0.9);
             border-radius: 15px;
@@ -71,18 +69,17 @@
             border-radius: 10px;
             margin-bottom: 12px;
             border: 1px solid #333;
+            background: #000;
         }
 
         .animal-name { font-family: 'Orbitron'; font-size: 1rem; color: var(--neon-green); margin-bottom: 3px; }
         .price-tag { color: var(--gold); font-weight: bold; font-size: 1.1rem; margin-bottom: 12px; display: block; font-family: 'Orbitron'; }
 
-        /* STAT BARLARI */
         .stat-container { flex-grow: 1; margin-bottom: 15px; text-align: left; }
         .stat-label { font-size: 0.7rem; font-family: 'Orbitron'; color: #888; margin-bottom: 2px; display: flex; justify-content: space-between; }
         .progress { background-color: #000; height: 5px; border-radius: 2px; margin-bottom: 8px; }
         .progress-bar-hp { background: #ff416c; }
         .progress-bar-atk { background: #39FF14; }
-        .progress-bar-def { background: #4facfe; }
 
         .btn-buy {
             background: transparent;
@@ -101,12 +98,8 @@
             width: 100%; padding: 8px; font-family: 'Orbitron'; font-size: 0.75rem;
         }
 
-        /* MOBİL ÖZEL AYARLAR */
         @media (max-width: 576px) {
-            .container { padding-left: 10px; padding-right: 10px; }
-            .animal-card { padding: 10px; }
             .market-header h2 { font-size: 1.2rem; }
-            .balance-box { font-size: 0.8rem; }
         }
     </style>
 </head>
@@ -114,7 +107,7 @@
 
 <header class="market-header">
     <div class="container d-flex justify-content-between align-items-center">
-        <h2 class="mb-0 text-uppercase"><i class="fas fa-shoppping-cart"></i> MARKET</h2>
+        <h2 class="mb-0 text-uppercase"><i class="fas fa-shopping-cart"></i> MARKET</h2>
         <div class="d-flex align-items-center">
             <div class="balance-box me-2">
                 <span style="color: var(--gold); font-family: 'Orbitron';">
@@ -143,15 +136,14 @@
         ];
 
         marketAnimals.forEach(animal => { 
-            const isOwned = user.inventory.some(item => item.name.toLowerCase() === animal.name.toLowerCase());
+            const isOwned = user.inventory.some(item => item.name === animal.name);
         %>
             <div class="col-6 col-md-4 col-lg-3">
                 <div class="animal-card">
-                   // app.js - 218. Satır civarı
-img: `/caracter/profile/${itemName}.jpg`, // itemName 'Tiger' ise 'Tiger.jpg' arayacak.
+                    <img src="/caracter/profile/<%= animal.name %>.jpg" 
                          alt="<%= animal.name %>" 
                          class="animal-img"
-                         onerror="this.src='/caracter/profile/logo.jpeg'">
+                         onerror="this.src='/caracter/profile/Logo.jpeg'">
                     
                     <h3 class="animal-name"><%= animal.name.toUpperCase() %></h3>
                     <span class="price-tag"><%= animal.price.toLocaleString() %> BPL</span>
@@ -178,35 +170,31 @@ img: `/caracter/profile/${itemName}.jpg`, // itemName 'Tiger' ise 'Tiger.jpg' ar
 </div>
 
 <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
-<script src="/socket.io/socket.io.js"></script>
-
 <script>
-    const socket = io();
     let userBpl = <%= user.bpl %>;
     const SAFETY_LIMIT = 5500;
 
     async function buyAnimal(name, price) {
-        // 1. ADIM: 5500 BPL SINIRI KONTROLÜ
         if (userBpl - price < SAFETY_LIMIT) {
             Swal.fire({
-                title: 'OPERASYON ENGELLENDİ',
-                text: `Stratejik limit (5500 BPL) altına düşemezsiniz. Mevcut: ${userBpl} BPL`,
+                title: 'LIMIT ENGELLİ',
+                text: `Stratejik limit (5500 BPL) altına düşemezsiniz.`,
                 icon: 'error',
                 background: '#0a0a0a',
                 color: '#fff',
-                confirmButtonColor: var(--neon-green)
+                confirmButtonColor: '#39FF14'
             });
             return;
         }
 
         const result = await Swal.fire({
-            title: 'ONAY GEREKLİ',
-            text: `${name} birimini envantere eklemek istiyor musunuz? (${price} BPL)`,
+            title: 'ONAY',
+            text: `${name} satın alınsın mı?`,
             icon: 'question',
             showCancelButton: true,
             confirmButtonColor: '#39FF14',
             cancelButtonColor: '#d33',
-            confirmButtonText: 'ONAYLA',
+            confirmButtonText: 'EVET',
             background: '#111',
             color: '#fff'
         });
@@ -224,32 +212,13 @@ img: `/caracter/profile/${itemName}.jpg`, // itemName 'Tiger' ise 'Tiger.jpg' ar
                     Swal.fire({ title: 'BAŞARILI', icon: 'success', background: '#111', color: '#fff' })
                     .then(() => location.reload());
                 } else {
-                    Swal.fire('HATA', data.error, 'error');
+                    Swal.fire('HATA', data.error || 'İşlem başarısız', 'error');
                 }
             } catch (err) {
-                Swal.fire('HATA', 'Sunucu bağlantısı koptu!', 'error');
+                Swal.fire('HATA', 'Sunucu hatası!', 'error');
             }
         }
     }
-
-    // ARENA DAVET SİSTEMİ (Socket Dinleyici)
-    socket.on('receive-arena-invitation', (data) => {
-        Swal.fire({
-            title: 'DÜELLO DAVETİ!',
-            text: `${data.senderNick} seni Arena'ya çağırıyor!`,
-            icon: 'warning',
-            showCancelButton: true,
-            confirmButtonText: 'KABUL ET',
-            cancelButtonText: 'REDDET',
-            background: '#111', color: '#fff'
-        }).then((result) => {
-            if (result.isConfirmed) {
-                window.location.href = `/arena?opponent=${data.senderNick}&room=${data.roomId}`;
-            }
-        });
-    });
 </script>
 </body>
 </html>
-
-
