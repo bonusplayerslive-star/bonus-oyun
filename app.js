@@ -387,7 +387,19 @@ app.post('/api/buy-item', async (req, res) => {
     }
 });
 
-
+app.get('/market', async (req, res) => {
+    // Giriş yapmamışsa ana sayfaya yönlendir
+    if (!req.session.userId) return res.redirect('/');
+    
+    try {
+        const user = await User.findById(req.session.userId);
+        // views/market.ejs dosyasını render eder
+        res.render('market', { user }); 
+    } catch (err) {
+        console.error("Market hatası:", err);
+        res.status(500).send("Market şu an kapalı.");
+    }
+});
 
 // 1. Cüzdan Adresi Kaydı
 app.post('/save-wallet-address', async (req, res) => {
@@ -812,6 +824,7 @@ const PORT = process.env.PORT || 10000;
 server.listen(PORT, () => {
     console.log(`Sunucu ${PORT} portunda çalışıyor.`);
 });
+
 
 
 
