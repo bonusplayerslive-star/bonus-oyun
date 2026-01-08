@@ -9,7 +9,7 @@ const mongoSanitize = require('express-mongo-sanitize');
 const http = require('http');
 const socketIo = require('socket.io');
 const bcrypt = require('bcryptjs');
-
+const nodemailer = require("nodemailer");
 // Modeller (Paylaştığın dosya isimlerine göre)
 const User = require('./models/User');
 const Log = require('./models/Log');
@@ -762,6 +762,7 @@ const PORT = process.env.PORT || 10000;
 server.listen(PORT, () => {
     console.log(`Sunucu ${PORT} portunda çalışıyor.`);
 });
+
 
 
 
