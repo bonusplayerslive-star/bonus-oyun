@@ -315,7 +315,58 @@ app.post('/verify-payment', async (req, res) => {
     }
 });
 
+io.on('connection', (socket) => {
+    const user = socket.request.session.user; // Session'dan kullanıcıyı al
 
+    // 1. Genel Mesajlaşma
+    socket.on('chat-message', (data) => {
+        io.emit('new-message', { sender: user.nickname, text: data.text });
+    });
+
+    // 2. Arena Daveti Gönderimi (Challenge)
+    socket.on('send-challenge', (data) => {
+        const battleRoom = `battle_${user.nickname}_${data.target}`;
+        // Rakibe daveti gönder
+        io.emit('challenge-received', {
+            from: user.nickname,
+            target: data.target,
+            room: battleRoom,
+            type: 'ARENA'
+        });
+    });
+
+    // 3. Konsey (Özel Oda) Daveti
+    socket.on('send-meeting-invite', (data) => {
+        const privateRoom = `meeting_${user.nickname}_${data.target}`;
+        io.emit('meeting-request', {
+            from: user.nickname,
+            target: data.target,
+            room: privateRoom
+        });
+    });
+
+    // 4. Lojistik Destek (VIP BPL Transferi)
+    socket.on('send-gift-vip', async (data) => {
+        try {
+            const sender = await User.findOne({ nickname: user.nickname });
+            const target = await User.findOne({ nickname: data.targetNick });
+
+            if (sender.bpl - data.amount >= 5500) {
+                sender.bpl -= data.amount;
+                target.bpl += data.amount;
+                await sender.save();
+                await target.save();
+
+                // Her iki tarafa da bakiye güncellemesi gönder
+                socket.emit('update-bpl', sender.bpl);
+                io.emit('new-message', { 
+                    sender: 'SİSTEM', 
+                    text: `${sender.nickname}, ${target.nickname} kullanıcısına ${data.amount} BPL lojistik destek gönderdi!` 
+                });
+            }
+        } catch (err) { console.log(err); }
+    });
+});
 
 
 
@@ -444,6 +495,7 @@ const PORT = process.env.PORT || 10000;
 server.listen(PORT, () => {
     console.log(`Sunucu ${PORT} portunda çalışıyor.`);
 });
+
 
 
 
