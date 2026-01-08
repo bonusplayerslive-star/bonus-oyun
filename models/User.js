@@ -14,6 +14,7 @@ const UserSchema = new mongoose.Schema({
         name: String,      // Örn: 'Lion'
         img: String,       // Örn: '/caracter/profile/Lion.jpg'
         level: { type: Number, default: 1 },
+        stamina: { type: Number, default: 100 },
         stats: {
             hp: { type: Number, default: 100 },
             atk: { type: Number, default: 20 },
@@ -31,4 +32,5 @@ resetPasswordToken: String,
 resetPasswordExpires: Date
 
 module.exports = mongoose.model('User', UserSchema);
+
 
