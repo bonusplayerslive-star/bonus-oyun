@@ -81,23 +81,26 @@ app.post('/register', async (req, res) => {
         res.status(500).send("Kayıt hatası oluştu.");
     }
 });
-
-// Giriş Yap (POST)
+// Giriş Yap (POST) - HATASIZ VERSİYON
 app.post('/login', async (req, res) => {
     try {
         const { email, password } = req.body;
         const user = await User.findOne({ email });
+
         if (!user || !(await bcrypt.compare(password, user.password))) {
             return res.send('<script>alert("Hatalı Bilgiler!"); window.location="/";</script>');
         }
-           if (user.role === 'banned') {
-        return res.send(`SÜRGÜN EDİLDİNİZ! Neden: ${user.banReason}`);
-    }
 
-});
+        if (user.role === 'banned') {
+            return res.send(`SÜRGÜN EDİLDİNİZ! Neden: ${user.banReason}`);
+        }
+
+        // --- BURADA PARANTEZLERİ YANLIŞ KAPATMIŞTIN, DÜZELTTİM ---
         req.session.userId = user._id;
         res.redirect('/profil');
+
     } catch (err) {
+        console.error(err);
         res.status(500).send("Giriş hatası.");
     }
 });
@@ -762,6 +765,7 @@ const PORT = process.env.PORT || 10000;
 server.listen(PORT, () => {
     console.log(`Sunucu ${PORT} portunda çalışıyor.`);
 });
+
 
 
 
