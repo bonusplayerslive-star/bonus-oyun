@@ -4,30 +4,27 @@ const UserSchema = new mongoose.Schema({
     nickname: { type: String, required: true, unique: true },
     email: { type: String, required: true, unique: true },
     password: { type: String, required: true },
-    bpl: { type: Number, default: 2500 },
+    bpl: { type: Number, default: 2500 }, // Başlangıç bakiyesi
     
-    // Arena'da o an hangi hayvanla savaşıyor?
-    selectedAnimal: { type: String, default: 'Tiger' },
+    selectedAnimal: { type: String, default: '' },
 
-    // Market sistemi için detaylandırılmış envanter
     inventory: [{
-        name: String,      // Örn: 'Lion'
-        img: String,       // Örn: '/caracter/profile/Lion.jpg'
+        name: String,      // Örn: 'Tiger'
+        img: String,       
         level: { type: Number, default: 1 },
-        stamina: { type: Number, default: 100 },
-        stats: {
-            hp: { type: Number, default: 100 },
-            atk: { type: Number, default: 20 },
-            def: { type: Number, default: 10 }
-        },
+        stamina: { type: Number, default: 100 }, // Savaş gücü/enerjisi
+        
+        // Geliştirme sayfasıyla doğrudan uyumlu stat yapısı
+        hp: { type: Number, default: 100 },    // Mevcut Can
+        maxHp: { type: Number, default: 100 }, // Geliştirilebilir Maksimum Can
+        atk: { type: Number, default: 20 },    // Kalıcı Saldırı Gücü
+        def: { type: Number, default: 10 },    // Kalıcı Savunma Gücü
+        
         purchasedAt: { type: Date, default: Date.now }
     }],
 
-    // Cüzdan ve Güvenlik işlemleri
     bnb_address: { type: String, default: '' },
-    usedHashes: { type: [String], default: [] }, // Tekrar eden ödemeleri engellemek için
-
-    // Şifre Sıfırlama Alanları (BURASI DÜZELTİLDİ)
+    usedHashes: { type: [String], default: [] },
     resetPasswordToken: String,
     resetPasswordExpires: Date
 });
