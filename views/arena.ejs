@@ -196,21 +196,31 @@ async function handleBattle(data) {
     }, 3000);
 }
 
+// arena.ejs içinde
 function playVideoAsync(animal, file, text) {
     return new Promise((resolve) => {
         statusMsg.innerText = text;
         
-        // İlk harfi büyük yapma mantığı: tiger -> Tiger
+        // Klasör ismi için: tiger -> Tiger
         const formattedAnimal = animal.charAt(0).toUpperCase() + animal.slice(1).toLowerCase();
         
-        // file zaten Tiger1 veya Tiger olarak geliyor, onu olduğu gibi bırakıyoruz
-        videoElement.src = `/caracter/move/${formattedAnimal}/${file}.mp4`;
+        // Dosya ismi için: tiger1 -> Tiger1 (Eğer file verisi küçük gelirse diye)
+        const formattedFile = file.charAt(0).toUpperCase() + file.slice(1);
+        
+        // Sonuç: /caracter/move/Tiger/Tiger1.mp4
+        videoElement.src = `/caracter/move/${formattedAnimal}/${formattedFile}.mp4`;
         
         videoElement.onended = resolve;
         videoElement.play().catch(e => {
-            console.error("Video hatası:", e);
+            console.error("Video oynatılamadı, 2 saniye bekleniyor...", e);
+            // Video yüklenmezse oyun takılmasın diye 2 saniye sonra devam et
             setTimeout(resolve, 2000); 
         });
+    });
+}
+<video id="arenaVideo" preload="auto" ...></video>
+    });
+}
     });
 }
     });
@@ -218,6 +228,7 @@ function playVideoAsync(animal, file, text) {
 </script>
 </body>
 </html>
+
 
 
 
