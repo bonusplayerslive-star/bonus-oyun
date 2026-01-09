@@ -44,24 +44,18 @@ const sessionMiddleware = session({
     saveUninitialized: false,
     store: MongoStore.create({ 
         mongoUrl: MONGO_URI,
-        ttl: 24 * 60 * 60 // Oturum 1 gün sürer
+        ttl: 2400 * 60 * 60 // Oturum 1 gün sürer
     }),
-    cookie: { 
-        secure: false, // Render/Heroku'da SSL yoksa false, varsa true
-        maxAge: 1000 * 60 * 60 * 24 
-    }
-});
-
-// --- GÜVENLİ USER MIDDLEWARE (Kalıcı Çözüm) ---
+   // --- TEK VE GÜÇLÜ USER MIDDLEWARE ---
 app.use(async (req, res, next) => {
-    res.locals.user = null; // Önce temizle
+    res.locals.user = null; 
     if (req.session.userId) {
         try {
             const user = await User.findById(req.session.userId);
             if (user) {
                 res.locals.user = user;
             } else {
-                req.session.userId = null; // DB'de yoksa oturumu sonlandır
+                req.session.userId = null; // Kullanıcı DB'den silindiyse oturumu da kapatır
             }
         } catch (e) {
             console.error("User Middleware Hatası:", e);
@@ -69,29 +63,6 @@ app.use(async (req, res, next) => {
     }
     next();
 });
-
-
-app.use(async (req, res, next) => {
-    res.locals.user = null;
-    if (req.session.userId) {
-        try {
-            const user = await User.findById(req.session.userId);
-            if (user) {
-                res.locals.user = user;
-            }
-        } catch (e) { 
-            console.error("User Context Error:", e); 
-        }
-    }
-    next();
-});
-
-// --- 3. GÜVENLİK VE YETKİLENDİRME ---
-const authRequired = (req, res, next) => {
-    if (req.session.userId) return next();
-    res.redirect('/');
-};
-
 const adminRequired = async (req, res, next) => {
     if (!req.session.userId) return res.status(401).send('Yetkisiz erişim.');
     const user = await User.findById(req.session.userId);
@@ -99,18 +70,6 @@ const adminRequired = async (req, res, next) => {
     res.status(403).render('error', { message: 'Bu alan için Admin yetkisi gerekiyor.' });
 };
 
-// Global User Değişkeni (Tüm EJS dosyalarında kullanıcı verisine erişmek için)
-app.use(async (req, res, next) => {
-    if (req.session.userId) {
-        try {
-            const user = await User.findById(req.session.userId);
-            res.locals.user = user;
-        } catch (e) { res.locals.user = null; }
-    } else {
-        res.locals.user = null;
-    }
-    next();
-});
 
 // --- 4. ANA SAYFA VE AUTH ROTALARI ---
 
@@ -510,6 +469,8 @@ async function updateArenaResults(uid, isWin, prize, mult) {
     socket.on('start-bot-battle', async (data) => {
         // Kuyruktan çıkar (eğer oradaysa)
         const idx = pvpQueue.findIndex(p => p.userId === userId);
+
+        
         if(idx > -1) pvpQueue.splice(idx, 1);
 
         const isWin = Math.random() > 0.4; // %60 kazanma şansı
@@ -535,17 +496,31 @@ async function updateArenaResults(uid, isWin, prize, mult) {
 });
 
 // Yardımcı Fonksiyon: BPL ve İstatistik Güncelleme
-async function updateBattleResults(uid, isWin, prize, mult) {
+async function updateArenaResults(uid, isWin, prize, mult) {
     try {
-        const User = require('./models/User');
-        const cost = 25 * mult; // Giriş maliyeti
-        const update = {
-            $inc: { 
-                bpl: isWin ? (prize - cost) : -cost,
-                "stats.wins": isWin ? 1 : 0,
-                "stats.losses": isWin ? 0 : 1
-            }
-        };
+        const user = await User.findById(uid);
+        const cost = 25 * mult;
+        const staminaDrain = 10 * mult; 
+
+        let newBpl = Math.max(0, user.bpl - cost + (isWin ? prize : 0));
+        
+        const animalIndex = user.inventory.findIndex(a => a.name === user.selectedAnimal);
+        if (animalIndex !== -1) {
+            const updateField = `inventory.${animalIndex}.stamina`;
+            const currentStam = user.inventory[animalIndex].stamina || 0;
+            
+            await User.findByIdAndUpdate(uid, {
+                $set: { 
+                    bpl: newBpl,
+                    [updateField]: Math.max(0, currentStam - staminaDrain)
+                },
+                $inc: { "stats.wins": isWin ? 1 : 0, "stats.losses": isWin ? 0 : 1 }
+            });
+        }
+    } catch (e) {
+        console.error("Database Update Error:", e);
+    }
+}
         await User.findByIdAndUpdate(uid, update);
     } catch (e) { console.log("DB Update Error:", e); }
 }
@@ -560,6 +535,10 @@ async function updateBattleResults(uid, isWin, prize, mult) {
 
         // Arena Davet Mekanizması
         socket.on('send-challenge', (data) => {
+if (!myAnimal || myAnimal.stamina < 40) {
+        return socket.emit('error', { msg: "Karakterin çok yorgun veya bulunamadı! Dinlenmesi gerekiyor." });
+    }
+            
             const targetSocketId = onlineUsers.get(data.targetNick);
             if (targetSocketId) {
                 io.to(targetSocketId).emit('receive-arena-invitation', {
@@ -572,6 +551,7 @@ async function updateBattleResults(uid, isWin, prize, mult) {
 
         // Arena Dövüş Mantığı (Gelişmiş)
         socket.on('join-fight', (data) => {
+     
             socket.join(data.roomId);
             console.log(`⚔️ [ARENA] ${user.nickname} odaya katıldı: ${data.roomId}`);
         });
@@ -621,6 +601,7 @@ server.listen(PORT, () => {
     ===========================================
     `);
 });
+
 
 
 
