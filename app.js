@@ -52,9 +52,19 @@ const sessionMiddleware = session({
     }
 });
 
-app.use(sessionMiddleware);
-io.use((socket, next) => {
-    sessionMiddleware(socket.request, {}, next);
+app.use(async (req, res, next) => {
+    res.locals.user = null;
+    if (req.session.userId) {
+        try {
+            const user = await User.findById(req.session.userId);
+            if (user) {
+                res.locals.user = user;
+            }
+        } catch (e) { 
+            console.error("User Context Error:", e); 
+        }
+    }
+    next();
 });
 
 // --- 3. GÜVENLİK VE YETKİLENDİRME ---
@@ -123,6 +133,18 @@ app.post('/auth/login', async (req, res) => {
 
         const isMatch = await bcrypt.compare(password, user.password);
         if (!isMatch) return res.status(400).send("Hatalı şifre.");
+
+        // --- VERİ ONARIM BLOĞU (Kalıcı Çözüm) ---
+        user.inventory.forEach(animal => {
+            if (animal.stats && !animal.hp) {
+                animal.hp = animal.stats.hp || 100;
+                animal.maxHp = animal.stats.hp || 100;
+                animal.atk = animal.stats.atk || 20;
+                animal.def = animal.stats.def || 10;
+            }
+        });
+        await user.save();
+        // ---------------------------------------
 
         req.session.userId = user._id;
         res.redirect('/profil');
@@ -344,6 +366,7 @@ server.listen(PORT, () => {
     ===========================================
     `);
 });
+
 
 
 
