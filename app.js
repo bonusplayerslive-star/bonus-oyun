@@ -299,46 +299,107 @@ app.post('/admin/add-bpl', adminRequired, async (req, res) => {
 
 // --- 8. REAL-TIME ENGINE (SOCKET.IO) ---
 
-// --- ARENA EŞLEŞME HAVUZU ---
-const pvpQueue = []; // { socketId, userId, nick, animal, multiplier }
+// --- BOT TANIMLAMALARI ---
+const ARENA_BOTS = [
+    { nick: "Black", animal: "Tiger", winRate: 0.50, stats: { atk: 60, def: 50, hp: 120 } },
+    { nick: "Deccal", animal: "Rhino", winRate: 0.60, stats: { atk: 70, def: 80, hp: 150 } },
+    { nick: "Kara Melek", animal: "Lion", winRate: 0.40, stats: { atk: 55, def: 45, hp: 110 } },
+    { nick: "Rass", animal: "Tiger", winRate: 0.55, stats: { atk: 65, def: 55, hp: 130 } }
+];
+
+const pvpQueue = [];
 
 io.on('connection', (socket) => {
-    // Session kontrolü
-    const userId = socket.request.session ? socket.request.session.userId : null;
+    const userId = socket.request.session?.userId;
     if (!userId) return;
 
-    // 1. RASTGELE EŞLEŞME (FIND MATCH)
+    // Savaş Hesaplama Fonksiyonu (Gerçek Güç Savaşı)
+    const calculateWinner = (p1, p2) => {
+        // Güç Skoru = (Atk * 2) + Def + (Hp / 2)
+        const p1Power = (p1.atk * 2) + p1.def + (p1.hp / 2);
+        const p2Power = (p2.atk * 2) + p2.def + (p2.hp / 2);
+        
+        // %70 Güç, %30 Şans faktörü
+        const totalPower = p1Power + p2Power;
+        const chance = Math.random() * totalPower;
+        return chance < p1Power;
+    };
+
+    // 1. RASTGELE EŞLEŞME VEYA BOT SAVAŞI
     socket.on('find-match', async (data) => {
-        // Havuzda bekleyen biri var mı? (Kendisi hariç)
+        const user = await User.findById(userId);
+        const myAnimal = user.inventory.find(a => a.name === data.myAnimal);
+        
+        if(!myAnimal) return socket.emit('error', { msg: "Karakter seçilemedi." });
+
+        // Havuzda Rakip Ara
         const opponentIndex = pvpQueue.findIndex(p => p.userId !== userId);
 
         if (opponentIndex > -1) {
-            // RAKİP BULUNDU!
+            // PVP BAŞLASIN
             const opponent = pvpQueue.splice(opponentIndex, 1)[0];
-            const roomId = `pvp_${socket.id}_${opponent.socketId}`;
-
-            // İki oyuncuyu da odaya al
-            socket.join(roomId);
-            const oppSocket = io.sockets.sockets.get(opponent.socketId);
-            if(oppSocket) oppSocket.join(roomId);
-
-            // Kazananı belirle (Basitçe Atk/Def veya Rastgele - Şimdilik rastgele)
-            const winnerIsMe = Math.random() > 0.5;
+            const isWin = calculateWinner(myAnimal, opponent.animalStats);
             const prize = 150 * data.multiplier;
 
-            // Her iki tarafa da sonucu gönder
-            socket.emit('pvp-found', { 
-                isWin: winnerIsMe, 
-                prize, 
-                players: [{nick: data.myNick, animal: data.myAnimal}, {nick: opponent.nick, animal: opponent.animal}] 
-            });
-            
-            io.to(opponent.socketId).emit('pvp-found', { 
-                isWin: !winnerIsMe, 
-                prize, 
-                players: [{nick: opponent.nick, animal: opponent.animal}, {nick: data.myNick, animal: data.myAnimal}] 
-            });
+            const battleData = {
+                prize,
+                players: [
+                    { nick: user.nickname, animal: myAnimal.name, img: `/caracter/profile/${myAnimal.name}.jpg` },
+                    { nick: opponent.nick, animal: opponent.animalName, img: `/caracter/profile/${opponent.animalName}.jpg` }
+                ]
+            };
 
+            socket.emit('pvp-found', { ...battleData, isWin });
+            io.to(opponent.socketId).emit('pvp-found', { ...battleData, isWin: !isWin });
+
+            await updateArenaResults(userId, isWin, prize, data.multiplier);
+            await updateArenaResults(opponent.userId, !isWin, prize, opponent.multiplier);
+
+        } else {
+            pvpQueue.push({
+                socketId: socket.id, userId, nick: user.nickname, 
+                animalName: myAnimal.name, animalStats: myAnimal, multiplier: data.multiplier
+            });
+        }
+    });
+
+    // 2. BOT SAVAŞI (Timer bittiğinde)
+    socket.on('start-bot-battle', async (data) => {
+        const user = await User.findById(userId);
+        const myAnimal = user.inventory.find(a => a.name === user.selectedAnimal);
+        
+        // Rastgele Bot Seç
+        const bot = ARENA_BOTS[Math.floor(Math.random() * ARENA_BOTS.length)];
+        
+        // Botun winRate'ine göre kazanma şansı
+        const isWin = Math.random() > bot.winRate;
+        const prize = isWin ? (120 * data.multiplier) : 0;
+
+        socket.emit('battle-result', {
+            isWin,
+            prize,
+            opponentName: bot.nick,
+            opponentAnimal: bot.animal,
+            players: [
+                { nick: user.nickname, animal: myAnimal.name, img: `/caracter/profile/${myAnimal.name}.jpg` },
+                { nick: bot.nick, animal: bot.animal, img: `/caracter/profile/${bot.animal}.jpg` }
+            ]
+        });
+
+        await updateArenaResults(userId, isWin, prize, data.multiplier);
+    });
+});
+
+async function updateArenaResults(uid, isWin, prize, mult) {
+    const cost = 25 * mult;
+    await User.findByIdAndUpdate(uid, {
+        $inc: { 
+            bpl: isWin ? (prize - cost) : -cost,
+            "stats.wins": isWin ? 1 : 0,
+            "stats.losses": isWin ? 0 : 1
+        }
+    });
+}
             // Veritabanı güncellemesi (BPL ekle/çıkar)
             await updateBattleResults(userId, winnerIsMe, prize, data.multiplier);
             await updateBattleResults(opponent.userId, !winnerIsMe, prize, opponent.multiplier);
@@ -492,6 +553,7 @@ server.listen(PORT, () => {
     ===========================================
     `);
 });
+
 
 
 
