@@ -30,7 +30,6 @@ const SESSION_SECRET = process.env.SESSION_SECRET || 'bpl_ultimate_megasecret_20
 mongoose.connect(MONGO_URI)
     .then(() => console.log('✅ [DATABASE] MongoDB bağlantısı başarıyla kuruldu.'))
     .catch(err => console.error('❌ [DATABASE] MongoDB hatası:', err));
-
 // --- 2. MIDDLEWARE YAPILANDIRMASI ---
 app.set('view engine', 'ejs');
 app.set('views', path.join(__dirname, 'views'));
@@ -38,24 +37,34 @@ app.use(express.static(path.join(__dirname, 'public')));
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
 
+// --- SESSION AYARLARI (DÜZELTİLDİ) ---
 const sessionMiddleware = session({
     secret: SESSION_SECRET,
     resave: false,
     saveUninitialized: false,
     store: MongoStore.create({ 
         mongoUrl: MONGO_URI,
-        ttl: 2400 * 60 * 60 // Oturum 1 gün sürer
+        ttl: 24 * 60 * 60 // 1 gün
     }),
-   // --- TEK VE GÜÇLÜ USER MIDDLEWARE ---
+    cookie: { 
+        secure: false, // Render/Heroku'da SSL yoksa false kalmalı
+        maxAge: 1000 * 60 * 60 * 24 
+    }
+}); // <--- BURADAKİ PARANTEZ VE NOKTALI VİRGÜL EKSİKTİ
+
+// Session middleware'ini uygulamaya tanıtıyoruz
+app.use(sessionMiddleware);
+
+// --- TEK VE GÜÇLÜ USER MIDDLEWARE ---
 app.use(async (req, res, next) => {
     res.locals.user = null; 
-    if (req.session.userId) {
+    if (req.session && req.session.userId) {
         try {
             const user = await User.findById(req.session.userId);
             if (user) {
                 res.locals.user = user;
             } else {
-                req.session.userId = null; // Kullanıcı DB'den silindiyse oturumu da kapatır
+                req.session.userId = null; 
             }
         } catch (e) {
             console.error("User Middleware Hatası:", e);
@@ -63,14 +72,23 @@ app.use(async (req, res, next) => {
     }
     next();
 });
-const adminRequired = async (req, res, next) => {
-    if (!req.session.userId) return res.status(401).send('Yetkisiz erişim.');
-    const user = await User.findById(req.session.userId);
-    if (user && user.role === 'admin') return next();
-    res.status(403).render('error', { message: 'Bu alan için Admin yetkisi gerekiyor.' });
+
+// --- YETKİ KONTROLLERİ ---
+const authRequired = (req, res, next) => {
+    if (req.session && req.session.userId) return next();
+    res.redirect('/');
 };
 
-
+const adminRequired = async (req, res, next) => {
+    if (!req.session || !req.session.userId) return res.status(401).send('Yetkisiz erişim.');
+    try {
+        const user = await User.findById(req.session.userId);
+        if (user && user.role === 'admin') return next();
+        res.status(403).render('error', { message: 'Bu alan için Admin yetkisi gerekiyor.' });
+    } catch (e) {
+        res.status(500).send("Admin yetki kontrolü sırasında hata oluştu.");
+    }
+};
 // --- 4. ANA SAYFA VE AUTH ROTALARI ---
 
 app.get('/', (req, res) => {
@@ -601,6 +619,7 @@ server.listen(PORT, () => {
     ===========================================
     `);
 });
+
 
 
 
