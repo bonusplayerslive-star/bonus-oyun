@@ -159,6 +159,13 @@ app.get('/wallet', authRequired, async (req, res) => {
     res.render('wallet', { user: res.locals.user });
 });
 
+// --- 5. OYUN İÇİ SAYFALAR (GET) ---
+
+// Geliştirme sayfası rotası
+app.get('/development', authRequired, async (req, res) => {
+    res.render('development', { user: res.locals.user });
+});
+
 // --- 6. MARKET VE EKONOMİ API'LERİ ---
 
 app.post('/api/buy-item', authRequired, async (req, res) => {
@@ -166,7 +173,12 @@ app.post('/api/buy-item', authRequired, async (req, res) => {
     try {
         const user = await User.findById(req.session.userId);
         
-        // LIMIT KONTROLÜ BURADAN KALDIRILDI (Artık markette kota yok)
+        // 1. KONTROL: En fazla 3 karakter sınırı
+        if (user.inventory && user.inventory.length >= 3) {
+            return res.status(400).json({ success: false, error: 'Maksimum karakter sınırına (3) ulaştınız!' });
+        }
+
+        // 2. KONTROL: Bakiye kontrolü (Market için stratejik limit yok demiştin)
         if (user.bpl < price) {
             return res.status(400).json({ success: false, error: 'Yetersiz bakiye!' });
         }
@@ -178,10 +190,14 @@ app.post('/api/buy-item', authRequired, async (req, res) => {
         user.inventory.push({
             name: itemName,
             img: `/caracter/profile/${itemName}.jpg`,
-            stamina: 100,
+            stamina: 100, // Savaş için gereken enerji
             level: 1,
-            stats: { hp: 100, atk: 75, def: 50 },
-            experience: 0
+            hp: 100,      // Mevcut Can
+            maxHp: 100,   // Kalıcı Geliştirilebilir Maks Can
+            atk: 50,      // Kalıcı Saldırı
+            def: 30,      // Kalıcı Savunma
+            experience: 0,
+            lastBattle: null // 2 saatlik kontrol için tarih tutabiliriz
         });
 
         await user.save();
@@ -190,34 +206,44 @@ app.post('/api/buy-item', authRequired, async (req, res) => {
         res.status(500).json({ success: false, error: 'İşlem sırasında bir hata oluştu.' });
     }
 });
-        await user.save();
-        res.json({ success: true, newBpl: user.bpl });
-    } catch (err) {
-        res.status(500).json({ success: false, error: 'İşlem sırasında bir hata oluştu.' });
-    }
-});
 
+// GELİŞTİRME API: Stat yükseltme ve Kalıcı Kayıt
 app.post('/api/upgrade-stat', authRequired, async (req, res) => {
-    const { animalName, statType } = req.body; // hp, atk, def
-    const UPGRADE_COST = 750;
+    const { animalName, statType } = req.body;
+    // Senin EJS'ndeki fiyatlandırma: DEF=10, Diğerleri=15
+    const cost = (statType === 'def') ? 10 : 15;
 
     try {
         const user = await User.findById(req.session.userId);
-        if (user.bpl < UPGRADE_COST) return res.status(400).json({ success: false, error: 'Yetersiz bakiye.' });
+        
+        if (user.bpl < cost) return res.status(400).json({ success: false, error: 'Yetersiz BPL.' });
 
         const animalIndex = user.inventory.findIndex(a => a.name === animalName);
         if (animalIndex === -1) return res.status(404).json({ success: false, error: 'Karakter bulunamadı.' });
 
-        user.bpl -= UPGRADE_COST;
-        user.inventory[animalIndex].stats[statType] += 10;
+        // Stat artış oranları
+        let increase = (statType === 'hp') ? 10 : 5;
+
+        user.bpl -= cost;
         
+        // Kalıcı geliştirme (Mongo'ya kayıt)
+        if (statType === 'hp') {
+            user.inventory[animalIndex].maxHp += increase;
+            user.inventory[animalIndex].hp += increase; // Canı da doldur
+        } else {
+            user.inventory[animalIndex][statType] += increase;
+        }
+        
+        // Seviye atlama mantığı (Her 5 geliştirmede 1 seviye gibi basit bir kural)
+        const totalStats = user.inventory[animalIndex].maxHp + user.inventory[animalIndex].atk + user.inventory[animalIndex].def;
+        user.inventory[animalIndex].level = Math.floor(totalStats / 50);
+
         await user.save();
-        res.json({ success: true, newBpl: user.bpl });
+        res.json({ success: true, newBalance: user.bpl });
     } catch (err) {
-        res.status(500).json({ success: false });
+        res.status(500).json({ success: false, error: 'Sunucu hatası.' });
     }
 });
-
 // --- 7. ADMIN PANELİ VE GÜVENLİK ---
 
 app.get('/admin', adminRequired, async (req, res) => {
@@ -318,5 +344,6 @@ server.listen(PORT, () => {
     ===========================================
     `);
 });
+
 
 
