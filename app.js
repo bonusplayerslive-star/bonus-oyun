@@ -299,19 +299,127 @@ app.post('/admin/add-bpl', adminRequired, async (req, res) => {
 
 // --- 8. REAL-TIME ENGINE (SOCKET.IO) ---
 
-const onlineUsers = new Map(); // Nickname -> SocketID
+// --- ARENA EŞLEŞME HAVUZU ---
+const pvpQueue = []; // { socketId, userId, nick, animal, multiplier }
 
 io.on('connection', (socket) => {
-    const session = socket.request.session;
-    if (!session.userId) return;
+    // Session kontrolü
+    const userId = socket.request.session ? socket.request.session.userId : null;
+    if (!userId) return;
 
-    User.findById(session.userId).then(user => {
-        if (!user) return;
+    // 1. RASTGELE EŞLEŞME (FIND MATCH)
+    socket.on('find-match', async (data) => {
+        // Havuzda bekleyen biri var mı? (Kendisi hariç)
+        const opponentIndex = pvpQueue.findIndex(p => p.userId !== userId);
+
+        if (opponentIndex > -1) {
+            // RAKİP BULUNDU!
+            const opponent = pvpQueue.splice(opponentIndex, 1)[0];
+            const roomId = `pvp_${socket.id}_${opponent.socketId}`;
+
+            // İki oyuncuyu da odaya al
+            socket.join(roomId);
+            const oppSocket = io.sockets.sockets.get(opponent.socketId);
+            if(oppSocket) oppSocket.join(roomId);
+
+            // Kazananı belirle (Basitçe Atk/Def veya Rastgele - Şimdilik rastgele)
+            const winnerIsMe = Math.random() > 0.5;
+            const prize = 150 * data.multiplier;
+
+            // Her iki tarafa da sonucu gönder
+            socket.emit('pvp-found', { 
+                isWin: winnerIsMe, 
+                prize, 
+                players: [{nick: data.myNick, animal: data.myAnimal}, {nick: opponent.nick, animal: opponent.animal}] 
+            });
+            
+            io.to(opponent.socketId).emit('pvp-found', { 
+                isWin: !winnerIsMe, 
+                prize, 
+                players: [{nick: opponent.nick, animal: opponent.animal}, {nick: data.myNick, animal: data.myAnimal}] 
+            });
+
+            // Veritabanı güncellemesi (BPL ekle/çıkar)
+            await updateBattleResults(userId, winnerIsMe, prize, data.multiplier);
+            await updateBattleResults(opponent.userId, !winnerIsMe, prize, opponent.multiplier);
+
+        } else {
+            // Havuzda kimse yok, sıraya ekle
+            pvpQueue.push({
+                socketId: socket.id,
+                userId: userId,
+                nick: data.myNick,
+                animal: data.myAnimal,
+                multiplier: data.multiplier
+            });
+        }
+    });
+
+    // 2. DAVETLİ ODA (INVITE SYSTEM - meeting.ejs'den gelen)
+    socket.on('join-invite-room', async (data) => {
+        socket.join(data.room);
+        const roomSize = io.sockets.adapter.rooms.get(data.room)?.size || 0;
+
+        if (roomSize === 2) {
+            // Oda doldu, savaşı başlat
+            const winnerIsMe = Math.random() > 0.5;
+            const prize = 200 * data.multiplier;
+
+            // Odadaki herkese (ikisine de) "pvp-found" yayınla
+            // Not: Invite sisteminde oyuncu bilgilerini socket üzerinden yönetmek için 
+            // oda içindeki socketlerin datalarına erişmek gerekir. 
+            // Basitleştirmek için:
+            io.to(data.room).emit('pvp-found', {
+                isWin: winnerIsMe, // Bu basitleştirilmiş bir örnektir, geliştirilebilir.
+                prize: prize,
+                players: [{nick: data.nick, animal: data.animal}, {nick: "Rakip", animal: "Tiger"}]
+            });
+        }
+    });
+
+    // 3. BOT SAVAŞI (Zaman aşımı sonrası)
+    socket.on('start-bot-battle', async (data) => {
+        // Kuyruktan çıkar (eğer oradaysa)
+        const idx = pvpQueue.findIndex(p => p.userId === userId);
+        if(idx > -1) pvpQueue.splice(idx, 1);
+
+        const isWin = Math.random() > 0.4; // %60 kazanma şansı
+        const prize = isWin ? (100 * data.multiplier) : 0;
         
-        onlineUsers.set(user.nickname, socket.id);
-        socket.join("general-chat");
-        console.log(`📡 [SOCKET] ${user.nickname} bağlandı.`);
+        const bots = ["Wolf", "Bear", "Tiger", "Lion"];
+        const randomBot = bots[Math.floor(Math.random() * bots.length)];
 
+        socket.emit('battle-result', {
+            isWin,
+            prize,
+            opponentName: "BPL_BOT_" + Math.floor(Math.random() * 999),
+            opponentAnimal: randomBot
+        });
+
+        await updateBattleResults(userId, isWin, prize, data.multiplier);
+    });
+
+    socket.on('disconnect', () => {
+        const idx = pvpQueue.findIndex(p => p.socketId === socket.id);
+        if(idx > -1) pvpQueue.splice(idx, 1);
+    });
+});
+
+// Yardımcı Fonksiyon: BPL ve İstatistik Güncelleme
+async function updateBattleResults(uid, isWin, prize, mult) {
+    try {
+        const User = require('./models/User');
+        const cost = 25 * mult; // Giriş maliyeti
+        const update = {
+            $inc: { 
+                bpl: isWin ? (prize - cost) : -cost,
+                "stats.wins": isWin ? 1 : 0,
+                "stats.losses": isWin ? 0 : 1
+            }
+        };
+        await User.findByIdAndUpdate(uid, update);
+    } catch (e) { console.log("DB Update Error:", e); }
+}
         // Chat Sistemi
         socket.on('chat-message', (data) => {
             io.to("general-chat").emit('new-message', {
@@ -384,6 +492,7 @@ server.listen(PORT, () => {
     ===========================================
     `);
 });
+
 
 
 
