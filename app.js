@@ -309,31 +309,71 @@ const ARENA_BOTS = [
 
 const pvpQueue = [];
 
+// ... socket bağlantı başlangıcı ...
 io.on('connection', (socket) => {
     const userId = socket.request.session?.userId;
     if (!userId) return;
 
-    // Savaş Hesaplama Fonksiyonu (Gerçek Güç Savaşı)
-    const calculateWinner = (p1, p2) => {
-        // Güç Skoru = (Atk * 2) + Def + (Hp / 2)
-        const p1Power = (p1.atk * 2) + p1.def + (p1.hp / 2);
-        const p2Power = (p2.atk * 2) + p2.def + (p2.hp / 2);
-        
-        // %70 Güç, %30 Şans faktörü
-        const totalPower = p1Power + p2Power;
-        const chance = Math.random() * totalPower;
-        return chance < p1Power;
-    };
-
-    // 1. RASTGELE EŞLEŞME VEYA BOT SAVAŞI
+    // --- BURAYA EKLE: 1. RASTGELE EŞLEŞME (FIND-MATCH) ---
     socket.on('find-match', async (data) => {
-        const user = await User.findById(userId);
-        const myAnimal = user.inventory.find(a => a.name === data.myAnimal);
-        
-        if(!myAnimal) return socket.emit('error', { msg: "Karakter seçilemedi." });
+        try {
+            const user = await User.findById(userId);
+            
+            // 1. ADIM: STAMINA KONTROLÜ (İSTEDİĞİN KOD)
+            const selectedAnimal = user.inventory.find(a => a.name === data.myAnimal);
+            
+            if (!selectedAnimal) {
+                return socket.emit('error', { msg: "Seçili karakter envanterde bulunamadı!" });
+            }
 
-        // Havuzda Rakip Ara
-        const opponentIndex = pvpQueue.findIndex(p => p.userId !== userId);
+            if (selectedAnimal.stamina < 10) {
+                return socket.emit('error', { msg: "Karakterin çok yorgun! Dinlenmesi gerekiyor." });
+            }
+
+            // 2. ADIM: EŞLEŞME HAVUZU MANTIĞI
+            const opponentIndex = pvpQueue.findIndex(p => p.userId !== userId);
+
+            if (opponentIndex > -1) {
+                // RAKİP BULUNDU - Savaş Başlasın...
+                const opponent = pvpQueue.splice(opponentIndex, 1)[0];
+                
+                // Güç hesaplama (calculateWinner fonksiyonun zaten aşağıda mevcut)
+                const isWin = calculateWinner(selectedAnimal, opponent.animalStats);
+                const prize = 150 * data.multiplier;
+
+                const battleData = {
+                    prize,
+                    players: [
+                        { nick: user.nickname, animal: selectedAnimal.name, img: `/caracter/profile/${selectedAnimal.name}.jpg` },
+                        { nick: opponent.nick, animal: opponent.animalName, img: `/caracter/profile/${opponent.animalName}.jpg` }
+                    ]
+                };
+
+                socket.emit('pvp-found', { ...battleData, isWin });
+                io.to(opponent.socketId).emit('pvp-found', { ...battleData, isWin: !isWin });
+
+                // Veritabanını güncelle (updateArenaResults fonksiyonun aşağıda mevcut)
+                await updateArenaResults(userId, isWin, prize, data.multiplier);
+                await updateArenaResults(opponent.userId, !isWin, prize, opponent.multiplier);
+
+            } else {
+                // Havuzda kimse yoksa sıraya ekle
+                pvpQueue.push({
+                    socketId: socket.id,
+                    userId,
+                    nick: user.nickname,
+                    animalName: selectedAnimal.name,
+                    animalStats: selectedAnimal,
+                    multiplier: data.multiplier
+                });
+            }
+        } catch (err) {
+            console.error("Matchmaking Hatası:", err);
+        }
+    });
+
+    // ... Diğer socket işlemleri (start-bot-battle vb.) ...
+});
 
         if (opponentIndex > -1) {
             // PVP BAŞLASIN
@@ -391,14 +431,42 @@ io.on('connection', (socket) => {
 });
 
 async function updateArenaResults(uid, isWin, prize, mult) {
-    const cost = 25 * mult;
-    await User.findByIdAndUpdate(uid, {
-        $inc: { 
-            bpl: isWin ? (prize - cost) : -cost,
-            "stats.wins": isWin ? 1 : 0,
-            "stats.losses": isWin ? 0 : 1
+    try {
+        const user = await User.findById(uid);
+        const cost = 25 * mult;
+        const staminaDrain = 10 * mult; // Her çarpan başına 10 stamina gider
+
+        // 1. BPL Kontrolü (0'ın altına düşürme)
+        let newBpl = user.bpl - cost;
+        if (isWin) newBpl += prize;
+        if (newBpl < 0) newBpl = 0;
+
+        // 2. Seçili Hayvanın Staminasını Düşür
+        // Kullanıcının o an seçili olan hayvanını buluyoruz
+        const animalIndex = user.inventory.findIndex(a => a.name === user.selectedAnimal);
+        
+        if (animalIndex !== -1) {
+            let currentStamina = user.inventory[animalIndex].stamina || 100;
+            currentStamina -= staminaDrain;
+            if (currentStamina < 0) currentStamina = 0;
+            
+            // Veritabanına yazma
+            const updateField = `inventory.${animalIndex}.stamina`;
+            
+            await User.findByIdAndUpdate(uid, {
+                $set: { 
+                    bpl: newBpl,
+                    [updateField]: currentStamina
+                },
+                $inc: { 
+                    "stats.wins": isWin ? 1 : 0,
+                    "stats.losses": isWin ? 0 : 1
+                }
+            });
         }
-    });
+    } catch (e) {
+        console.error("Arena Update Hatası:", e);
+    }
 }
             // Veritabanı güncellemesi (BPL ekle/çıkar)
             await updateBattleResults(userId, winnerIsMe, prize, data.multiplier);
@@ -553,6 +621,7 @@ server.listen(PORT, () => {
     ===========================================
     `);
 });
+
 
 
 
