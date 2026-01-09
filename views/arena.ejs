@@ -199,17 +199,25 @@ async function handleBattle(data) {
 function playVideoAsync(animal, file, text) {
     return new Promise((resolve) => {
         statusMsg.innerText = text;
-        // Dosya yolu: /caracter/move/tiger/tiger1.mp4
-        videoElement.src = `/caracter/move/${animal.toLowerCase()}/${file.toLowerCase()}.mp4`;
+        
+        // İlk harfi büyük yapma mantığı: tiger -> Tiger
+        const formattedAnimal = animal.charAt(0).toUpperCase() + animal.slice(1).toLowerCase();
+        
+        // file zaten Tiger1 veya Tiger olarak geliyor, onu olduğu gibi bırakıyoruz
+        videoElement.src = `/caracter/move/${formattedAnimal}/${file}.mp4`;
+        
         videoElement.onended = resolve;
         videoElement.play().catch(e => {
-            console.warn("Video oynatılamadı, geçiliyor...");
-            setTimeout(resolve, 2000); // Video yoksa 2 sn bekle devam et
+            console.error("Video hatası:", e);
+            setTimeout(resolve, 2000); 
         });
+    });
+}
     });
 }
 </script>
 </body>
 </html>
+
 
 
