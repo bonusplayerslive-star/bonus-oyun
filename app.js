@@ -291,10 +291,86 @@ io.on('connection', (socket) => {
     const userId = socket.request.session?.userId;
     if (!userId) return;
 
-    // --- BURAYA EKLE: 1. RASTGELE EŞLEŞME (FIND-MATCH) ---
+  io.on('connection', (socket) => {
+    const userId = socket.request.session?.userId;
+    if (!userId) return;
+
+    // 1. RASTGELE EŞLEŞME (PVP)
     socket.on('find-match', async (data) => {
         try {
             const user = await User.findById(userId);
+            // Karakter seçimi ve stamina kontrolü
+            const myAnimal = user.inventory.find(a => a.name === data.myAnimal);
+            
+            if (!myAnimal) return socket.emit('error', { msg: "Karakter bulunamadı!" });
+            if (myAnimal.stamina < 10) return socket.emit('error', { msg: "Karakterin çok yorgun! Dinlenmesi gerekiyor." });
+
+            const opponentIndex = pvpQueue.findIndex(p => p.userId !== userId);
+
+            if (opponentIndex > -1) {
+                const opponent = pvpQueue.splice(opponentIndex, 1)[0];
+                const isWin = calculateWinner(myAnimal, opponent.animalStats);
+                const prize = 150 * data.multiplier;
+
+                const battleData = {
+                    prize,
+                    players: [
+                        { nick: user.nickname, animal: myAnimal.name, img: `/caracter/profile/${myAnimal.name}.jpg` },
+                        { nick: opponent.nick, animal: opponent.animalName, img: `/caracter/profile/${opponent.animalName}.jpg` }
+                    ]
+                };
+
+                socket.emit('pvp-found', { ...battleData, isWin });
+                io.to(opponent.socketId).emit('pvp-found', { ...battleData, isWin: !isWin });
+
+                // await artık async fonksiyon içinde olduğu için hata vermez
+                await updateArenaResults(userId, isWin, prize, data.multiplier);
+                await updateArenaResults(opponent.userId, !isWin, prize, opponent.multiplier);
+            } else {
+                pvpQueue.push({
+                    socketId: socket.id,
+                    userId,
+                    nick: user.nickname,
+                    animalName: myAnimal.name,
+                    animalStats: myAnimal,
+                    multiplier: data.multiplier
+                });
+            }
+        } catch (err) {
+            console.error("PVP Hatası:", err);
+        }
+    });
+
+    // 2. BOT SAVAŞI
+    socket.on('start-bot-battle', async (data) => {
+        try {
+            const user = await User.findById(userId);
+            const myAnimal = user.inventory.find(a => a.name === user.selectedAnimal);
+            
+            if (!myAnimal || myAnimal.stamina < 10) {
+                return socket.emit('error', { msg: "Yetersiz stamina veya karakter seçilmemiş!" });
+            }
+
+            const bot = ARENA_BOTS[Math.floor(Math.random() * ARENA_BOTS.length)];
+            const isWin = Math.random() > bot.winRate;
+            const prize = isWin ? (120 * data.multiplier) : 0;
+
+            socket.emit('battle-result', {
+                isWin, prize,
+                opponentName: bot.nick,
+                opponentAnimal: bot.animal,
+                players: [
+                    { nick: user.nickname, animal: myAnimal.name, img: `/caracter/profile/${myAnimal.name}.jpg` },
+                    { nick: bot.nick, animal: bot.animal, img: `/caracter/profile/${bot.animal}.jpg` }
+                ]
+            });
+
+            await updateArenaResults(userId, isWin, prize, data.multiplier);
+        } catch (err) {
+            console.error("Bot Savaşı Hatası:", err);
+        }
+    });
+});
             
             // 1. ADIM: STAMINA KONTROLÜ (İSTEDİĞİN KOD)
             const selectedAnimal = user.inventory.find(a => a.name === data.myAnimal);
@@ -619,6 +695,7 @@ server.listen(PORT, () => {
     ===========================================
     `);
 });
+
 
 
 
