@@ -159,115 +159,57 @@
             </div>
         </div>
     </div>
-
 <script>
-    const arenaSocket = io();
-    const videoElement = document.getElementById('battle-video');
-    const statusMsg = document.getElementById('battle-status');
-    const resultBanner = document.getElementById('result-banner');
+// arena.ejs içindeki script kısmı
+async function handleBattle(data) {
+    isMatchFound = true;
+    clearInterval(timerInt);
     
-    const myId = "<%= user._id %>";
-    const myNick = "<%= user.nickname %>";
-    const myAnimal = "<%= user.selectedAnimal %>";
+    // Oyuncu Bilgileri
+    const me = data.players.find(p => p.nick === myNick);
+    const opponent = data.players.find(p => p.nick !== myNick);
 
-    const urlParams = new URLSearchParams(window.location.search);
-    const inviteRoom = urlParams.get('room');
+    document.getElementById('matching-ui').style.display = 'none';
+    document.getElementById('opp-name').innerText = opponent.nick;
+    document.getElementById('opp-img').src = opponent.img; // Dinamik resim yolu
+    
+    document.getElementById('video-overlay').style.display = 'flex';
 
-    let selectedMultiplier = 1;
-    let timerInt;
-    let isMatchFound = false;
+    // SIRA 1: Rakibin Saldırısı (Herkes rakibin hamlesini izler)
+    // Örn: Tiger1.mp4
+    await playVideoAsync(opponent.animal, `${opponent.animal}1`, `${opponent.nick.toUpperCase()} HAMLE YAPIYOR!`);
 
-    if(inviteRoom) {
-        document.getElementById('start-btn').innerText = "DÜELLOYA KATIL";
-        document.getElementById('start-btn').classList.replace('btn-danger', 'btn-warning');
-    }
+    // SIRA 2: Kazananın Zafer Videosu
+    // Örn: Tiger.mp4
+    const winner = data.isWin ? me : opponent;
+    
+    // UI Güncelleme
+    resultBanner.innerText = data.isWin ? "VICTORY" : "DEFEAT";
+    resultBanner.style.color = data.isWin ? "var(--neon-green)" : "var(--neon-red)";
+    resultBanner.classList.add('banner-active');
 
-    function setMultiplier(val, el) {
-        selectedMultiplier = val;
-        document.querySelectorAll('.bet-card').forEach(c => c.classList.remove('active'));
-        el.querySelector('.bet-card').classList.add('active');
-    }
+    await playVideoAsync(winner.animal, winner.animal, `${winner.nick.toUpperCase()} KAZANDI!`);
+    
+    // 3 Saniye bekle ve profile dön
+    setTimeout(() => {
+        window.location.href = "/profil";
+    }, 3000);
+}
 
-    function startSearch() {
-        if (!arenaSocket.connected) {
-            Swal.fire('Hata', 'Bağlantı yok!', 'error'); return;
-        }
-        document.getElementById('bet-selection').style.display = 'none';
-        document.getElementById('matching-ui').style.display = 'block';
-
-        if(inviteRoom) {
-            arenaSocket.emit('join-invite-room', { room: inviteRoom, nick: myNick, animal: myAnimal, multiplier: selectedMultiplier });
-        } else {
-            arenaSocket.emit('find-match', { myNick, myAnimal, multiplier: selectedMultiplier });
-            runTimer();
-        }
-    }
-
-    function runTimer() {
-        let count = 13;
-        timerInt = setInterval(() => {
-            if (isMatchFound) { clearInterval(timerInt); return; }
-            count--;
-            document.getElementById('timer').innerText = count;
-            if(count <= 0) {
-                clearInterval(timerInt);
-                arenaSocket.emit('start-bot-battle', { multiplier: selectedMultiplier, userId: myId });
-            }
-        }, 1000);
-    }
-
-    // --- SAVAŞ SONUCU VE VİDEO AKIŞI ---
-
-    arenaSocket.on('pvp-found', (data) => handleBattle(data));
-    arenaSocket.on('battle-result', (data) => handleBattle(data));
-
-    function handleBattle(data) {
-        isMatchFound = true;
-        clearInterval(timerInt);
-        const opponent = data.players ? data.players.find(p => p.nick !== myNick) : { nick: data.opponentName, animal: data.opponentAnimal };
-        
-        document.getElementById('matching-ui').style.display = 'none';
-        document.getElementById('opp-name').innerText = opponent.nick;
-        document.getElementById('opp-img').src = `/caracter/profile/${opponent.animal}.png`;
-        
-        runBattleSequence(myAnimal, opponent.animal, data.isWin, data.prize);
-    }
-
-    async function runBattleSequence(player, enemy, isWin, prize) {
-        document.getElementById('video-overlay').style.display = 'flex';
-        
-        // 1. VİDEO: RAKİBİN SALDIRISI (Her iki kullanıcı da bunu izler)
-        // Dosya: /caracter/move/rakiphayvan/rakiphayvan1.mp4
-        await playVideoAsync(enemy, `${enemy}1`, `RAKİP ${enemy.toUpperCase()} SALDIRIYOR!`);
-
-        // 2. VİDEO: KAZANANIN ZAFERİ (Her iki kullanıcı da kazananı izler)
-        // Dosya: /caracter/move/kazananhayvan/kazananhayvan.mp4
-        const winner = isWin ? player : enemy;
-        const winnerNick = isWin ? myNick : document.getElementById('opp-name').innerText;
-        
-        resultBanner.innerText = isWin ? "ZAFER" : "KAYIP";
-        resultBanner.style.color = isWin ? "var(--neon-green)" : "var(--neon-red)";
-        
-        await playVideoAsync(winner, winner, `${winnerNick.toUpperCase()} KAZANDI!`);
-        
-        resultBanner.classList.add('banner-active');
-        
-        setTimeout(() => { 
-            window.location.href = "/profil"; 
-        }, 4000);
-    }
-
-    function playVideoAsync(animal, file, text) {
-        return new Promise((resolve) => {
-            statusMsg.innerText = text;
-            videoElement.src = `/caracter/move/${animal.toLowerCase()}/${file.toLowerCase()}.mp4`;
-            videoElement.onended = resolve;
-            videoElement.onerror = () => { console.error("Video hatası"); resolve(); };
-            videoElement.load();
-            videoElement.play().catch(e => resolve());
+function playVideoAsync(animal, file, text) {
+    return new Promise((resolve) => {
+        statusMsg.innerText = text;
+        // Dosya yolu: /caracter/move/tiger/tiger1.mp4
+        videoElement.src = `/caracter/move/${animal.toLowerCase()}/${file.toLowerCase()}.mp4`;
+        videoElement.onended = resolve;
+        videoElement.play().catch(e => {
+            console.warn("Video oynatılamadı, geçiliyor...");
+            setTimeout(resolve, 2000); // Video yoksa 2 sn bekle devam et
         });
-    }
+    });
+}
 </script>
 </body>
 </html>
+
 
