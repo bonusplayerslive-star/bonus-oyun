@@ -52,6 +52,25 @@ const sessionMiddleware = session({
     }
 });
 
+// --- GÜVENLİ USER MIDDLEWARE (Kalıcı Çözüm) ---
+app.use(async (req, res, next) => {
+    res.locals.user = null; // Önce temizle
+    if (req.session.userId) {
+        try {
+            const user = await User.findById(req.session.userId);
+            if (user) {
+                res.locals.user = user;
+            } else {
+                req.session.userId = null; // DB'de yoksa oturumu sonlandır
+            }
+        } catch (e) {
+            console.error("User Middleware Hatası:", e);
+        }
+    }
+    next();
+});
+
+
 app.use(async (req, res, next) => {
     res.locals.user = null;
     if (req.session.userId) {
@@ -212,16 +231,15 @@ app.post('/api/buy-item', authRequired, async (req, res) => {
         user.inventory.push({
             name: itemName,
             img: `/caracter/profile/${itemName}.jpg`,
-            stamina: 100, // Savaş için gereken enerji
+            stamina: 100, 
             level: 1,
-            hp: 100,      // Mevcut Can
-            maxHp: 100,   // Kalıcı Geliştirilebilir Maks Can
-            atk: 50,      // Kalıcı Saldırı
-            def: 30,      // Kalıcı Savunma
+            hp: 100,      // Doğrudan erişim için dışarıda
+            maxHp: 100,   // Geliştirme sayfası için gerekli
+            atk: 50,      
+            def: 30,      
             experience: 0,
-            lastBattle: null // 2 saatlik kontrol için tarih tutabiliriz
+            lastBattle: null 
         });
-
         await user.save();
         res.json({ success: true, newBpl: user.bpl });
     } catch (err) {
@@ -366,6 +384,7 @@ server.listen(PORT, () => {
     ===========================================
     `);
 });
+
 
 
 
