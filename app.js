@@ -161,15 +161,14 @@ app.get('/wallet', authRequired, async (req, res) => {
 
 // --- 6. MARKET VE EKONOMİ API'LERİ ---
 
-const SAFETY_LIMIT = 5500;
-
 app.post('/api/buy-item', authRequired, async (req, res) => {
     const { itemName, price } = req.body;
     try {
         const user = await User.findById(req.session.userId);
         
-        if (user.bpl - price < SAFETY_LIMIT) {
-            return res.status(400).json({ success: false, error: 'Stratejik limit (5500 BPL) altına düşemezsiniz!' });
+        // LIMIT KONTROLÜ BURADAN KALDIRILDI (Artık markette kota yok)
+        if (user.bpl < price) {
+            return res.status(400).json({ success: false, error: 'Yetersiz bakiye!' });
         }
 
         const alreadyOwned = user.inventory.some(i => i.name === itemName);
@@ -185,6 +184,12 @@ app.post('/api/buy-item', authRequired, async (req, res) => {
             experience: 0
         });
 
+        await user.save();
+        res.json({ success: true, newBpl: user.bpl });
+    } catch (err) {
+        res.status(500).json({ success: false, error: 'İşlem sırasında bir hata oluştu.' });
+    }
+});
         await user.save();
         res.json({ success: true, newBpl: user.bpl });
     } catch (err) {
@@ -313,4 +318,5 @@ server.listen(PORT, () => {
     ===========================================
     `);
 });
+
 
