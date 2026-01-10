@@ -286,45 +286,168 @@ const ARENA_BOTS = [
 
 const pvpQueue = [];
 
-// ... socket bağlantı başlangıcı ...
-// --- TÜM SİSTEMLERİ BİRLEŞTİREN GÜVENLİ SOCKET BLOĞU ---
+// --- TÜM SİSTEMLER ENTEGRE (CHAT, ARENA, MEETING, BOT, BPL, STAMINA) ---
 io.on('connection', async (socket) => {
     const userId = socket.request.session?.userId;
     if (!userId) return;
 
+    // Kullanıcı verilerini anlık çek (En güncel haliyle)
     const user = await User.findById(userId);
     if (!user) return;
     
+    // Online listesine ekle ve Chat odasına sok
     onlineUsers.set(user.nickname, socket.id);
     socket.join("general-chat");
 
-    // A. CHAT & CHALLENGE (Meydan Okuma)
+    // --- 1. GLOBAL CHAT & CHALLENGE (Meydan Okuma) ---
+    socket.on('chat-message', (data) => {
+        if (!data.text || data.text.trim() === "") return;
+        io.to("general-chat").emit('new-message', {
+            sender: user.nickname,
+            text: data.text,
+            time: new Date().toLocaleTimeString()
+        });
+    });
+
+    // Chat veya Meeting üzerinden gelen Arena Daveti
     socket.on('send-challenge', async (data) => {
-        const myAnimal = user.inventory.find(a => a.name === user.selectedAnimal);
-        if (!myAnimal || myAnimal.stamina < 40) {
-            return socket.emit('error', { msg: "Enerjin yetersiz (Meydan okumak için en az 40 Stamina gerekir)!" });
-        }
-        const targetSocketId = onlineUsers.get(data.targetNick);
-        if (targetSocketId) {
-            io.to(targetSocketId).emit('receive-arena-invitation', {
-                senderNick: user.nickname,
-                roomId: `room_${user.nickname}_${data.targetNick}`,
-                bet: data.betAmount,
-                senderAnimal: myAnimal.name
-            });
-        }
+        try {
+            const currentUser = await User.findById(userId);
+            const myAnimal = currentUser.inventory.find(a => a.name === currentUser.selectedAnimal);
+
+            // Gelişmiş Stamina ve BPL Kontrolü
+            if (!myAnimal || myAnimal.stamina < 40) {
+                return socket.emit('error', { msg: "Seçili karakterin çok yorgun! (Min. 40 Stamina gerekir)" });
+            }
+            if (currentUser.bpl < data.betAmount) {
+                return socket.emit('error', { msg: "Bakiyen bu bahis için yetersiz!" });
+            }
+
+            const targetSocketId = onlineUsers.get(data.targetNick);
+            if (targetSocketId) {
+                io.to(targetSocketId).emit('receive-arena-invitation', {
+                    senderNick: currentUser.nickname,
+                    roomId: `room_${currentUser.nickname}_${data.targetNick}`,
+                    bet: data.betAmount,
+                    senderAnimal: myAnimal.name
+                });
+            }
+        } catch (err) { console.error("Davet Hatası:", err); }
     });
 
-    // B. PVP VE BOT SAVAŞLARI (BPL GÜNCELLEMELİ)
+    // --- 2. RASTGELE EŞLEŞME (ARENA PVP) ---
     socket.on('find-match', async (data) => {
-        // ... (Yukarıda paylaştığımız stamina ve BPL kontrollü find-match kodu)
-        // updateArenaResults(userId, isWin, prize, data.multiplier) burada çalışır
+        try {
+            const currentUser = await User.findById(userId);
+            const myAnimal = currentUser.inventory.find(a => a.name === data.myAnimal);
+            
+            // Stamina kontrolü (Seçili hayvanın staminası)
+            if (!myAnimal || myAnimal.stamina < 10) {
+                return socket.emit('error', { msg: "Karakterin çok yorgun! Dinlenmesi gerekiyor." });
+            }
+
+            const opponentIndex = pvpQueue.findIndex(p => p.userId !== userId);
+
+            if (opponentIndex > -1) {
+                const opponent = pvpQueue.splice(opponentIndex, 1)[0];
+                const isWin = calculateWinner(myAnimal, opponent.animalStats);
+                const prize = 150 * data.multiplier;
+
+                const battleData = {
+                    prize,
+                    players: [
+                        { nick: currentUser.nickname, animal: myAnimal.name, img: `/caracter/profile/${myAnimal.name}.jpg` },
+                        { nick: opponent.nick, animal: opponent.animalName, img: `/caracter/profile/${opponent.animalName}.jpg` }
+                    ]
+                };
+
+                socket.emit('pvp-found', { ...battleData, isWin });
+                io.to(opponent.socketId).emit('pvp-found', { ...battleData, isWin: !isWin });
+
+                // BPL ve Stamina Güncellemesi (Her iki taraf için)
+                await updateArenaResults(userId, isWin, prize, data.multiplier);
+                await updateArenaResults(opponent.userId, !isWin, prize, opponent.multiplier);
+            } else {
+                pvpQueue.push({
+                    socketId: socket.id, userId, nick: currentUser.nickname,
+                    animalName: myAnimal.name, animalStats: myAnimal, multiplier: data.multiplier
+                });
+            }
+        } catch (err) { console.error("PVP Hatası:", err); }
     });
 
+    // --- 3. BOT SAVAŞI (Zaman Aşımı Sonrası) ---
     socket.on('start-bot-battle', async (data) => {
-        // ... (Bot savaşı ve BPL ödül sistemi)
-        // updateArenaResults(userId, isWin, prize, data.multiplier) burada çalışır
+        try {
+            // Kuyruktan sil
+            const idx = pvpQueue.findIndex(p => p.userId === userId);
+            if(idx > -1) pvpQueue.splice(idx, 1);
+
+            const currentUser = await User.findById(userId);
+            const myAnimal = currentUser.inventory.find(a => a.name === currentUser.selectedAnimal);
+            
+            if (!myAnimal || myAnimal.stamina < 10) {
+                return socket.emit('error', { msg: "Yetersiz stamina!" });
+            }
+
+            const bot = ARENA_BOTS[Math.floor(Math.random() * ARENA_BOTS.length)];
+            const isWin = Math.random() > bot.winRate;
+            const prize = isWin ? (120 * data.multiplier) : 0;
+
+            socket.emit('battle-result', {
+                isWin, prize,
+                opponentName: bot.nick,
+                opponentAnimal: bot.animal,
+                players: [
+                    { nick: currentUser.nickname, animal: myAnimal.name, img: `/caracter/profile/${myAnimal.name}.jpg` },
+                    { nick: bot.nick, animal: bot.animal, img: `/caracter/profile/${bot.animal}.jpg` }
+                ]
+            });
+
+            // Bot savaşı sonrası BPL ve Stamina kaydı
+            await updateArenaResults(userId, isWin, prize, data.multiplier);
+        } catch (err) { console.error("Bot Hatası:", err); }
     });
+
+    socket.on('disconnect', () => {
+        onlineUsers.delete(user.nickname);
+        const idx = pvpQueue.findIndex(p => p.socketId === socket.id);
+        if(idx > -1) pvpQueue.splice(idx, 1);
+    });
+});
+
+// --- YARDIMCI FONKSİYON: BPL, STAMINA VE İSTATİSTİK GÜNCELLEME (Hatasız Versiyon) ---
+async function updateArenaResults(uid, isWin, prize, mult) {
+    try {
+        const user = await User.findById(uid);
+        if (!user) return;
+
+        const cost = 25 * mult;
+        const staminaDrain = 10 * mult; 
+
+        // 1. BPL Güncelleme (Minimum 0 Kontrollü)
+        let newBpl = user.bpl - cost + (isWin ? prize : 0);
+        if (newBpl < 0) newBpl = 0;
+
+        // 2. Seçili Hayvanı Bul ve Staminasını Düşür (Geliştirme kayıtlarını bozmaz)
+        const animalIndex = user.inventory.findIndex(a => a.name === user.selectedAnimal);
+        
+        const updateObj = { 
+            $set: { bpl: newBpl }, 
+            $inc: { "stats.wins": isWin ? 1 : 0, "stats.losses": isWin ? 0 : 1 } 
+        };
+
+        if (animalIndex !== -1) {
+            let currentStam = user.inventory[animalIndex].stamina || 100;
+            // Sadece stamina alanını günceller, power/health gibi geliştirilmiş değerlere dokunmaz
+            updateObj.$set[`inventory.${animalIndex}.stamina`] = Math.max(0, currentStam - staminaDrain);
+        }
+
+        await User.findByIdAndUpdate(uid, updateObj);
+    } catch (e) {
+        console.error("Database Güncelleme Hatası:", e);
+    }
+}
 
     socket.on('disconnect', () => { onlineUsers.delete(user.nickname); });
 });
@@ -356,6 +479,7 @@ server.listen(PORT, () => {
     ===========================================
     `);
 });
+
 
 
 
