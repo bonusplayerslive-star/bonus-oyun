@@ -48,7 +48,7 @@ const sessionMiddleware = session({
     }),
     cookie: { 
         secure: false, // Render/Heroku'da SSL yoksa false kalmalı
-        maxAge: 1000 * 60 * 60 * 24 
+        maxAge :24 * 60 * 60 * 1000
     }
 }); // <--- BURADAKİ PARANTEZ VE NOKTALI VİRGÜL EKSİKTİ
 
@@ -105,14 +105,18 @@ app.post('/auth/register', async (req, res) => {
         const salt = await bcrypt.genSalt(10);
         const hashedPassword = await bcrypt.hash(password, salt);
 
-        const newUser = new User({
-            nickname,
-            email,
-            password: hashedPassword,
-            bpl: 7500, // Hoşgeldin bonusu
-            inventory: [],
-            stats: { wins: 0, losses: 0 }
-        });
+      // app.js içindeki register kısmını bu şekilde zırhlandır:
+const newUser = new User({
+    nickname: nickname.trim(), // Boşlukları temizle
+    email: email.toLowerCase().trim(),
+    password: hashedPassword,
+    bpl: 2500, 
+    inventory: [],
+    selectedAnimal: "none", // null yerine "none" stringi sorgularda daha güvenlidir
+    stats: { wins: 0, losses: 0 },
+    lastLogin: new Date(), // Kullanıcının ne zaman geldiğini takip et
+    ipAddress: req.ip // Güvenlik için IP kaydı
+});
 
         await newUser.save();
         res.redirect('/');
@@ -130,21 +134,30 @@ app.post('/auth/login', async (req, res) => {
         const isMatch = await bcrypt.compare(password, user.password);
         if (!isMatch) return res.status(400).send("Hatalı şifre.");
 
-        // --- VERİ ONARIM BLOĞU (Kalıcı Çözüm) ---
-        user.inventory.forEach(animal => {
-            if (animal.stats && !animal.hp) {
-                animal.hp = animal.stats.hp || 100;
-                animal.maxHp = animal.stats.hp || 100;
-                animal.atk = animal.stats.atk || 20;
-                animal.def = animal.stats.def || 10;
-            }
-        });
-        await user.save();
+        // --- GÜVENLİ VERİ ONARIM BLOĞU ---
+        if (user.inventory && user.inventory.length > 0) {
+            user.inventory.forEach(animal => {
+                // Eğer stats objesi varsa ama ana seviyede hp yoksa onar
+                if (animal.stats && typeof animal.hp === 'undefined') {
+                    animal.hp = animal.stats.hp || 100;
+                    animal.maxHp = animal.stats.hp || 100;
+                    animal.atk = animal.stats.atk || 20;
+                    animal.def = animal.stats.def || 10;
+                }
+                // Stamina eksikse %100 yap
+                if (typeof animal.stamina === 'undefined') {
+                    animal.stamina = 100;
+                }
+            });
+            user.markModified('inventory'); // MongoDB'ye dizinin değiştiğini söyle
+            await user.save();
+        }
         // ---------------------------------------
 
         req.session.userId = user._id;
         res.redirect('/profil');
     } catch (err) {
+        console.error("Login Hatası:", err);
         res.status(500).send("Giriş işlemi başarısız.");
     }
 });
@@ -155,8 +168,27 @@ app.get('/auth/logout', (req, res) => {
 });
 
 // --- 5. OYUN İÇİ SAYFALAR (GET) ---
+// Bu middleware her sayfa geçişinde çalışır
+const authGuard = async (req, res, next) => {
+    if (!req.session.userId) {
+        return res.redirect('/login');
+    }
+    
+    const user = await User.findById(req.session.userId);
+    
+    // Kullanıcı DB'den silindiyse veya session bozulduysa
+    if (!user) {
+        req.session.destroy();
+        return res.redirect('/login');
+    }
 
-app.get('/profil', authRequired, async (req, res) => {
+    // Her istekte kullanıcı verisini güncel tut
+    res.locals.user = user;
+    next();
+};
+
+// Kullanımı:
+app.get('/profil', authGuard, (req, res) => {
     res.render('profil', { user: res.locals.user });
 });
 
@@ -479,6 +511,7 @@ server.listen(PORT, () => {
     ===========================================
     `);
 });
+
 
 
 
