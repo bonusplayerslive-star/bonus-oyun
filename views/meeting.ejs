@@ -220,37 +220,50 @@
             myStream = await navigator.mediaDevices.getUserMedia({ video: true, audio: true });
             document.getElementById('localVideo').srcObject = myStream;
         } catch (e) {
-            console.error("Medya hatası:", e);
-            Swal.fire("Hata", "Kamera veya Mikrofon bulunamadı!", "error");
+            Swal.fire("Medya Hatası", "Kamera bulunamadı!", "error");
         }
     }
 
-    // 2. Peer Bağlantısı
+    // 2. Peer ve Socket Bağlantısı
     myPeer.on('open', id => {
         socket.emit('join-meeting', { roomId: currentRoom, peerId: id, nickname: myNick });
     });
 
-    socket.on('room-info', data => {
-        document.getElementById('room-owner').innerText = data.owner;
-        if (data.owner === myNick) {
-            document.querySelectorAll('.host-only').forEach(el => el.style.display = 'block');
-        } else {
-            document.querySelectorAll('.host-only').forEach(el => el.style.display = 'none');
-        }
+    socket.on('update-bpl', (newBalance) => {
+        document.getElementById('user-bpl').innerText = newBalance;
+    });
+
+    socket.on('error', (msg) => {
+        Swal.fire("Uyarı", msg, "info");
+    });
+
+    // Arena Daveti (VIP Odasındayken gelirse)
+    socket.on('arena-invite-received', (data) => {
+        Swal.fire({
+            title: '⚔️ ARENA DAVETİ',
+            text: `${data.from} seni düelloya çağırıyor!`,
+            showCancelButton: true,
+            confirmButtonText: 'KABUL ET'
+        }).then((result) => {
+            if (result.isConfirmed) {
+                window.location.href = "/arena";
+            }
+        });
+    });
+
+    // Diğer kullanıcıların kameralarını ekleme mantığı
+    socket.on('user-connected', data => {
+        if (data.peerId === myPeer.id) return;
+        const call = myPeer.call(data.peerId, myStream);
+        call.on('stream', userStream => {
+            addRemoteVideo(data.peerId, userStream, data.nickname);
+        });
     });
 
     myPeer.on('call', call => {
         call.answer(myStream);
         call.on('stream', userStream => {
             addRemoteVideo(call.peer, userStream, "Katılımcı");
-        });
-    });
-
-    socket.on('user-connected', data => {
-        if (data.peerId === myPeer.id) return;
-        const call = myPeer.call(data.peerId, myStream);
-        call.on('stream', userStream => {
-            addRemoteVideo(data.peerId, userStream, data.nickname);
         });
     });
 
@@ -261,21 +274,24 @@
         slot.className = "v-slot";
         slot.id = peerId;
         slot.onclick = (e) => showMenu(e, nick, peerId);
-
         const video = document.createElement('video');
         video.srcObject = stream;
         video.autoplay = true;
         video.playsInline = true;
-
-        const label = document.createElement('div');
-        label.className = "slot-controls";
-        label.innerHTML = `<span class="badge bg-dark">${nick}</span>`;
-
-        slot.append(video, label);
+        slot.append(video);
         wrapper.append(slot);
     }
 
-    // 3. Menü ve Aksiyonlar
+    // 3. Özel Fonksiyonlar
+    function inviteUser() {
+        const nick = document.getElementById('invite-nick').value;
+        if (nick) {
+            socket.emit('send-meeting-invite', { target: nick });
+            Swal.fire("Başarılı", nick + " davet edildi.", "success");
+            document.getElementById('invite-nick').value = "";
+        }
+    }
+
     function showMenu(e, nick, peerId) {
         e.stopPropagation();
         selectedUser = { nick, peerId };
@@ -288,7 +304,6 @@
 
     async function handleMenuAction(action) {
         if (!selectedUser) return;
-        
         if (action === 'gift') {
             const { value: amount } = await Swal.fire({
                 title: 'Hediye Miktarı',
@@ -297,18 +312,14 @@
                 background: '#111', color: '#fff'
             });
             if (amount) socket.emit('send-gift-vip', { targetNick: selectedUser.nick, amount: parseInt(amount), room: currentRoom });
-        } 
-        else if (action === 'kick') {
+        } else if (action === 'arena') {
+            socket.emit('arena-invite-request', { to: selectedUser.nick });
+        } else if (action === 'kick') {
             socket.emit('kick-user', { targetPeerId: selectedUser.peerId, room: currentRoom });
         }
-        else if (action === 'arena') {
-            socket.emit('arena-invite-request', { to: selectedUser.nick });
-        }
-        
         document.getElementById('context-menu').style.display = 'none';
     }
 
-    // 4. Sohbet
     function sendMsg() {
         const input = document.getElementById('m-input');
         if (input.value.trim()) {
@@ -326,45 +337,11 @@
         chat.scrollTop = chat.scrollHeight;
     });
 
-    // 5. Kontroller
-    function toggleMic() {
-        const audio = myStream.getAudioTracks()[0];
-        audio.enabled = !audio.enabled;
-        document.getElementById('mic-btn').classList.toggle('btn-outline-danger');
-    }
-
-    function toggleVid() {
-        const video = myStream.getVideoTracks()[0];
-        video.enabled = !video.enabled;
-        document.getElementById('vid-btn').classList.toggle('btn-outline-danger');
-    }
-
-    function exitRoom() {
-        window.location.href = "/chat";
-    }
-
-    socket.on('user-kicked', () => {
-        Swal.fire("Atıldın", "Masa sahibi seni odadan çıkardı.", "error").then(() => {
-            window.location.href = "/chat";
-        });
-    });
-
-    window.onclick = () => document.getElementById('context-menu').style.display = 'none';
     startMedia();
-
-// Bakiyeyi anlık güncellemek için
-socket.on('update-bpl', (newBalance) => {
-    document.getElementById('user-bpl').innerText = newBalance;
-});
-
-// Hediye bildirimi geldiğinde mesaj olarak göster
-socket.on('error', (msg) => {
-    Swal.fire("Hata", msg, "error");
-});
-
-
+    window.onclick = () => document.getElementById('context-menu').style.display = 'none';
 </script>
 
 </body>
 </html>
+
 
