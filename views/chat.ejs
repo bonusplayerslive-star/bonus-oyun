@@ -148,7 +148,23 @@
     <button id="meetBtn" class="btn btn-action btn-meeting">🏛️ KONSEY DAVETİ</button>
     <button onclick="closePanel()" class="btn btn-sm text-muted w-100 mt-2">İPTAL</button>
 </div>
-
+<div class="message-item" style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 10px; border-bottom: 1px dashed #444;">
+    <div class="message-content">
+        <strong style="color: #edb709;"><%= sender %>:</strong> 
+        <span><%= text %></span>
+    </div>
+    <div class="message-actions">
+        <button onclick="openGiftModal('<%= sender %>')" class="btn btn-sm btn-outline-success" title="Hediye Gönder">
+            <i class="fas fa-gift"></i>
+        </button>
+        <button onclick="challengeToArena('<%= sender %>')" class="btn btn-sm btn-outline-danger" title="Arena'ya Çağır">
+            <i class="fas fa-swords"></i>
+        </button>
+        <button onclick="inviteToMeeting('<%= sender %>')" class="btn btn-sm btn-outline-warning" title="Masaya Davet Et">
+            <i class="fas fa-users"></i>
+        </button>
+    </div>
+</div>
 <div class="input-footer">
     <form id="chatForm" onsubmit="sendMessage(); return false;">
         <div class="input-group">
@@ -324,8 +340,33 @@ socket.on('meeting-request', (data) => {
         });
     }
 });
+// Arena Meydan Okuma
+function challengeToArena(targetNick) {
+    if(confirm(targetNick + " isimli oyuncuya ARENA düellosu göndermek istiyor musun?")) {
+        socket.emit('arena-invite-request', { to: targetNick, from: userNickname });
+        alert("Meydan okuma gönderildi!");
+    }
+}
 
+// Hediye Gönderme (BPL)
+function openGiftModal(targetNick) {
+    const amount = prompt(targetNick + " kullanıcısına ne kadar BPL göndermek istersin?");
+    if (amount && !isNaN(amount)) {
+        socket.emit('send-gift-bpl', { toNickname: targetNick, amount: amount });
+        alert("Hediye gönderiliyor...");
+    }
+}
+
+// Toplantı (Beşgen Masa) Daveti
+function inviteToMeeting(targetNick) {
+    if(confirm(targetNick + " kullanıcısını özel masana davet etmek istiyor musun?")) {
+        // Burada kullanıcının mevcut bir odası olmalı (50 BPL ile açtığı)
+        socket.emit('send-private-invite', { to: targetNick, roomId: myCurrentRoomId });
+        alert("Masa daveti iletildi!");
+    }
+}
 </script>
 </body>
 </html>
+
 
