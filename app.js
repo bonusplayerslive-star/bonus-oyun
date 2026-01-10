@@ -258,32 +258,42 @@ io.on('connection', async (socket) => {
         arenaQueue = arenaQueue.filter(p => p.socketId !== socket.id);
     });
 });
-
 async function startBattle(p1, p2, io) {
     const winner = p1.power >= p2.power ? p1 : p2;
     const loser = p1.power >= p2.power ? p2 : p1;
 
+    // Kazanan kullanıcı ise ödülünü ver
     if (!winner.nickname.includes('_Bot')) {
-        const winUser = await User.findOne({ nickname: winner.nickname });
-        if (winUser) {
-            winUser.bpl += 100;
-            await winUser.save();
+        try {
+            const winUser = await User.findOne({ nickname: winner.nickname });
+            if (winUser) {
+                winUser.bpl += 100;
+                await winUser.save();
+            }
+        } catch (err) {
+            console.error("Ödül verme hatası:", err);
         }
     }
 
+    // Oyunculara sonucu bildir
     [p1, p2].forEach(p => {
         if (p.socketId) {
-   
-io.to(p.socketId).emit('arena-match-found', {
-    opponent: p === p1 ? p2 : p1,
-    winner: winner.nickname,
-    winnerAnimal: winner.selectedAnimal // Bu satırı ekleyin
-});
-                
-   
-    io.to("general-chat").emit('new-message', { sender: "SİSTEM", text: `📢 Arena: ${winner.nickname}, ${loser.nickname}'i yendi!` });
+            io.to(p.socketId).emit('arena-match-found', {
+                opponent: p === p1 ? p2 : p1,
+                winner: winner.nickname,
+                winnerAnimal: winner.animal // Resimdeki yapıya uygun olan
+            });
+        }
+    });
+
+    // Genel sohbete duyuru geç
+    io.to("general-chat").emit('new-message', { 
+        sender: "SİSTEM", 
+        text: `📢 Arena: ${winner.nickname}, ${loser.nickname}'i yendi!` 
+    });
 }
 
+// Sunucuyu başlat
 const PORT = process.env.PORT || 10000;
 server.listen(PORT, () => console.log(`🚀 SİSTEM AKTİF: ${PORT}`));
 
