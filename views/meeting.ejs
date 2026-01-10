@@ -155,9 +155,12 @@
         <hr>
         
         <div class="media-controls">
-            <button onclick="toggleMic()" id="mic-btn" class="btn btn-warning"><i class="fas fa-microphone"></i></button>
-            <button onclick="toggleVideo()" id="vid-btn" class="btn btn-warning"><i class="fas fa-video"></i></button>
-        </div>
+    <button onclick="toggleMic()" id="mic-btn" class="btn btn-warning"><i class="fas fa-microphone"></i></button>
+    <button onclick="toggleVideo()" id="vid-btn" class="btn btn-warning"><i class="fas fa-video"></i></button>
+    <button onclick="sendArenaInviteFromMeeting()" class="btn btn-danger" title="Arena'ya Davet Et">
+        <i class="fas fa-swords"></i>
+    </button>
+</div>
 
         <div class="invite-section" style="margin-top: 20px;">
             <input type="text" id="invite-nickname" placeholder="Nick Name Yaz..." class="form-control">
@@ -372,11 +375,27 @@ function sendInvite() {
         alert(nick + " kullanıcısına davet gönderildi!");
     }
 }
+function sendArenaInviteFromMeeting() {
+    const targetNick = document.getElementById('invite-nickname').value; // Davet edilecek kişinin nicki
+    if (!targetNick) {
+        alert("Önce Arena'ya davet etmek istediğin kişinin nickini yazmalısın!");
+        return;
+    }
+    
+    // Sunucuya Arena daveti gönderiyoruz
+    socket.emit('arena-invite-request', {
+        to: targetNick,
+        from: userNickname, // Session'dan gelen nick
+        roomId: currentRoom
+    });
+    alert(targetNick + " kullanıcısına Arena daveti gönderildi!");
+}
 
 const currentRoom = rawRoomId; // Backend zaten secureRoomId prefixini ekliyor.
 
 </script>
 </body>
 </html>
+
 
 
