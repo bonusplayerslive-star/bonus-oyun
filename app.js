@@ -228,47 +228,74 @@ io.on('connection', async (socket) => {
         }
     });
 
-    socket.on('arena-join-queue', async (data) => {
+   socket.on('arena-join-queue', async (data) => {
+    try {
+        // Kullanıcıyı güncel haliyle veritabanından çek (BPL kontrolü için)
+        const user = await User.findOne({ nickname: socket.nickname });
+        if (!user) return;
+        
+        // 1. AYAR: Zaten sıradaysa tekrar ekleme
         if (arenaQueue.find(p => p.nickname === user.nickname)) return;
 
-       // app.js içinde socket.on('arena-join-queue') kısmındaki player nesnesini şu şekilde garantiye al:
-const player = {
-    nickname: user.nickname,
-    socketId: socket.id,
-    animal: user.selectedAnimal, // Burası 'Lion', 'Bear' vb. olmalı
-    power: (user.inventory.find(i => i.name === user.selectedAnimal)?.level || 1) * 10 + Math.random() * 50
-};
+        // 2. AYAR: Bahis miktarını düş (Veritabanı güvenliği için burada yapılır)
+        const betAmount = data.bet || 25;
+        const prizeAmount = data.prize || 50;
+        
+        if (user.bpl < betAmount) {
+            return socket.emit('error', 'Yetersiz BPL bakiyesi!');
+        }
+        
+        user.bpl -= betAmount;
+        await user.save(); // Bakiyeyi hemen düş
+
+        // 3. AYAR: Player nesnesini tam dolu gönder (Video hatasını önler)
+        const player = {
+            nickname: user.nickname,
+            socketId: socket.id,
+            animal: user.selectedAnimal, // Video yolu için kritik
+            power: (user.inventory.find(i => i.name === user.selectedAnimal)?.level || 1) * 10 + Math.random() * 50,
+            prize: prizeAmount // Kazanınca alacağı ödül
+        };
 
         if (arenaQueue.length > 0) {
             const opponent = arenaQueue.shift();
             startBattle(player, opponent, io);
         } else {
             arenaQueue.push(player);
-            setTimeout(() => {
+            // 10 Saniye bekleme ve Bot eşleşmesi
+            setTimeout(async () => {
                 const idx = arenaQueue.findIndex(p => p.nickname === player.nickname);
                 if (idx !== -1) {
-                    const randomBot = BOTS[Math.floor(Math.random() * BOTS.length)];
-                    startBattle(arenaQueue.splice(idx, 1)[0], randomBot, io);
+                    const randomBotName = BOTS[Math.floor(Math.random() * BOTS.length)];
+                    // Bot nesnesini oyuncu nesnesiyle aynı yapıda kur (Hata vermemesi için)
+                    const botObject = {
+                        nickname: randomBotName + "_Bot",
+                        socketId: null,
+                        animal: randomBotName, // Botun hayvanı klasör adıyla aynı olmalı
+                        power: Math.random() * 100,
+                        prize: prizeAmount
+                    };
+                    startBattle(arenaQueue.splice(idx, 1)[0], botObject, io);
                 }
             }, 10000);
         }
-    });
-
-    socket.on('disconnect', () => {
-        onlineUsers.delete(socket.nickname);
-        arenaQueue = arenaQueue.filter(p => p.socketId !== socket.id);
-    });
+    } catch (err) {
+        console.error("Sıra hatası:", err);
+    }
 });
+
 async function startBattle(p1, p2, io) {
+    // Güç dengesine göre kazananı belirle
     const winner = p1.power >= p2.power ? p1 : p2;
     const loser = p1.power >= p2.power ? p2 : p1;
 
-    // Kazanan kullanıcı ise ödülünü ver
+    // 4. AYAR: Kazanan gerçek kullanıcı ise ödülü ver
     if (!winner.nickname.includes('_Bot')) {
         try {
             const winUser = await User.findOne({ nickname: winner.nickname });
             if (winUser) {
-                winUser.bpl += 100;
+                winUser.bpl += winner.prize; // Belirlenen ödülü ekle
+                winUser.markModified('inventory'); // Envanter değişikliği varsa bildir
                 await winUser.save();
             }
         } catch (err) {
@@ -276,28 +303,30 @@ async function startBattle(p1, p2, io) {
         }
     }
 
-    // Oyunculara sonucu bildir
+    // 5. AYAR: Oyunculara sonucu bildir (Video parametrelerini düzelt)
     [p1, p2].forEach(p => {
         if (p.socketId) {
-        io.to(p.socketId).emit('arena-match-found', {
-    opponent: p === p1 ? p2 : p1,
-    winner: winner.nickname,
-    winnerAnimal: winner.selectedAnimal, // Burası 'none' gelmemeli
-    // ... diğer veriler
-});
+            io.to(p.socketId).emit('arena-match-found', {
+                opponent: p === p1 ? p2 : p1,
+                opponentAnimal: p === p1 ? p2.animal : p1.animal, // Rakip video yolu
+                winnerNick: winner.nickname,
+                winnerAnimal: winner.animal, // Kazanan video yolu (none gelmesi engellendi)
+                prize: winner.prize
+            });
         }
     });
 
     // Genel sohbete duyuru geç
-    io.to("general-chat").emit('new-message', { 
+    io.emit('new-message', { 
         sender: "SİSTEM", 
-        text: `📢 Arena: ${winner.nickname}, ${loser.nickname}'i yendi!` 
+        text: `📢 Arena: ${winner.nickname}, ${loser.nickname}'i mağlup etti! +${winner.prize} BPL!` 
     });
 }
 
 // Sunucuyu başlat
 const PORT = process.env.PORT || 10000;
 server.listen(PORT, () => console.log(`🚀 SİSTEM AKTİF: ${PORT}`));
+
 
 
 
