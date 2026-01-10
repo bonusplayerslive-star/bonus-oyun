@@ -92,6 +92,7 @@ const adminRequired = async (req, res, next) => {
 // --- 4. ANA SAYFA VE AUTH ROTALARI ---
 
 app.get('/', (req, res) => {
+    // Eğer zaten giriş yapmışsa direkt profil, yapmamışsa index/login
     if (req.session.userId) return res.redirect('/profil');
     res.render('index', { title: 'BPL Ultimate - Giriş' });
 });
@@ -99,74 +100,61 @@ app.get('/', (req, res) => {
 app.post('/auth/register', async (req, res) => {
     const { nickname, email, password } = req.body;
     try {
-        const existing = await User.findOne({ $or: [{ email }, { nickname }] });
+        // 1. Validasyon: Alanlar boş mu?
+        if(!nickname || !email || !password) return res.status(400).send("Tüm alanları doldurun.");
+
+        const existing = await User.findOne({ $or: [{ email: email.toLowerCase() }, { nickname: nickname.trim() }] });
         if (existing) return res.status(400).send("Nickname veya Email zaten kullanımda.");
 
         const salt = await bcrypt.genSalt(10);
         const hashedPassword = await bcrypt.hash(password, salt);
 
-      // app.js içindeki register kısmını bu şekilde zırhlandır:
-const newUser = new User({
-    nickname: nickname.trim(), // Boşlukları temizle
-    email: email.toLowerCase().trim(),
-    password: hashedPassword,
-    bpl: 2500, 
-    inventory: [],
-    selectedAnimal: "none", // null yerine "none" stringi sorgularda daha güvenlidir
-    stats: { wins: 0, losses: 0 },
-    lastLogin: new Date(), // Kullanıcının ne zaman geldiğini takip et
-    ipAddress: req.ip // Güvenlik için IP kaydı
-});
+        const newUser = new User({
+            nickname: nickname.trim(),
+            email: email.toLowerCase().trim(),
+            password: hashedPassword,
+            bpl: 2500, 
+            inventory: [],
+            selectedAnimal: "none",
+            stats: { wins: 0, losses: 0 },
+            lastLogin: new Date(),
+            ipAddress: req.headers['x-forwarded-for'] || req.ip // Render için daha doğru IP
+        });
 
-        await newUser.save();
-        res.redirect('/');
+        const savedUser = await newUser.save();
+        
+        // 2. Kayıt sonrası oturum aç
+        req.session.userId = savedUser._id;
+        res.redirect('/profil');
+
     } catch (err) {
-        res.status(500).send("Sunucu hatası oluştu.");
+        console.error("Register Hatası:", err);
+        res.status(500).render('error', { message: "Kayıt sırasında teknik bir hata oluştu." });
     }
 });
 
 app.post('/auth/login', async (req, res) => {
     const { email, password } = req.body;
     try {
-        const user = await User.findOne({ email });
+        const user = await User.findOne({ email: email.toLowerCase().trim() });
         if (!user) return res.status(400).send("Kullanıcı bulunamadı.");
 
         const isMatch = await bcrypt.compare(password, user.password);
         if (!isMatch) return res.status(400).send("Hatalı şifre.");
 
-        // --- GÜVENLİ VERİ ONARIM BLOĞU ---
-        if (user.inventory && user.inventory.length > 0) {
-            user.inventory.forEach(animal => {
-                // Eğer stats objesi varsa ama ana seviyede hp yoksa onar
-                if (animal.stats && typeof animal.hp === 'undefined') {
-                    animal.hp = animal.stats.hp || 100;
-                    animal.maxHp = animal.stats.hp || 100;
-                    animal.atk = animal.stats.atk || 20;
-                    animal.def = animal.stats.def || 10;
-                }
-                // Stamina eksikse %100 yap
-                if (typeof animal.stamina === 'undefined') {
-                    animal.stamina = 100;
-                }
-            });
-            user.markModified('inventory'); // MongoDB'ye dizinin değiştiğini söyle
-            await user.save();
-        }
-        // ---------------------------------------
-
+        // Oturumu başlat
         req.session.userId = user._id;
+        
+        // Son giriş zamanını güncelle
+        user.lastLogin = new Date();
+        await user.save();
+
         res.redirect('/profil');
     } catch (err) {
         console.error("Login Hatası:", err);
-        res.status(500).send("Giriş işlemi başarısız.");
+        res.status(500).render('error', { message: "Giriş işlemi başarısız." });
     }
 });
-
-app.get('/auth/logout', (req, res) => {
-    req.session.destroy();
-    res.redirect('/');
-});
-
 // --- 5. OYUN İÇİ SAYFALAR (GET) ---
 // Bu middleware her sayfa geçişinde çalışır
 const authGuard = async (req, res, next) => {
@@ -498,6 +486,7 @@ server.listen(PORT, () => {
     ===========================================
     `);
 });
+
 
 
 
