@@ -179,18 +179,22 @@ app.post('/api/select-animal', authRequired, async (req, res) => {
     }
 });
 
+// --- 6. LOGOUT ROTASI ---
+app.get('/logout', (req, res) => {
+    req.session.destroy();
+    res.redirect('/');
+});
 
-
-
-
-
-
-
-
-// --- 6. SOCKET.IO SİSTEMİ (TEK BLOKTA BİRLEŞTİRİLDİ) ---
-
+// --- 7. SOCKET.IO SİSTEMİ (TEK BLOKTA BİRLEŞTİRİLDİ) ---
 const onlineUsers = new Map();
-let arenaQueue = []; // Tek havuz
+let arenaQueue = []; 
+
+const BOTS = [
+    { nickname: "Aslan_Bot", animal: "Lion", power: 45 },
+    { nickname: "Kurt_Bot", animal: "Wolf", power: 35 },
+    { nickname: "Goril_Bot", animal: "Gorilla", power: 55 },
+    { nickname: "Rhino_Bot", animal: "Rhino", power: 57 }
+];
 
 // Global online listesi periyodik gönderim
 setInterval(() => {
@@ -205,7 +209,7 @@ let chatHistory = [];
 function addToHistory(sender, text) {
     const msg = { sender, text, time: Date.now() };
     chatHistory.push(msg);
-    if (chatHistory.length > 50) chatHistory.shift(); // Son 50 mesajı tut
+    if (chatHistory.length > 50) chatHistory.shift();
 }
 
 io.on('connection', async (socket) => {
@@ -215,31 +219,24 @@ io.on('connection', async (socket) => {
     const user = await User.findById(uId);
     if (!user) return;
 
-    // Kullanıcı Bilgilerini Socket'e Tanımla
     socket.nickname = user.nickname;
     onlineUsers.set(user.nickname, socket.id);
     socket.join("general-chat");
-    
-    // Geçmişi gönder
     socket.emit('load-history', chatHistory);
 
-    // --- CHAT ---
+    // --- CHAT SİSTEMİ ---
     socket.on('chat-message', (data) => {
         addToHistory(socket.nickname, data.text);
         io.to("general-chat").emit('new-message', { sender: socket.nickname, text: data.text });
     });
 
-    // --- MEETING ---
+    // --- MEETING SİSTEMİ ---
     socket.on('join-meeting', (roomId) => {
         socket.join(roomId);
-        console.log(`🛋️ ${socket.nickname} masaya katıldı: ${roomId}`);
     });
 
     socket.on('meeting-message', (data) => {
-        io.to(data.room).emit('new-meeting-message', {
-            sender: socket.nickname,
-            text: data.text
-        });
+        io.to(data.room).emit('new-meeting-message', { sender: socket.nickname, text: data.text });
     });
 
     socket.on('mute-user', (data) => {
@@ -253,91 +250,22 @@ io.on('connection', async (socket) => {
         const receiver = await User.findOne({ nickname: targetNick });
 
         if (sender && receiver && sender.bpl >= 5500 && (sender.bpl - amount) >= 25) {
-            const tax = amount * 0.25;
-            const netAmount = amount - tax;
-
+            const netAmount = amount * 0.75; // %25 vergi
             sender.bpl -= amount;
             receiver.bpl += netAmount;
-
             await sender.save();
             await receiver.save();
 
             io.to(room).emit('new-meeting-message', {
                 sender: 'SİSTEM',
-                text: `${sender.nickname}, ${targetNick}'e ${amount} BPL gönderdi! (%25 Vergi)`
+                text: `${sender.nickname}, ${targetNick}'e ${amount} BPL gönderdi!`
             });
             socket.emit('update-bpl', sender.bpl);
         }
     });
 
-    // --- ARENA (KAVUŞMA BURADA) ---
+    // --- ARENA SİSTEMİ ---
     socket.on('arena-join-queue', async (data) => {
-        const u = await User.findById(uId);
-        if (!u || u.bpl < 25) return socket.emit('error-msg', 'Yetersiz BPL!');
-
-        const player = {
-            nickname: u.nickname,
-            socketId: socket.id,
-            animal: u.selectedAnimal,
-            bet: data.bet,
-            prize: data.prize,
-            power: (u.inventory.find(i => i.name === u.selectedAnimal)?.level || 1) * 10 + Math.random() * 50
-        };
-
-        if (arenaQueue.length > 0 && arenaQueue[0].nickname !== u.nickname) {
-            const opponent = arenaQueue.shift();
-            startBattle(player, opponent, io);
-        } else {
-            arenaQueue.push(player);
-            // 13 Saniye Bot Süresi
-            setTimeout(() => {
-                const idx = arenaQueue.findIndex(p => p.nickname === player.nickname);
-                if (idx !== -1) {
-                    const bot = { 
-                        nickname: "System_Bot", 
-                        animal: "Lion", 
-                        power: 40 + Math.random() * 30 
-                    };
-                    startBattle(arenaQueue.splice(idx, 1)[0], bot, io);
-                }
-            }, 13000);
-        }
-    });
-
-    socket.on('disconnect', () => {
-        onlineUsers.delete(socket.nickname);
-        arenaQueue = arenaQueue.filter(p => p.socketId !== socket.id);
-    });
-});
-    // 5. BAĞLANTI KESİLDİĞİNDE
-    socket.on('disconnect', () => {
-        onlineUsers.delete(user.nickname);
-        console.log(`❌ ${user.nickname} ayrıldı.`);
-    });
-
-
-// --- ARENA MATCHMAKING & BOT SİSTEMİ ---
-let arenaQueue = []; 
-
-const BOTS = [
-    { nickname: "Aslan_Bot", animal: "Lion", power: 45 },
-    { nickname: "Kurt_Bot", animal: "Wolf", power: 35 },
-    { nickname: "Goril_Bot", animal: "Gorilla", power: 55 }
-];
-
-// Ana Socket Bloğu
-io.on('connection', async (socket) => {
-    const uId = socket.request.session?.userId;
-    if (!uId) return;
-    const user = await User.findById(uId);
-    if (!user) return;
-
-    socket.nickname = user.nickname;
-    onlineUsers.set(user.nickname, socket.id);
-
-    // Arena Giriş ve Eşleşme
-    socket.on('arena-join-queue', async (data) => {
-        // Zaten sıradaysa tekrar ekleme
         if (arenaQueue.find(p => p.nickname === user.nickname)) return;
 
         const player = {
@@ -350,52 +278,47 @@ io.on('connection', async (socket) => {
         };
 
         if (arenaQueue.length > 0) {
-            // Eşleşme sağla
             const opponent = arenaQueue.shift();
             startBattle(player, opponent, io);
         } else {
-            // Sıraya ekle
             arenaQueue.push(player);
-            
-            // 13 Saniye Bot Süresi
             setTimeout(() => {
                 const idx = arenaQueue.findIndex(p => p.nickname === player.nickname);
                 if (idx !== -1) {
-                    const botPlayer = BOTS[Math.floor(Math.random() * BOTS.length)];
-                    const waitingPlayer = arenaQueue.splice(idx, 1)[0];
-                    startBattle(waitingPlayer, botPlayer, io);
+                    const randomBot = BOTS[Math.floor(Math.random() * BOTS.length)];
+                    startBattle(arenaQueue.splice(idx, 1)[0], randomBot, io);
                 }
             }, 13000);
         }
     });
 
+    // --- DISCONNECT ---
     socket.on('disconnect', () => {
-        onlineUsers.delete(user.nickname);
+        onlineUsers.delete(socket.nickname);
         arenaQueue = arenaQueue.filter(p => p.socketId !== socket.id);
+        console.log(`❌ ${socket.nickname} ayrıldı.`);
     });
 });
 
-// Battle Fonksiyonu (Dışarıda kalsın)
+// --- BATTLE FONKSİYONU ---
 async function startBattle(p1, p2, io) {
     const winner = p1.power >= p2.power ? p1 : p2;
     const loser = p1.power >= p2.power ? p2 : p1;
 
-    // Ödül İşlemleri
-    if (winner.nickname.indexOf('_Bot') === -1) { // Eğer kazanan bot değilse
+    // Kazanan bot değilse ödül ver
+    if (!winner.nickname.includes('_Bot')) {
         const winUser = await User.findOne({ nickname: winner.nickname });
         if (winUser) {
-            winUser.bpl += (p1.prize || 100); 
+            winUser.bpl += (p1.prize || 100);
             await winUser.save();
         }
     }
 
-    // Bilgilendirme
     [p1, p2].forEach(p => {
         if (p.socketId) {
             io.to(p.socketId).emit('arena-match-found', {
                 opponent: p === p1 ? p2 : p1,
-                winner: winner.nickname,
-                type: p2.nickname.includes('_Bot') ? 'bot' : 'pvp'
+                winner: winner.nickname
             });
         }
     });
@@ -405,21 +328,6 @@ async function startBattle(p1, p2, io) {
         text: `📢 Arena: ${winner.nickname}, ${loser.nickname}'i mağlup etti!`
     });
 }
+
 const PORT = process.env.PORT || 10000;
 server.listen(PORT, () => console.log(`🚀 SİSTEM AKTİF: ${PORT}`));
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
