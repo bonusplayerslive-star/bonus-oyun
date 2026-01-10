@@ -172,7 +172,7 @@
 <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
 <script>
     let userBpl = <%= user.bpl %>;
-    const SAFETY_LIMIT = 5500;
+    const SAFETY_LIMIT = 25;
 
     async function buyAnimal(name, price) {
         if (userBpl - price < SAFETY_LIMIT) {
@@ -222,3 +222,4 @@
 </script>
 </body>
 </html>
+
