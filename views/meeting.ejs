@@ -147,7 +147,28 @@
     </style>
 </head>
 <body>
+               <div class="meeting-container" style="display: flex;">
+    <div class="video-grid" style="flex: 3;"> ... </div>
 
+    <div class="control-panel" style="flex: 1; background: #1a1a1a; padding: 15px; border-left: 2px solid #edb709;">
+        <h4 style="color: #edb709;">MASA YÖNETİMİ</h4>
+        <hr>
+        
+        <div class="media-controls">
+            <button onclick="toggleMic()" id="mic-btn" class="btn btn-warning"><i class="fas fa-microphone"></i></button>
+            <button onclick="toggleVideo()" id="vid-btn" class="btn btn-warning"><i class="fas fa-video"></i></button>
+        </div>
+
+        <div class="invite-section" style="margin-top: 20px;">
+            <input type="text" id="invite-nickname" placeholder="Nick Name Yaz..." class="form-control">
+            <button onclick="sendInvite()" class="btn btn-outline-warning w-100 mt-2">DAVET GÖNDER</button>
+        </div>
+
+        <div id="meeting-chat-box" style="height: 300px; overflow-y: auto; margin-top: 20px; background: #000;"></div>
+        <input type="text" id="chat-input" class="form-control mt-2">
+        <button onclick="sendMeetingMessage()" class="btn btn-warning w-100 mt-1">GÖNDER</button>
+    </div>
+</div>
 <div class="video-sidebar" id="video-list">
     <div class="v-slot" id="slot-me">
         <video id="localVideo" autoplay muted playsinline></video>
@@ -331,10 +352,31 @@ const rawRoomId = urlParams.get('room');
 if (!rawRoomId || rawRoomId.length < 5) {
     Swal.fire('Hata', 'Geçersiz Konsey Kodu!', 'error').then(() => window.location.href = '/chat');
 }
+let myStream; // Kameradan gelen akış
+
+async function initMedia() {
+    myStream = await navigator.mediaDevices.getUserMedia({ video: true, audio: true });
+    document.getElementById('local-video').srcObject = myStream;
+}
+
+function toggleMic() {
+    const audioTrack = myStream.getAudioTracks()[0];
+    audioTrack.enabled = !audioTrack.enabled;
+    document.getElementById('mic-btn').innerHTML = audioTrack.enabled ? '<i class="fas fa-microphone"></i>' : '<i class="fas fa-microphone-slash"></i>';
+}
+
+function sendInvite() {
+    const nick = document.getElementById('invite-nickname').value;
+    if(nick) {
+        socket.emit('send-private-invite', { to: nick, roomId: currentRoom });
+        alert(nick + " kullanıcısına davet gönderildi!");
+    }
+}
 
 const currentRoom = rawRoomId; // Backend zaten secureRoomId prefixini ekliyor.
 
 </script>
 </body>
 </html>
+
 
