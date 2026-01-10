@@ -336,13 +336,12 @@ io.on('connection', async (socket) => {
         }
     });
 
-    // --- DISCONNECT ---
-    socket.on('disconnect', () => {
+});
+  socket.on('disconnect', () => {
         onlineUsers.delete(socket.nickname);
         arenaQueue = arenaQueue.filter(p => p.socketId !== socket.id);
-        console.log(`❌ ${socket.nickname} ayrıldı.`);
+        console.log(`❌ ${socket.nickname || 'Bilinmeyen'} ayrıldı.`);
     });
-});
 
 // --- BATTLE FONKSİYONU ---
 async function startBattle(p1, p2, io) {
@@ -372,12 +371,8 @@ async function startBattle(p1, p2, io) {
         text: `📢 Arena: ${winner.nickname}, ${loser.nickname}'i mağlup etti!`
     });
 
-    socket.on('disconnect', () => {
-        onlineUsers.delete(socket.nickname);
-        arenaQueue = arenaQueue.filter(p => p.socketId !== socket.id);
-        console.log(`❌ ${socket.nickname || 'Bilinmeyen'} ayrıldı.`);
-    });
-
+  });
 
 const PORT = process.env.PORT || 10000;
 server.listen(PORT, () => console.log(`🚀 SİSTEM AKTİF: ${PORT}`));
+
