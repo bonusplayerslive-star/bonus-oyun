@@ -125,18 +125,47 @@ app.post('/api/buy-item', authRequired, async (req, res) => {
 });
 
 // Geliştirme API (Geliştirme sayfasındaki 404 hatasını çözer)
+// Geliştirme API - TAMİR EDİLDİ
 app.post('/api/upgrade-stat', authRequired, async (req, res) => {
     try {
-        const { animalIndex, statName, cost } = req.body;
+        const { animalName, statType } = req.body; // Frontend'den bunlar geliyor
         const user = await User.findById(req.session.userId);
 
-        if (!user || !user.inventory[animalIndex]) {
+        // Envanterde ismiyle bul
+        const animal = user.inventory.find(a => a.name === animalName);
+
+        if (!animal) {
             return res.status(404).json({ success: false, error: 'Hayvan envanterde bulunamadı!' });
         }
+
+        // Fiyat belirleme (Backend kontrolü)
+        const cost = (statType === 'def') ? 10 : 15;
 
         if ((user.bpl - cost) < 25) {
             return res.status(400).json({ success: false, error: 'Bakiye 25 BPL altına düşemez!' });
         }
+
+        // İstatistiği yükselt
+        if (statType === 'hp') {
+            animal.maxHp = (animal.maxHp || 100) + 10;
+            animal.hp = animal.maxHp;
+        } else if (statType === 'atk') {
+            animal.atk += 5;
+        } else if (statType === 'def') {
+            animal.def += 5;
+        }
+
+        user.bpl -= cost;
+        user.markModified('inventory'); 
+        await user.save();
+
+        // Frontend'in beklediği formatta cevap dön: { success, newBalance }
+        res.json({ success: true, newBalance: user.bpl });
+    } catch (err) {
+        console.error("Geliştirme Hatası:", err);
+        res.status(500).json({ success: false, error: 'Sunucu hatası oluştu.' });
+    }
+});
 
         // Değişikliği uygula
         const animal = user.inventory[animalIndex];
@@ -331,3 +360,4 @@ async function startBattle(p1, p2, io) {
 
 const PORT = process.env.PORT || 10000;
 server.listen(PORT, () => console.log(`🚀 SİSTEM AKTİF: ${PORT}`));
+
