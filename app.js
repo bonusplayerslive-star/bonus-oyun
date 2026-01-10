@@ -126,19 +126,20 @@ app.post('/api/buy-item', authRequired, async (req, res) => {
 
 // Geliştirme API (Geliştirme sayfasındaki 404 hatasını çözer)
 app.post('/api/upgrade-stat', authRequired, async (req, res) => {
-    const { animalIndex, statName, cost } = req.body;
     try {
+        const { animalIndex, statName, cost } = req.body;
         const user = await User.findById(req.session.userId);
-        
-        // Geliştirme yaparken de bakiye 25 BPL altına düşmemeli
+
+        if (!user || !user.inventory[animalIndex]) {
+            return res.status(404).json({ success: false, error: 'Hayvan envanterde bulunamadı!' });
+        }
+
         if ((user.bpl - cost) < 25) {
             return res.status(400).json({ success: false, error: 'Bakiye 25 BPL altına düşemez!' });
         }
 
+        // Değişikliği uygula
         const animal = user.inventory[animalIndex];
-        if (!animal) return res.status(404).json({ success: false, error: 'Hayvan bulunamadı!' });
-
-        // İlgili özelliği artır
         if (statName === 'hp') {
             animal.maxHp += 10;
             animal.hp = animal.maxHp;
@@ -149,13 +150,11 @@ app.post('/api/upgrade-stat', authRequired, async (req, res) => {
         }
 
         user.bpl -= cost;
-        // Mongoose'un dizideki değişikliği fark etmesi için:
-        user.markModified('inventory'); 
+        user.markModified('inventory'); // MongoDB'ye dizinin değiştiğini söyle
         await user.save();
 
-        res.json({ success: true, newBpl: user.bpl, newValue: animal[statName === 'hp' ? 'maxHp' : statName] });
+        res.json({ success: true, newBpl: user.bpl });
     } catch (err) {
-        console.error("Geliştirme Hatası:", err);
         res.status(500).json({ success: false });
     }
 });
@@ -450,6 +449,7 @@ async function startBattle(p1, p2, io) {
 }
 const PORT = process.env.PORT || 10000;
 server.listen(PORT, () => console.log(`🚀 SİSTEM AKTİF: ${PORT}`));
+
 
 
 
