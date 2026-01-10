@@ -381,9 +381,3 @@ async function startBattle(p1, p2, io) {
 
 const PORT = process.env.PORT || 10000;
 server.listen(PORT, () => console.log(`🚀 SİSTEM AKTİF: ${PORT}`));
-
-
-
-
-
-
