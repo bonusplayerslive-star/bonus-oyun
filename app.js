@@ -236,7 +236,27 @@ io.on('connection', async (socket) => {
         io.to("general-chat").emit('new-message', { sender: socket.nickname, text: data.text });
     });
 
-    socket.on('join-meeting', (roomId) => { socket.join(roomId); });
+ // Geliştirilmiş Meeting Katılımı
+    socket.on('join-meeting', (data) => {
+        const { roomId, peerId, nickname } = data;
+        socket.join(roomId);
+        
+        // Odanın ilk kurucusu (sahibi) bilgisini gönder (Basit mantık: Oda adı nick ise o kişidir)
+        // Ya da odayı başlatan kişiyi socket katmanında saklayabilirsiniz.
+        io.to(roomId).emit('room-info', { owner: roomId }); // Oda adı genelde kurucunun nickidir
+        
+        // Diğer kullanıcılara yeni birinin geldiğini ve Peer ID'sini bildir
+        socket.to(roomId).emit('user-connected', { peerId, nickname });
+    });
+
+    // MASADAN ATMA (KICK) FONKSİYONU
+    socket.on('kick-user', (data) => {
+        const { targetPeerId, room } = data;
+        // Sadece oda sahibi (room name == socket.nickname) atabilir
+        if (socket.nickname === room) {
+            io.to(room).emit('user-kicked', { peerId: targetPeerId });
+        }
+    });
 
     socket.on('meeting-message', (data) => {
         io.to(data.room).emit('new-meeting-message', { sender: socket.nickname, text: data.text });
@@ -279,20 +299,45 @@ io.on('connection', async (socket) => {
     });
 
     // --- KONSEY (MEETING) DAVETİ ---
-    socket.on('send-meeting-invite', async (data) => {
-        const sender = await User.findById(socket.userId);
-        const targetUser = onlineUsers.get(data.target);
+    // --- VIP HEDİYE SİSTEMİ (ÖZEL ODA) ---
+    socket.on('send-gift-vip', async (data) => {
+        const { targetNick, amount, room } = data;
+        const sender = await User.findById(socket.userId); // uId yerine socket.userId kullanıyoruz
+        const receiver = await User.findOne({ nickname: targetNick });
 
-        if (sender && sender.bpl >= 50 && targetUser) {
-            sender.bpl -= 50;
+        // 5500 BPL Sınırı ve Alt Limit Kontrolü
+        if (!sender || sender.bpl < 5500) {
+            return socket.emit('error', 'Hediye göndermek için en az 5500 BPL bakiyeniz olmalıdır!');
+        }
+
+        if (receiver && sender.bpl >= amount) {
+            const tax = amount * 0.25; // %25 Kesinti (Sistem vergisi)
+            const netAmount = amount - tax;
+
+            sender.bpl -= amount;
+            receiver.bpl += netAmount;
+
             await sender.save();
-            socket.emit('update-bpl', sender.bpl);
+            await receiver.save();
 
-            // Hedef oyuncuya davet gönder
-            io.to(targetUser.id).emit('meeting-invite-received', { from: sender.nickname });
+            // SİSTEM MESAJI: Sadece o odadakilere duyur
+            io.to(room).emit('new-meeting-message', { 
+                sender: 'SİSTEM', 
+                text: `🎁 ${sender.nickname}, ${targetNick}'e ${amount} BPL gönderdi! (%25 Vergi Kesildi)` 
+            });
+
+            // Gönderenin bakiyesini güncelle
+            socket.emit('update-bpl', sender.bpl);
+            
+            // Alıcı online ise onun bakiyesini de anlık güncelle
+            const targetSocketData = onlineUsers.get(targetNick);
+            if (targetSocketData && targetSocketData.id) {
+                io.to(targetSocketData.id).emit('update-bpl', receiver.bpl);
+            }
+        } else {
+            socket.emit('error', 'Yetersiz bakiye veya geçersiz kullanıcı!');
         }
     });
-
     // --- ARENA SIRAYA GİRME (KODUNUZUN DEVAMI) ---
     socket.on('arena-join-queue', async (data) => {
         try {
@@ -352,9 +397,29 @@ io.on('connection', async (socket) => {
     });
 });
 
+async function startBattle(p1, p2, io) {
+    const winner = p1.power >= p2.power ? p1 : p2;
+    const prize = p1.prize; // 50 BPL
 
+    if (winner.socketId) {
+        const winUser = await User.findOne({ nickname: winner.nickname });
+        winUser.bpl += prize;
+        await winUser.save();
+        io.to(winner.socketId).emit('update-bpl', winUser.bpl);
+    }
+
+    [p1, p2].forEach(p => {
+        if (p.socketId) {
+            io.to(p.socketId).emit('arena-match-found', {
+                opponent: p === p1 ? p2 : p1,
+                winner: winner.nickname
+            });
+        }
+    });
+}
 const PORT = process.env.PORT || 10000;
 server.listen(PORT, () => console.log(`🚀 SİSTEM AKTİF: ${PORT}`));
+
 
 
 
