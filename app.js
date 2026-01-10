@@ -214,16 +214,21 @@ app.get('/logout', (req, res) => {
     res.redirect('/');
 });
 
+
+const BOTS = [
+    { nickname: "Aslan", animal: "Lion", power: 45 },
+    { nickname: "Kurt", animal: "Wolf", power: 35 },
+    { nickname: "Goril", animal: "Gorilla", power: 55 },
+    { nickname: "Rhino", animal: "Rhino", power: 57 }
+];
+
+
+
 // --- 7. SOCKET.IO SİSTEMİ (TEK BLOKTA BİRLEŞTİRİLDİ) ---
 const onlineUsers = new Map();
 let arenaQueue = []; 
 
-const BOTS = [
-    { nickname: "Aslan_Bot", animal: "Lion", power: 45 },
-    { nickname: "Kurt_Bot", animal: "Wolf", power: 35 },
-    { nickname: "Goril_Bot", animal: "Gorilla", power: 55 },
-    { nickname: "Rhino_Bot", animal: "Rhino", power: 57 }
-];
+
 
 // Global online listesi periyodik gönderim
 setInterval(() => {
@@ -360,4 +365,5 @@ async function startBattle(p1, p2, io) {
 
 const PORT = process.env.PORT || 10000;
 server.listen(PORT, () => console.log(`🚀 SİSTEM AKTİF: ${PORT}`));
+
 
