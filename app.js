@@ -342,9 +342,84 @@ app.post('/api/enter-arena', authRequired, async (req, res) => {
         res.status(500).json({ success: false });
     }
 });
+let arenaQueue = [];
 
+io.on('connection', (socket) => {
+    // Arena Giriş ve Eşleşme
+    socket.on('arena-join-queue', async (data) => {
+        const user = await User.findById(socket.request.session.userId);
+        if (!user || user.bpl < 25) return socket.emit('error-msg', 'Yetersiz BPL!');
+
+        // Bahis Tahsilatı (Kıyak: Yetmiyorsa sıfırla)
+        const finalBet = user.bpl >= data.bet ? data.bet : user.bpl;
+        user.bpl -= finalBet;
+        await user.save();
+
+        const player = {
+            nickname: user.nickname,
+            socketId: socket.id,
+            animal: user.selectedAnimal,
+            bet: finalBet,
+            prize: data.prize,
+            // Güç hesaplama: Level + Envanterdeki rastgele statlar 
+            power: (user.inventory.find(i => i.name === user.selectedAnimal)?.level || 1) * 10 + Math.random() * 50
+        };
+
+        // Eşleşme Kontrolü
+        if (arenaQueue.length > 0) {
+            const opponent = arenaQueue.shift();
+            startBattle(player, opponent, io);
+        } else {
+            arenaQueue.push(player);
+            // 13 Saniye sonra BOT atama
+            setTimeout(() => {
+                const idx = arenaQueue.findIndex(p => p.nickname === player.nickname);
+                if (idx !== -1) {
+                    const botPlayer = { 
+                        nickname: "System_Bot", 
+                        animal: ["Lion", "Tiger", "Wolf", "Gorilla"][Math.floor(Math.random()*4)],
+                        power: Math.random() * 70 // Botlar orta seviye güçte
+                    };
+                    startBattle(arenaQueue.splice(idx, 1)[0], botPlayer, io);
+                }
+            }, 13000);
+        }
+    });
+});
+
+async function startBattle(p1, p2, io) {
+    // Gücü yüksek olan kazanır
+    const winner = p1.power >= p2.power ? p1 : p2;
+    const loser = p1.power >= p2.power ? p2 : p1;
+
+    // Ödülü ver (Sadece oyuncuysa)
+    if (winner.nickname !== "System_Bot") {
+        const winUser = await User.findOne({ nickname: winner.nickname });
+        winUser.bpl += p1.prize; // Kazanan ödülü alır
+        await winUser.save();
+
+        // GLOBAL CHAT DUYURUSU (Otomatik)
+        io.to("general-chat").emit('new-message', {
+            sender: "SİSTEM",
+            text: `📢 ARENA HABERİ: ${winner.nickname}, ${loser.nickname}'i devirerek ${p1.prize} BPL kazandı!`
+        });
+    }
+
+    // İki tarafa da sonuçları gönder
+    [p1, p2].forEach(p => {
+        if(p.socketId) {
+            io.to(p.socketId).emit('arena-match-found', {
+                opponentAnimal: p === p1 ? p2.animal : p1.animal,
+                winnerAnimal: winner.animal,
+                winner: winner.nickname,
+                prize: p1.prize
+            });
+        }
+    });
+}
 const PORT = process.env.PORT || 10000;
 server.listen(PORT, () => console.log(`🚀 SİSTEM AKTİF: ${PORT}`));
+
 
 
 
