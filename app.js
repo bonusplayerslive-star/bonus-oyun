@@ -111,6 +111,7 @@ app.post('/login', async (req, res) => {
         const user = await User.findOne({ email: email.toLowerCase().trim() });
         if (user && await bcrypt.compare(password, user.password)) {
             req.session.userId = user._id;
+            req.session.user = user;
             return res.redirect('/profil');
         }
         res.status(401).send("Hatalı giriş bilgileri.");
@@ -177,16 +178,28 @@ app.post('/api/upgrade-stat', authRequired, async (req, res) => {
     } catch (err) { res.status(500).json({ success: false }); }
 });
 
+// Profil sayfasındaki seçimi veritabanına kaydeder
+// Profil sayfasındaki seçimi veritabanına kaydeder
 app.post('/api/select-animal', authRequired, async (req, res) => {
-    const { animalIndex } = req.body;
     try {
+        const { animalName } = req.body;
+        // userId üzerinden kullanıcıyı bul (Garanti yöntem)
         const user = await User.findById(req.session.userId);
-        if (!user.inventory[animalIndex]) return res.status(404).json({ success: false, error: 'Hayvan bulunamadı!' });
-        
-        user.selectedAnimal = user.inventory[animalIndex].name;
+
+        if (!user) return res.json({ success: false, error: 'Kullanıcı bulunamadı.' });
+
+        // Envanterde bu hayvan var mı kontrol et
+        const hasAnimal = user.inventory.some(i => i.name === animalName);
+        if (!hasAnimal) return res.json({ success: false, error: 'Bu hayvana sahip değilsiniz.' });
+
+        user.selectedAnimal = animalName;
         await user.save();
+
         res.json({ success: true });
-    } catch (err) { res.status(500).json({ success: false }); }
+    } catch (err) {
+        console.error("Seçim Hatası:", err);
+        res.json({ success: false, error: 'Sunucu hatası.' });
+    }
 });
 
 // --- 6. SOCKET.IO SİSTEMİ ---
@@ -249,12 +262,14 @@ io.on('connection', async (socket) => {
         await user.save(); // Bakiyeyi hemen düş
 
         // 3. AYAR: Player nesnesini tam dolu gönder (Video hatasını önler)
+    // 3. AYAR: Player nesnesini tam dolu gönder
         const player = {
             nickname: user.nickname,
             socketId: socket.id,
-            animal: user.selectedAnimal, // Video yolu için kritik
+            // Seçili hayvan yoksa envanterdeki ilk hayvanı, o da yoksa Lion'u ata
+            animal: (user.selectedAnimal && user.selectedAnimal !== 'none') ? user.selectedAnimal : (user.inventory[0] ? user.inventory[0].name : 'Lion'), 
             power: (user.inventory.find(i => i.name === user.selectedAnimal)?.level || 1) * 10 + Math.random() * 50,
-            prize: prizeAmount // Kazanınca alacağı ödül
+            prize: prizeAmount
         };
 
         if (arenaQueue.length > 0) {
@@ -331,4 +346,5 @@ socket.on('disconnect', () => {
 }); // <--- BU PARANTEZ EKSİK OLABİLİR (io.on kapanışı)
 const PORT = process.env.PORT || 10000;
 server.listen(PORT, () => console.log(`🚀 SİSTEM AKTİF: ${PORT}`));
+
 
