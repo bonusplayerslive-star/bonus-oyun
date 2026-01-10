@@ -324,8 +324,11 @@ async function startBattle(p1, p2, io) {
 } // startBattle fonksiyonunun kapanışı
 
 // --- SOKET BAĞLANTISI KAPANIŞI ---
-// Eğer io.on('connection', (socket) => { ... }) bloğunun içindeyse bir tane daha } gerekebilir.
-// Yukarıdaki kodun akışına göre startBattle dışarıda bir fonksiyon olduğu için parantezleri şu şekilde kapatalım:
-
+socket.on('disconnect', () => {
+        onlineUsers.delete(socket.nickname);
+        arenaQueue = arenaQueue.filter(p => p.socketId !== socket.id);
+    });
+}); // <--- BU PARANTEZ EKSİK OLABİLİR (io.on kapanışı)
 const PORT = process.env.PORT || 10000;
 server.listen(PORT, () => console.log(`🚀 SİSTEM AKTİF: ${PORT}`));
+
