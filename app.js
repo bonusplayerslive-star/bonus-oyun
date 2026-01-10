@@ -314,7 +314,7 @@ io.on('connection', async (socket) => {
         onlineUsers.delete(user.nickname);
         console.log(`❌ ${user.nickname} ayrıldı.`);
     });
-});
+
 
 // --- ARENA MATCHMAKING & BOT SİSTEMİ ---
 let arenaQueue = []; 
@@ -407,6 +407,7 @@ async function startBattle(p1, p2, io) {
 }
 const PORT = process.env.PORT || 10000;
 server.listen(PORT, () => console.log(`🚀 SİSTEM AKTİF: ${PORT}`));
+
 
 
 
