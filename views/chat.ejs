@@ -80,26 +80,24 @@
     let selectedUser = "";
 
     // --- 1. SİSTEM DİNLEYİCİLERİ ---
-
-    // Bakiye Güncelleme (Hediye gönderince veya davet atınca anlık düşer)
     socket.on('update-bpl', (newBpl) => {
         const bplElement = document.getElementById('myBpl');
         if (bplElement) bplElement.innerText = newBpl;
     });
 
-    // Geçmiş Mesajları Yükle
+    socket.on('error', (msg) => {
+        Swal.fire("Sistem Mesajı", msg, "info");
+    });
+
     socket.on('load-history', (history) => {
         const box = document.getElementById('chatMessages');
-        // Geçmişi yüklemeden önce temizlemek istersen: box.innerHTML = '';
         history.forEach(msg => appendMessage(msg.sender, msg.text, true));
     });
 
-    // Yeni Mesaj Geldiğinde
     socket.on('new-message', (data) => {
         appendMessage(data.sender, data.text);
     });
 
-    // Online Listesini Güncelle (Fix: Obje yapısına uygun)
     socket.on('update-online-users', (users) => {
         const list = document.getElementById('onlineUserList');
         if (!list) return;
@@ -115,65 +113,53 @@
         });
     });
 
-    // --- 2. DAVET DİNLEYİCİLERİ (GELEN TALEPLER) ---
-
-    // Arena Daveti Geldiğinde
+    // --- 2. DAVET VE ARENA DİNLEYİCİLERİ ---
     socket.on('arena-invite-received', (data) => {
         Swal.fire({
-            title: '⚔️ DÜELLO TALEBİ!',
-            text: `${data.from} seni arenaya davet ediyor!`,
+            title: '⚔️ ARENA MEYDAN OKUMASI!',
+            text: `${data.from} seni düelloya davet ediyor! (50 BPL)`,
             icon: 'warning',
             showCancelButton: true,
-            confirmButtonColor: '#ffc107',
-            cancelButtonColor: '#d33',
             confirmButtonText: 'KABUL ET',
             cancelButtonText: 'REDDET',
             background: '#0a0b0c',
             color: '#fff'
         }).then((result) => {
             if (result.isConfirmed) {
-                window.location.href = "/arena";
+                // Kabul edince sunucuya bildir (Arena odasına yönlendirme backend'den yapılacak)
+                socket.emit('arena-join-queue', { bet: 25, prize: 50 }); 
             }
         });
     });
 
-    // Konsey Daveti Geldiğinde
     socket.on('meeting-invite-received', (data) => {
         Swal.fire({
             title: '🏛️ KONSEY ÇAĞRISI',
-            text: `${data.from} seni konsey odasına bekliyor!`,
+            text: `${data.from} seni VIP odasına davet etti!`,
             icon: 'info',
-            confirmButtonColor: '#00f3ff',
-            confirmButtonText: 'ODAYA GİT',
+            confirmButtonText: 'GİT',
             background: '#0a0b0c',
             color: '#fff'
         }).then((result) => {
             if (result.isConfirmed) {
-                window.location.href = "/meeting";
+                window.location.href = "/meeting?room=" + data.from;
             }
         });
     });
 
     // --- 3. FONKSİYONLAR ---
-
-    // Mesaj Ekleme
     function appendMessage(sender, text, isHistory = false) {
         const box = document.getElementById('chatMessages');
         if (!box) return;
         const div = document.createElement('div');
         div.className = "msg-entry";
-        if (isHistory) div.style.opacity = "0.6";
-        
-        // Gönderen SİSTEM ise farklı renk yapabilirsin
         const tagClass = (sender === "SİSTEM") ? "text-danger" : "sender-tag";
-        
         div.innerHTML = `<span class="${tagClass}" onclick="openUserMenu('${sender}')">[${sender}]</span> 
                          <span class="text-light small">${text}</span>`;
         box.appendChild(div);
         box.scrollTop = box.scrollHeight;
     }
 
-    // Mesaj Gönderme
     function sendMessage() {
         const input = document.getElementById('messageInput');
         if (input && input.value.trim()) {
@@ -182,67 +168,33 @@
         }
     }
 
-    // Kullanıcı Menüsünü Aç
     function openUserMenu(nick) {
         if (nick === myNick || nick === "SİSTEM") return;
         selectedUser = nick;
-        const label = document.getElementById('selectedUserLabel');
-        if (label) label.innerText = nick;
+        document.getElementById('selectedUserLabel').innerText = nick;
         document.getElementById('userActionPanel').style.display = 'block';
     }
 
-    // Menüyü Kapat
-    function closePanel() { 
-        document.getElementById('userActionPanel').style.display = 'none'; 
-    }
+    function closePanel() { document.getElementById('userActionPanel').style.display = 'none'; }
 
-    // Menü Aksiyonlarını Gönder (Hediye, Arena, Konsey)
     async function sendAction(type) {
         closePanel();
-        
         if (type === 'gift') {
             const { value: amt } = await Swal.fire({
-                title: 'M miktar girin',
+                title: 'BPL Gönder',
                 input: 'number',
-                inputLabel: 'Gönderilecek BPL Miktarı',
-                inputPlaceholder: 'Örn: 100',
-                background: '#111',
-                color: '#fff',
-                confirmButtonText: 'GÖNDER'
+                background: '#111', color: '#fff'
             });
-            if (amt && amt > 0) {
-                socket.emit('send-gift-bpl', { to: selectedUser, amount: amt });
-            }
-        } 
-        
-        else if (type === 'arena') {
+            if (amt > 0) socket.emit('send-gift-bpl', { to: selectedUser, amount: amt });
+        } else if (type === 'arena') {
             socket.emit('arena-invite-request', { to: selectedUser });
-            Swal.fire({ 
-                icon: 'success', 
-                title: 'Düello İletildi', 
-                text: 'Davet gönderildi, 50 BPL tahsil edildi.', 
-                timer: 2000, 
-                showConfirmButton: false,
-                background: '#000', 
-                color: '#fff' 
-            });
-        }
-        
-        else if (type === 'meeting') {
+        } else if (type === 'meeting') {
             socket.emit('send-meeting-invite', { target: selectedUser });
-            Swal.fire({ 
-                icon: 'info', 
-                title: 'Konsey Çağrısı', 
-                text: 'Davet iletildi, 50 BPL düşüldü. Odaya aktarılıyorsunuz...', 
-                timer: 2000, 
-                showConfirmButton: false,
-                background: '#000', 
-                color: '#fff' 
-            });
-            setTimeout(() => { window.location.href = "/meeting"; }, 1600);
+            window.location.href = "/meeting?room=" + myNick;
         }
     }
 </script>
 </body>
 </html>
+
 
