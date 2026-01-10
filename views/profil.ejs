@@ -1,4 +1,3 @@
-
 <!DOCTYPE html>
 <html lang="tr">
 <head>
@@ -75,7 +74,7 @@
             <a href="/profil"><img src="/caracter/page/logo.jpeg" alt="BPL LOGO" class="logo-img"></a>
             <div class="text-end">
                 <h5 class="mb-0 text-uppercase font-orbitron" style="color: var(--neon-green);"><%= user.nickname %></h5>
-                <span class="bpl-badge"><i class="fas fa-coins me-1"></i><%= user.bpl.toLocaleString() %> BPL</span>
+                <span class="bpl-badge"><i class="fas fa-coins me-1"></i><%= (user.bpl || 0).toLocaleString() %> BPL</span>
             </div>
         </div>
     </div>
@@ -103,7 +102,7 @@
                 <div class="glass-panel">
                     <div class="d-flex justify-content-between align-items-center mb-4">
                         <h4 class="font-orbitron mb-0 text-uppercase"><i class="fas fa-boxes me-2 text-success"></i>ENVANTER</h4>
-                        <span class="badge rounded-pill bg-dark border border-secondary p-2">Varlık: <%= user.inventory.length %></span>
+                        <span class="badge rounded-pill bg-dark border border-secondary p-2">Varlık: <%= (user.inventory ? user.inventory.length : 0) %></span>
                     </div>
 
                     <div class="row">
@@ -111,6 +110,7 @@
                             <div class="col-12 text-center py-5">
                                 <i class="fas fa-dragon fa-4x mb-3 text-secondary" style="opacity: 0.2;"></i>
                                 <h3 class="font-orbitron">ENVANTER BOŞ</h3>
+                                <p class="text-muted">Henüz bir karakterin yok. Marketten hemen bir tane edin!</p>
                                 <a href="/market" class="btn btn-outline-success mt-3">KARAKTER SATIN AL</a>
                             </div>
                         <% } else { %>
@@ -127,30 +127,34 @@
                                         <h5 class="text-uppercase my-2 font-orbitron" style="color: var(--neon-green);"><%= item.name %></h5>
                                         
                                         <div class="px-2">
+                                            <% 
+                                                let hp = (item.stats && item.stats.hp) ? item.stats.hp : 100;
+                                                let stamina = (typeof item.stamina !== 'undefined') ? item.stamina : 100;
+                                            %>
                                             <div class="d-flex justify-content-between stat-label mb-1">
                                                 <span>HP</span>
-                                                <span><%= (item.stats && item.stats.hp) ? item.stats.hp : 100 %> / 100</span>
+                                                <span><%= hp %> / 100</span>
                                             </div>
                                             <div class="progress mb-2">
-                                                <div class="progress-bar bg-danger" style="width: <%= (item.stats && item.stats.hp) ? item.stats.hp : 100 %>%"></div>
+                                                <div class="progress-bar bg-danger" style="width: <%= hp %>%"></div>
                                             </div>
 
                                             <div class="d-flex justify-content-between stat-label mb-1">
-                                                <span>GÜÇ</span>
-                                                <span>%<%= item.stamina || 0 %></span>
+                                                <span>ENERJİ (STAMINA)</span>
+                                                <span>%<%= stamina %></span>
                                             </div>
                                             <div class="progress mb-3">
-                                                <div class="progress-bar bg-warning" style="width: <%= item.stamina %>%"></div>
+                                                <div class="progress-bar bg-warning" style="width: <%= stamina %>%"></div>
                                             </div>
 
                                             <div class="action-container">
-                                                <button onclick="selectForArena('<%= item.name %>')" class="btn btn-arena-select btn-sm w-100 font-orbitron">
+                                                <button onclick="selectForArena('<%= item.name %>')" class="btn btn-arena-select btn-sm w-100 font-orbitron mb-2">
                                                     ARENA İÇİN SEÇ
                                                 </button>
-                                                <button onclick="window.location.href='/development'" class="btn btn-dev-select btn-sm w-100 font-orbitron">
+                                                <button onclick="window.location.href='/development'" class="btn btn-dev-select btn-sm w-100 font-orbitron mb-2">
                                                     GELİŞTİRME YAP
                                                 </button>
-                                                <button onclick="refillStamina('<%= item.name %>')" class="btn btn-link btn-sm text-success mt-2 p-0" style="text-decoration: none; font-size: 0.7rem;">
+                                                <button onclick="refillStamina('<%= item.name %>')" class="btn btn-link btn-sm text-success p-0" style="text-decoration: none; font-size: 0.7rem;">
                                                     <i class="fas fa-bolt"></i> ENERJİ VER (10 BPL)
                                                 </button>
                                             </div>
@@ -168,7 +172,11 @@
     <script src="/socket.io/socket.io.js"></script>
     <script>
         const socket = io();
-        socket.emit('register-user', { id: "<%= user._id %>", nickname: "<%= user.nickname %>" });
+        
+        // Register user only if ID exists
+        <% if (user && user._id) { %>
+            socket.emit('register-user', { id: "<%= user._id %>", nickname: "<%= user.nickname %>" });
+        <% } %>
 
         async function selectForArena(name) {
             try {
@@ -180,34 +188,39 @@
                 const data = await res.json();
                 if(data.status === 'success') {
                     alert(name + " savaşa hazır!");
+                } else {
+                    alert("Hata: " + (data.msg || "Karakter seçilemedi."));
                 }
             } catch (err) {
                 console.error("Hata:", err);
+                alert("Bağlantı hatası oluştu.");
             }
         }
 
         async function refillStamina(name) {
-    if(!confirm(name + " enerjisini 10 BPL karşılığında yenilemek istiyor musunuz?")) return;
+            if(!confirm(name + " enerjisini 10 BPL karşılığında yenilemek istiyor musunuz?")) return;
 
-    try {
-        const res = await fetch('/refill-stamina', {
-            method: 'POST',
-            headers: {'Content-Type': 'application/json'},
-            body: JSON.stringify({ animalName: name })
-        });
-        const data = await res.json();
-        
-        if(data.status === 'success') {
-            alert("Enerji Fullendi! Kalan BPL: " + data.newBpl);
-            location.reload(); // Sayfayı yenile ki barlar güncellensin
-        } else if(data.status === 'low_balance') {
-            alert("Yetersiz BPL bakiyesi!");
+            try {
+                const res = await fetch('/refill-stamina', {
+                    method: 'POST',
+                    headers: {'Content-Type': 'application/json'},
+                    body: JSON.stringify({ animalName: name })
+                });
+                const data = await res.json();
+                
+                if(data.status === 'success') {
+                    alert("Enerji Fullendi! Kalan BPL: " + data.newBpl);
+                    location.reload();
+                } else if(data.status === 'low_balance') {
+                    alert("Yetersiz BPL bakiyesi!");
+                } else {
+                    alert("Hata: " + (data.msg || "İşlem başarısız."));
+                }
+            } catch (err) {
+                console.error("Hata:", err);
+                alert("Sunucuya ulaşılamadı.");
+            }
         }
-    } catch (err) {
-        console.error("Hata:", err);
-    }
-}
     </script>
 </body>
 </html>
-
