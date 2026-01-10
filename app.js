@@ -279,11 +279,12 @@ async function startBattle(p1, p2, io) {
     // Oyunculara sonucu bildir
     [p1, p2].forEach(p => {
         if (p.socketId) {
-            io.to(p.socketId).emit('arena-match-found', {
-                opponent: p === p1 ? p2 : p1,
-                winner: winner.nickname,
-                winnerAnimal: winner.animal // Resimdeki yapıya uygun olan
-            });
+        io.to(p.socketId).emit('arena-match-found', {
+    opponent: p === p1 ? p2 : p1,
+    winner: winner.nickname,
+    winnerAnimal: winner.selectedAnimal, // Burası 'none' gelmemeli
+    // ... diğer veriler
+});
         }
     });
 
@@ -297,6 +298,7 @@ async function startBattle(p1, p2, io) {
 // Sunucuyu başlat
 const PORT = process.env.PORT || 10000;
 server.listen(PORT, () => console.log(`🚀 SİSTEM AKTİF: ${PORT}`));
+
 
 
 
