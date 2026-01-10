@@ -80,7 +80,25 @@
         <button onclick="sendInvite()" class="btn btn-sm btn-outline-success w-100">MASAYA ÇAĞIR</button>
     </div>
 </div>
+<div id="action-menu">
+    <div id="menu-title" class="p-2 bg-dark text-warning text-center small fw-bold"></div>
+    <div class="menu-item" onclick="askGiftAmount()">🎁 HEDİYE GÖNDER</div>
+    <div class="menu-item" onclick="handleAction('arena')">⚔️ ARENA DAVETİ</div>
+    <div class="menu-item text-danger" onclick="handleAction('mute')">🚫 SUSTUR</div>
+</div>
 
+<script>
+async function askGiftAmount() {
+    const { value: amount } = await Swal.fire({
+        title: 'Miktar Seçin',
+        input: 'select',
+        inputOptions: { '100': '100 BPL', '500': '500 BPL', '1000': '1000 BPL', '2000': '2000 BPL' },
+        inputPlaceholder: 'Miktar',
+        showCancelButton: true
+    });
+    if (amount) handleAction('gift', parseInt(amount));
+}
+</script>
 <div id="action-menu">
     <div id="menu-title" class="p-2 bg-dark text-warning text-center small fw-bold"></div>
     <div class="menu-item" onclick="handleAction('gift', 50)">🎁 50 BPL GÖNDER</div>
@@ -240,4 +258,5 @@ let roomParam = new URLSearchParams(window.location.search).get('room');
 </script>
 </body>
 </html>
+
 
