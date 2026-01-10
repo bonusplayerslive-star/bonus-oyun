@@ -233,28 +233,7 @@ const BOTS = [
 ];
 
 
-
-// --- 7. SOCKET.IO SİSTEMİ (TEK BLOKTA BİRLEŞTİRİLDİ) ---
-const onlineUsers = new Map();
-let arenaQueue = []; 
-
-
-
-// Global online listesi periyodik gönderim
-setInterval(() => {
-    const users = Array.from(io.sockets.sockets.values()).map(s => ({
-        nickname: s.nickname,
-        id: s.id
-    }));
-    io.emit('update-global-online', users);
-}, 5000);
-
-let chatHistory = [];
-function addToHistory(sender, text) {
-    const msg = { sender, text, time: Date.now() };
-    chatHistory.push(msg);
-    if (chatHistory.length > 50) chatHistory.shift();
-}
+// --- 7. SOCKET.IO SİSTEMİ (PARANTEZLER TAMİR EDİLDİ) ---
 
 io.on('connection', async (socket) => {
     const uId = socket.request.session?.userId;
@@ -294,7 +273,7 @@ io.on('connection', async (socket) => {
         const receiver = await User.findOne({ nickname: targetNick });
 
         if (sender && receiver && sender.bpl >= 5500 && (sender.bpl - amount) >= 25) {
-            const netAmount = amount * 0.75; // %25 vergi
+            const netAmount = amount * 0.75; 
             sender.bpl -= amount;
             receiver.bpl += netAmount;
             await sender.save();
@@ -336,19 +315,19 @@ io.on('connection', async (socket) => {
         }
     });
 
-});
-  socket.on('disconnect', () => {
+    // --- BAĞLANTI KESİLDİĞİNDE (DOĞRU YERİ BURASI) ---
+    socket.on('disconnect', () => {
         onlineUsers.delete(socket.nickname);
         arenaQueue = arenaQueue.filter(p => p.socketId !== socket.id);
         console.log(`❌ ${socket.nickname || 'Bilinmeyen'} ayrıldı.`);
     });
+}); // <--- io.on('connection') bloğunun tek ve gerçek bitişi
 
-// --- BATTLE FONKSİYONU ---
+// --- BATTLE FONKSİYONU (Dışarıda kalmalı) ---
 async function startBattle(p1, p2, io) {
     const winner = p1.power >= p2.power ? p1 : p2;
     const loser = p1.power >= p2.power ? p2 : p1;
 
-    // Kazanan bot değilse ödül ver
     if (!winner.nickname.includes('_Bot')) {
         const winUser = await User.findOne({ nickname: winner.nickname });
         if (winUser) {
@@ -370,9 +349,9 @@ async function startBattle(p1, p2, io) {
         sender: "SİSTEM",
         text: `📢 Arena: ${winner.nickname}, ${loser.nickname}'i mağlup etti!`
     });
-
-  });
+}
 
 const PORT = process.env.PORT || 10000;
 server.listen(PORT, () => console.log(`🚀 SİSTEM AKTİF: ${PORT}`));
+
 
