@@ -273,13 +273,18 @@ async function startBattle(p1, p2, io) {
 
     [p1, p2].forEach(p => {
         if (p.socketId) {
-            io.to(p.socketId).emit('arena-match-found', { opponent: p === p1 ? p2 : p1, winner: winner.nickname });
-        }
-    });
-
+   
+io.to(p.socketId).emit('arena-match-found', {
+    opponent: p === p1 ? p2 : p1,
+    winner: winner.nickname,
+    winnerAnimal: winner.selectedAnimal // Bu satırı ekleyin
+});
+                
+   
     io.to("general-chat").emit('new-message', { sender: "SİSTEM", text: `📢 Arena: ${winner.nickname}, ${loser.nickname}'i yendi!` });
 }
 
 const PORT = process.env.PORT || 10000;
 server.listen(PORT, () => console.log(`🚀 SİSTEM AKTİF: ${PORT}`));
+
 
