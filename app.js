@@ -4,7 +4,16 @@
 const express = require('express');
 const mongoose = require('mongoose');
 const session = require('express-session');
-const MongoStore = require('connect-mongo');
+const sessionMiddleware = session({
+    secret: SESSION_SECRET,
+    resave: false,
+    saveUninitialized: false,
+    store: MongoStore.create({ 
+        mongoUrl: MONGO_URI, 
+        ttl: 24 * 60 * 60 
+    }),
+    cookie: { secure: false, maxAge: 24 * 60 * 60 * 1000 }
+});
 const http = require('http');
 const socketIo = require('socket.io');
 const path = require('path');
@@ -197,3 +206,4 @@ app.use((req, res) => res.status(404).render('error', { message: 'Sayfa bulunama
 
 const PORT = process.env.PORT || 3000;
 server.listen(PORT, () => console.log(`🚀 Sunucu ${PORT} üzerinde aktif!`));
+
