@@ -3,110 +3,201 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
-    <title>BPL | VIP KONSEY MERKEZİ</title>
+    <title>BPL | VIP STRATEJİK MERKEZ</title>
     <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
-    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css">
-    <link href="https://fonts.googleapis.com/css2?family=Cinzel:wght@400;700&family=Rajdhani:wght@500;700&display=swap" rel="stylesheet">
-    // Sayfa başına oda bilgisini ekleyin
-const urlParams = new URLSearchParams(window.location.search);
-const currentRoom = urlParams.get('room') || 'default'; // Hata: currentRoom tanımlı değildi
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <link href="https://fonts.googleapis.com/css2?family=Cinzel:wght@700&family=Rajdhani:wght@400;600;700&display=swap" rel="stylesheet">
+    
     <style>
-        :root { --gold: #ffd700; --gold-dark: #d4af37; --panel-dark: #0a0a0a; --neon-red: #ff003c; }
-        body { background: #000; color: #fff; height: 100dvh; display: flex; margin: 0; overflow: hidden; font-family: 'Rajdhani', sans-serif; }
+        :root {
+            --gold: #ffd700;
+            --gold-glow: rgba(255, 215, 0, 0.3);
+            --bg-dark: #050505;
+            --panel-dark: #0d0d0d;
+            --neon-red: #ff003c;
+        }
 
-        /* SOL: MASADAKİLER (VİDEOLAR) */
-        .video-sidebar { width: 160px; border-right: 2px solid var(--gold-dark); background: #050505; display: flex; flex-direction: column; padding: 10px; gap: 10px; overflow-y: auto; }
-        
-        /* ORTA: CHAT VE KONTROL */
-        .main-content { flex: 1; display: flex; flex-direction: column; background: radial-gradient(circle, #111 0%, #000 100%); }
-        
-        /* SAĞ: GLOBAL ONLINE PANELİ */
-        .global-sidebar { width: 200px; border-left: 1px solid #333; background: #080808; display: flex; flex-direction: column; }
-        
-        .v-slot { width: 140px; height: 140px; border: 2px solid #222; border-radius: 10px; overflow: hidden; position: relative; background: #000; flex-shrink: 0; cursor: pointer; }
-        .v-slot.active-speaker { border-color: var(--gold); box-shadow: 0 0 15px var(--gold); }
+        body {
+            background: var(--bg-dark);
+            color: #fff;
+            height: 100dvh;
+            margin: 0;
+            display: flex;
+            flex-direction: column;
+            font-family: 'Rajdhani', sans-serif;
+            overflow: hidden;
+        }
+
+        /* ÜST BAR: LOGO VE MASA BİLGİSİ */
+        .top-nav {
+            height: 60px;
+            background: linear-gradient(90deg, #000 0%, #111 50%, #000 100%);
+            border-bottom: 2px solid var(--gold);
+            display: flex;
+            align-items: center;
+            padding: 0 20px;
+            justify-content: space-between;
+            z-index: 100;
+        }
+
+        .host-info { display: flex; align-items: center; gap: 15px; }
+        .host-badge { border: 1px solid var(--gold); padding: 2px 10px; border-radius: 20px; color: var(--gold); font-size: 0.8rem; font-weight: bold; }
+
+        /* ANA YAPI: YATAY BLOKLAR */
+        .master-container {
+            flex: 1;
+            display: flex;
+            overflow: hidden;
+        }
+
+        /* SOL PANEL: KATILIMCI KAMERALARI (DİKEY) */
+        .video-grid {
+            width: 220px;
+            background: var(--panel-dark);
+            border-right: 1px solid #222;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            padding: 15px 0;
+            gap: 20px;
+            overflow-y: auto;
+        }
+
+        .v-slot {
+            width: 130px;
+            height: 130px;
+            border-radius: 50%; /* Dairesel Tasarım */
+            border: 3px solid #333;
+            overflow: hidden;
+            position: relative;
+            background: #000;
+            transition: 0.3s;
+            box-shadow: 0 0 15px rgba(0,0,0,0.5);
+        }
+
+        .v-slot.is-host { border-color: var(--gold); width: 150px; height: 150px; box-shadow: 0 0 20px var(--gold-glow); }
+        .v-slot.active-speaker { border-color: #39FF14; transform: scale(1.05); }
+
         video { width: 100%; height: 100%; object-fit: cover; }
-        .user-label { position: absolute; bottom: 0; width: 100%; background: rgba(0,0,0,0.7); color: var(--gold); font-size: 0.6rem; text-align: center; padding: 2px; }
+
+        .slot-controls {
+            position: absolute;
+            bottom: 5px;
+            display: flex;
+            gap: 5px;
+            width: 100%;
+            justify-content: center;
+            opacity: 0;
+            transition: 0.3s;
+        }
+        .v-slot:hover .slot-controls { opacity: 1; }
+        .mini-btn { width: 24px; height: 24px; border-radius: 50%; border: none; font-size: 10px; cursor: pointer; display: flex; align-items: center; justify-content: center; }
+
+        /* ORTA PANEL: GENİŞ EKRAN PAYLAŞIMI VE ÖZEL ALAN */
+        .presentation-area {
+            flex: 1;
+            background: radial-gradient(circle, #1a1a1a 0%, #000 100%);
+            display: flex;
+            flex-direction: column;
+            position: relative;
+        }
+
+        #shared-screen { flex: 1; width: 100%; object-fit: contain; }
+
+        /* SAĞ PANEL: GLOBAL VE CHAT */
+        .chat-sidebar {
+            width: 320px;
+            background: #080808;
+            border-left: 1px solid #222;
+            display: flex;
+            flex-direction: column;
+        }
+
+        .chat-messages { flex: 1; overflow-y: auto; padding: 15px; font-size: 0.9rem; }
+        .msg { margin-bottom: 8px; border-radius: 5px; padding: 5px 10px; background: rgba(255,255,255,0.05); }
 
         /* MENÜLER */
-        #action-menu { position: fixed; display: none; background: #111; border: 1px solid var(--gold); z-index: 10000; min-width: 180px; border-radius: 5px; box-shadow: 0 0 20px #000; }
-        .menu-item { padding: 10px 15px; cursor: pointer; font-size: 0.8rem; border-bottom: 1px solid #222; }
+        #context-menu {
+            position: fixed;
+            display: none;
+            background: #111;
+            border: 1px solid var(--gold);
+            border-radius: 8px;
+            z-index: 9999;
+            width: 200px;
+            overflow: hidden;
+        }
+        .menu-item { padding: 12px 15px; cursor: pointer; transition: 0.2s; font-size: 0.85rem; border-bottom: 1px solid #222; }
         .menu-item:hover { background: var(--gold); color: #000; }
 
-        .online-user-item { padding: 8px; border-bottom: 1px solid #111; font-size: 0.75rem; cursor: pointer; display: flex; align-items: center; justify-content: space-between; }
-        .online-user-item:hover { background: #151515; }
-        .dot { width: 6px; height: 6px; background: #39FF14; border-radius: 50%; }
-
-        @media (max-width: 768px) {
-            body { flex-direction: column; }
-            .video-sidebar { width: 100%; height: 120px; flex-direction: row; border-right: none; border-bottom: 1px solid var(--gold); }
-            .global-sidebar { display: none; } /* Mobilde sağ paneli butona bağlayabilirsin, şimdilik gizli */
+        /* MOBİL UYUM */
+        @media (max-width: 992px) {
+            .master-container { flex-direction: column; }
+            .video-grid { width: 100%; height: 140px; flex-direction: row; padding: 10px; }
+            .chat-sidebar { width: 100%; height: 250px; }
         }
     </style>
 </head>
 <body>
 
-<div class="video-sidebar" id="video-list">
-    <div class="v-slot" id="slot-me" onclick="showLocalMenu(event)">
-        <video id="localVideo" autoplay muted playsinline></video>
-        <div class="user-label">SİZ (KOMUTAN)</div>
+<nav class="top-nav">
+    <div class="host-info">
+        <img src="/img/logo.png" height="35" alt="BPL">
+        <div class="host-badge"><i class="fas fa-crown"></i> <span id="room-owner">Yükleniyor...</span></div>
     </div>
-</div>
+    <div class="d-flex align-items-center gap-3">
+        <div class="text-warning small fw-bold"><i class="fas fa-coins"></i> <span id="user-bpl"><%= user.bpl %></span> BPL</div>
+        <button onclick="toggleMic()" id="mic-btn" class="btn btn-sm btn-outline-light"><i class="fas fa-microphone"></i></button>
+        <button onclick="toggleVid()" id="vid-btn" class="btn btn-sm btn-outline-light"><i class="fas fa-video"></i></button>
+        <button onclick="exitRoom()" class="btn btn-sm btn-danger"><i class="fas fa-door-open"></i> AYRIL</button>
+    </div>
+</nav>
 
-<div class="main-content">
-    <div class="p-2 border-bottom border-secondary d-flex justify-content-between align-items-center">
-        <span class="text-warning fw-bold font-cinzel">KONSEY ODASI</span>
-        <div>
-            <button onclick="toggleMic()" id="mic-btn" class="btn btn-sm btn-outline-warning"><i class="fas fa-microphone"></i></button>
-            <button onclick="toggleVideo()" id="vid-btn" class="btn btn-sm btn-outline-warning"><i class="fas fa-video"></i></button>
+<div class="master-container">
+    <div class="video-grid" id="video-wrapper">
+        <div class="v-slot is-host" id="slot-me" onclick="openMyMenu(event)">
+            <video id="localVideo" autoplay muted playsinline></video>
+            <div class="slot-controls">
+                <span class="badge bg-dark text-warning">SİZ</span>
+            </div>
+        </div>
+        </div>
+
+    <div class="presentation-area">
+        <div id="screen-placeholder" class="h-100 d-flex align-items-center justify-content-center text-secondary">
+            <div class="text-center">
+                <i class="fas fa-shield-halved fa-4x mb-3 text-warning" style="opacity: 0.2;"></i>
+                <p class="font-cinzel">VIP STRATEJİ ODASI AKTİF</p>
+            </div>
+        </div>
+        <video id="shared-screen" autoplay playsinline style="display:none;"></video>
+    </div>
+
+    <div class="chat-sidebar">
+        <div class="p-2 border-bottom border-secondary bg-dark text-center small font-cinzel text-warning">VIP SOHBET</div>
+        <div class="chat-messages" id="meeting-chat"></div>
+        <div class="p-2 border-top border-secondary bg-black">
+            <div class="input-group">
+                <input type="text" id="m-input" class="form-control form-control-sm bg-dark text-white border-0" placeholder="Mesaj yaz...">
+                <button onclick="sendMsg()" class="btn btn-sm btn-warning"><i class="fas fa-paper-plane"></i></button>
+            </div>
+        </div>
+        
+        <div class="p-2 bg-dark">
+            <div class="input-group">
+                <input type="text" id="invite-nick" class="form-control form-control-sm bg-black text-white" placeholder="Oyuncu Nick...">
+                <button onclick="inviteUser()" class="btn btn-sm btn-success">DAVET</button>
+            </div>
         </div>
     </div>
-    
-    <div id="vip-chat" style="flex:1; overflow-y:auto; padding:15px; background:rgba(0,0,0,0.5);"></div>
-
-    <div class="p-3 bg-black border-top border-secondary">
-        <div class="input-group">
-            <span class="input-group-text bg-dark text-warning border-secondary"><span id="my-bpl"><%= user.bpl %></span></span>
-            <input type="text" id="chat-input" class="form-control bg-dark text-white border-secondary" placeholder="Mesaj gönder...">
-            <button onclick="sendMeetingMessage()" class="btn btn-warning">GÖNDER</button>
-        </div>
-    </div>
 </div>
 
-<div class="global-sidebar">
-    <div class="p-2 text-center border-bottom border-secondary bg-dark small">GLOBAL ONLINE</div>
-    <div id="global-list" style="overflow-y:auto; flex:1;">
-        </div>
-    <div class="p-2">
-        <input type="text" id="invite-nickname" class="form-control form-control-sm bg-dark text-white mb-1" placeholder="Nick gir...">
-        <button onclick="sendInvite()" class="btn btn-sm btn-outline-success w-100">MASAYA ÇAĞIR</button>
-    </div>
-</div>
-<div id="action-menu">
-    <div id="menu-title" class="p-2 bg-dark text-warning text-center small fw-bold"></div>
-    <div class="menu-item" onclick="askGiftAmount()">🎁 HEDİYE GÖNDER</div>
-    <div class="menu-item" onclick="handleAction('arena')">⚔️ ARENA DAVETİ</div>
-    <div class="menu-item text-danger" onclick="handleAction('mute')">🚫 SUSTUR</div>
-</div>
-
-<script>
-async function askGiftAmount() {
-    const { value: amount } = await Swal.fire({
-        title: 'Miktar Seçin',
-        input: 'select',
-        inputOptions: { '100': '100 BPL', '500': '500 BPL', '1000': '1000 BPL', '2000': '2000 BPL' },
-        inputPlaceholder: 'Miktar',
-        showCancelButton: true
-    });
-    if (amount) handleAction('gift', parseInt(amount));
-}
-</script>
-<div id="action-menu">
-    <div id="menu-title" class="p-2 bg-dark text-warning text-center small fw-bold"></div>
-    <div class="menu-item" onclick="handleAction('gift', 50)">🎁 50 BPL GÖNDER</div>
-    <div class="menu-item" onclick="handleAction('arena')">⚔️ ARENA DAVETİ</div>
-    <div class="menu-item text-danger" id="mute-option" onclick="handleAction('mute')">🚫 MİKROFONU KAPAT</div>
-    <div class="menu-item text-center bg-secondary text-white" onclick="hideMenu()">KAPAT</div>
+<div id="context-menu">
+    <div id="menu-user-title" class="p-2 bg-dark text-center text-warning small fw-bold border-bottom border-warning"></div>
+    <div class="menu-item" onclick="handleMenuAction('gift')"><i class="fas fa-gift me-2"></i>Hediye Gönder</div>
+    <div class="menu-item" onclick="handleMenuAction('arena')"><i class="fas fa-bolt me-2"></i>Arena Daveti</div>
+    <div class="menu-item text-danger host-only" onclick="handleMenuAction('mute')"><i class="fas fa-microphone-slash me-2"></i>Sustur</div>
+    <div class="menu-item text-danger host-only" onclick="handleMenuAction('kick')"><i class="fas fa-user-times me-2"></i>Odadan At</div>
 </div>
 
 <script src="/socket.io/socket.io.js"></script>
@@ -116,163 +207,151 @@ async function askGiftAmount() {
 <script>
     const socket = io();
     const myNick = "<%= user.nickname %>";
-let roomParam = new URLSearchParams(window.location.search).get('room');
-    const myPeer = new Peer();
+    const urlParams = new URLSearchParams(window.location.search);
+    const currentRoom = urlParams.get('room') || 'global';
+    
     let myStream;
-    let selectedTarget = null; // Menüde seçilen kişi
-    let inviteCount = 0;
+    let myPeer = new Peer();
+    let selectedUser = null;
 
-    // 1. Kamera Başlatma (iPhone uyumlu)
-    async function init() {
+    // 1. Kamera Başlatma
+    async function startMedia() {
         try {
             myStream = await navigator.mediaDevices.getUserMedia({ video: true, audio: true });
             document.getElementById('localVideo').srcObject = myStream;
         } catch (e) {
-            Swal.fire("Kamera Hatası", "Kamera erişimi sağlanamadı.", "error");
+            console.error("Medya hatası:", e);
+            Swal.fire("Hata", "Kamera veya Mikrofon bulunamadı!", "error");
         }
     }
 
-    // 2. Peer & Connection
+    // 2. Peer Bağlantısı
     myPeer.on('open', id => {
         socket.emit('join-meeting', { roomId: currentRoom, peerId: id, nickname: myNick });
     });
 
+    socket.on('room-info', data => {
+        document.getElementById('room-owner').innerText = data.owner;
+        if (data.owner === myNick) {
+            document.querySelectorAll('.host-only').forEach(el => el.style.display = 'block');
+        } else {
+            document.querySelectorAll('.host-only').forEach(el => el.style.display = 'none');
+        }
+    });
+
     myPeer.on('call', call => {
         call.answer(myStream);
-        call.on('stream', remoteStream => {
-            addVideoSlot(call.peer, remoteStream, "KATILIMCI");
+        call.on('stream', userStream => {
+            addRemoteVideo(call.peer, userStream, "Katılımcı");
         });
     });
 
     socket.on('user-connected', data => {
         if (data.peerId === myPeer.id) return;
-        setTimeout(() => {
-            const call = myPeer.call(data.peerId, myStream);
-            call.on('stream', remoteStream => {
-                addVideoSlot(data.peerId, remoteStream, data.nickname);
-            });
-        }, 1000);
-    });
-
-    function addVideoSlot(peerId, stream, nick) {
-        if (document.getElementById(peerId)) return;
-        const slot = document.createElement('div');
-        slot.className = "v-slot";
-        slot.id = peerId;
-        slot.onclick = (e) => showActionMenu(e, nick, peerId);
-        
-        const v = document.createElement('video');
-        v.srcObject = stream;
-        v.autoplay = true;
-        v.playsInline = true; // iPhone zorunlu
-        
-        const l = document.createElement('div');
-        l.className = "user-label";
-        l.innerText = nick;
-        
-        slot.append(v, l);
-        document.getElementById('video-list').append(slot);
-    }
-
-    // 3. Global Online Listesi (Sağ Panel)
-    socket.on('update-global-online', users => {
-        const list = document.getElementById('global-list');
-        list.innerHTML = "";
-        users.forEach(u => {
-            const div = document.createElement('div');
-            div.className = "online-user-item";
-            div.innerHTML = `<span>${u.nickname}</span> <div class="dot"></div>`;
-            div.onclick = () => { document.getElementById('invite-nickname').value = u.nickname; };
-            list.appendChild(div);
+        const call = myPeer.call(data.peerId, myStream);
+        call.on('stream', userStream => {
+            addRemoteVideo(data.peerId, userStream, data.nickname);
         });
     });
 
-    // 4. Davet Sistemi (Max 10)
-    function sendInvite() {
-        const target = document.getElementById('invite-nickname').value;
-        if (!target) return;
-        if (inviteCount >= 10) return Swal.fire("Limit", "Bu oturumda max 10 davet gönderebilirsin.", "warning");
+    function addRemoteVideo(peerId, stream, nick) {
+        if (document.getElementById(peerId)) return;
+        const wrapper = document.getElementById('video-wrapper');
+        const slot = document.createElement('div');
+        slot.className = "v-slot";
+        slot.id = peerId;
+        slot.onclick = (e) => showMenu(e, nick, peerId);
 
-        socket.emit('send-private-invite', { to: target, roomId: currentRoom });
-        inviteCount++;
-        Swal.fire("Başarılı", target + " davet edildi (" + inviteCount + "/10)", "success");
+        const video = document.createElement('video');
+        video.srcObject = stream;
+        video.autoplay = true;
+        video.playsInline = true;
+
+        const label = document.createElement('div');
+        label.className = "slot-controls";
+        label.innerHTML = `<span class="badge bg-dark">${nick}</span>`;
+
+        slot.append(video, label);
+        wrapper.append(slot);
     }
 
-    // 5. Menü İşlemleri
-    function showActionMenu(e, nick, peerId) {
+    // 3. Menü ve Aksiyonlar
+    function showMenu(e, nick, peerId) {
         e.stopPropagation();
-        selectedTarget = { nick, peerId };
-        const menu = document.getElementById('action-menu');
-        document.getElementById('menu-title').innerText = nick;
+        selectedUser = { nick, peerId };
+        const menu = document.getElementById('context-menu');
+        document.getElementById('menu-user-title').innerText = nick;
         menu.style.display = 'block';
         menu.style.left = e.clientX + 'px';
         menu.style.top = e.clientY + 'px';
     }
 
-    function handleAction(type, amt = 0) {
-        if (!selectedTarget) return;
+    async function handleMenuAction(action) {
+        if (!selectedUser) return;
         
-        if (type === 'gift') {
-            socket.emit('send-gift-vip', { targetNick: selectedTarget.nick, amount: amt, room: currentRoom });
-        } else if (type === 'arena') {
-            socket.emit('arena-invite-request', { to: selectedTarget.nick, from: myNick, roomId: currentRoom });
-        } else if (type === 'mute') {
-            socket.emit('mute-user', { targetPeerId: selectedTarget.peerId, roomId: currentRoom });
+        if (action === 'gift') {
+            const { value: amount } = await Swal.fire({
+                title: 'Hediye Miktarı',
+                input: 'select',
+                inputOptions: { '500': '500 BPL', '1000': '1000 BPL', '5000': '5000 BPL' },
+                background: '#111', color: '#fff'
+            });
+            if (amount) socket.emit('send-gift-vip', { targetNick: selectedUser.nick, amount: parseInt(amount), room: currentRoom });
+        } 
+        else if (action === 'kick') {
+            socket.emit('kick-user', { targetPeerId: selectedUser.peerId, room: currentRoom });
         }
-        hideMenu();
-    }
-
-    function hideMenu() { document.getElementById('action-menu').style.display = 'none'; }
-
-    // 6. Komutanın Susturma Komutu
-    socket.on('command-mute', data => {
-        if (myPeer.id === data.peerId) {
-            myStream.getAudioTracks()[0].enabled = false;
-            document.getElementById('mic-btn').innerHTML = '<i class="fas fa-microphone-slash"></i>';
-            Swal.fire({ toast: true, position: 'top', title: 'Komutan mikrofonunuzu kapattı!', icon: 'warning', showConfirmButton: false, timer: 2000 });
+        else if (action === 'arena') {
+            socket.emit('arena-invite-request', { to: selectedUser.nick });
         }
-    });
+        
+        document.getElementById('context-menu').style.display = 'none';
+    }
 
-  // Mesaj gönderme fonksiyonunu düzeltin
-function sendMeetingMessage() {
-    const input = document.getElementById('chat-input');
-    const message = input.value.trim();
-    if (message) {
-        // app.js'deki socket olayına uygun şekilde gönderin
-        socket.emit('meeting-message', { room: currentRoom, text: message }); 
-        input.value = "";
+    // 4. Sohbet
+    function sendMsg() {
+        const input = document.getElementById('m-input');
+        if (input.value.trim()) {
+            socket.emit('meeting-message', { room: currentRoom, text: input.value });
+            input.value = "";
+        }
     }
-}
-// Hediye gönderme fonksiyonunu handleAction ile uyumlu hale getirin
-async function askGiftAmount() {
-    const { value: amount } = await Swal.fire({
-        title: 'Miktar Seçin',
-        input: 'select',
-        inputOptions: { '100': '100 BPL', '500': '500 BPL', '1000': '1000 BPL' },
-        showCancelButton: true
-    });
-    if (amount) {
-        handleAction('gift', parseInt(amount));
-    }
-}
-    socket.on('new-meeting-message', d => {
-        const box = document.getElementById('vip-chat');
+
+    socket.on('new-meeting-message', data => {
+        const chat = document.getElementById('meeting-chat');
         const div = document.createElement('div');
-        div.innerHTML = `<small class="text-warning">[${d.sender}]:</small> <span class="text-white">${d.text}</span>`;
-        box.appendChild(div);
-        box.scrollTop = box.scrollHeight;
+        div.className = "msg";
+        div.innerHTML = `<b class="text-warning">${data.sender}:</b> <span class="text-light">${data.text}</span>`;
+        chat.appendChild(div);
+        chat.scrollTop = chat.scrollHeight;
     });
 
-    function toggleMic() { 
-        const state = myStream.getAudioTracks()[0].enabled = !myStream.getAudioTracks()[0].enabled;
-        document.getElementById('mic-btn').innerHTML = state ? '<i class="fas fa-microphone"></i>' : '<i class="fas fa-microphone-slash"></i>';
+    // 5. Kontroller
+    function toggleMic() {
+        const audio = myStream.getAudioTracks()[0];
+        audio.enabled = !audio.enabled;
+        document.getElementById('mic-btn').classList.toggle('btn-outline-danger');
     }
 
-    window.onclick = hideMenu;
-    init();
+    function toggleVid() {
+        const video = myStream.getVideoTracks()[0];
+        video.enabled = !video.enabled;
+        document.getElementById('vid-btn').classList.toggle('btn-outline-danger');
+    }
+
+    function exitRoom() {
+        window.location.href = "/chat";
+    }
+
+    socket.on('user-kicked', () => {
+        Swal.fire("Atıldın", "Masa sahibi seni odadan çıkardı.", "error").then(() => {
+            window.location.href = "/chat";
+        });
+    });
+
+    window.onclick = () => document.getElementById('context-menu').style.display = 'none';
+    startMedia();
 </script>
+
 </body>
 </html>
-
-
-
