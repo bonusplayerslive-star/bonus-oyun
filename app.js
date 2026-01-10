@@ -241,10 +241,42 @@ socket.on('arena-invite-received', (data) => {
         window.location.href = '/arena?vs=' + data.from; // Doğrudan arena sayfasına ve o kişiye yönlendir
     }
 });
+// BPL Hediye Etme Sistemi
+socket.on('send-gift-bpl', async (data) => {
+    try {
+        const sender = await User.findById(req.session.userId);
+        const receiver = await User.findOne({ nickname: data.toNickname });
 
-    
+        if (sender.bpl >= data.amount && data.amount > 0) {
+            sender.bpl -= Number(data.amount);
+            receiver.bpl += Number(data.amount);
+            
+            await sender.save();
+            await receiver.save();
+
+            // Alıcıya anlık bildirim gönder
+            const targetSocketId = onlineUsers.get(data.toNickname);
+            if (targetSocketId) {
+                io.to(targetSocketId).emit('gift-received', {
+                    from: sender.nickname,
+                    amount: data.amount
+                });
+            }
+            socket.emit('gift-success', { newBalance: sender.bpl });
+        }
+    } catch (err) { console.error("Hediye Hatası:", err); }
+});
+    socket.on('gift-received', (data) => {
+    alert("🎁 MÜJDE! " + data.from + " sana " + data.amount + " BPL hediye gönderdi!");
+    // Cüzdanı veya bakiye kısmını anlık güncelle
+    if(document.getElementById('user-bpl-display')) {
+        let current = parseInt(document.getElementById('user-bpl-display').innerText);
+        document.getElementById('user-bpl-display').innerText = current + parseInt(data.amount);
+    }
+});
 const PORT = process.env.PORT || 10000;
 server.listen(PORT, () => console.log(`🚀 SİSTEM AKTİF: ${PORT}`));
+
 
 
 
