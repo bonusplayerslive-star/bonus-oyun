@@ -351,10 +351,11 @@ io.on('connection', async (socket) => {
         broadcastOnlineList(); // Listeyi güncelle
     });
 });
-    });
+
 }); // <--- BU PARANTEZ EKSİK OLABİLİR (io.on kapanışı)
 const PORT = process.env.PORT || 10000;
 server.listen(PORT, () => console.log(`🚀 SİSTEM AKTİF: ${PORT}`));
+
 
 
 
