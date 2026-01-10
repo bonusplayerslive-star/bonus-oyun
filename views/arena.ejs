@@ -36,60 +36,72 @@
 
 <script src="/socket.io/socket.io.js"></script>
 <script>
+    // Global değişkenler
     const socket = io();
     const myNick = "<%= user.nickname %>";
-    const myAnimal = "<%= user.selectedAnimal %>";
+    // user nesnesinden seçili hayvanı güvenli bir şekilde alalım
+    const myAnimal = "<%= user.selectedAnimal || '' %>"; 
     const arenaVideo = document.getElementById('arena-video');
 
     function startSearch(bet, prize) {
+        console.log("Arama başlatıldı, Bahis:", bet);
         document.getElementById('bet-screen').style.display = 'none';
         document.getElementById('wait-screen').style.display = 'block';
         
+        // Sunucuya katılma isteği gönder
         socket.emit('arena-join-queue', { bet: bet, prize: prize });
 
         let count = 13;
         const countdown = setInterval(() => {
             count--;
-            document.getElementById('timer').innerText = count;
-            if(count <= 0) clearInterval(countdown);
+            const timerEl = document.getElementById('timer');
+            if (timerEl) timerEl.innerText = count;
+            
+            if(count <= 0) {
+                clearInterval(countdown);
+            }
         }, 1000);
     }
 
     socket.on('arena-match-found', (data) => {
+        console.log("Eşleşme bulundu:", data);
         document.getElementById('wait-screen').style.display = 'none';
         document.getElementById('battle-screen').style.display = 'block';
-        arenaVideo.style.display = 'block';
+        
+        if (arenaVideo) {
+            arenaVideo.style.display = 'block';
 
-        // Klasör yapına uygun yol: /caracter/move/Hayvan/Hayvan1.mp4
-        const opponentAnimal = data.opponent.animal;
-        const winnerAnimal = data.winnerAnimal;
+            // Klasör yapın: /caracter/move/Hayvan/Hayvan1.mp4
+            const opponentAnimal = data.opponent.animal;
+            const winnerAnimal = data.winnerAnimal;
 
-        // 1. Aşama: Rakip Saldırıyor (Hayvan1.mp4)
-        arenaVideo.src = `/caracter/move/${opponentAnimal}/${opponentAnimal}1.mp4`;
-        arenaVideo.play().catch(e => console.error("Video hatası:", e));
+            // 1. AŞAMA: Rakip Saldırısı
+            arenaVideo.src = `/caracter/move/${opponentAnimal}/${opponentAnimal}1.mp4`;
+            arenaVideo.play().catch(e => console.error("Video oynatılamadı:", e));
 
-        arenaVideo.onended = () => {
-            // 2. Aşama: Kazananın Videosu (Hayvan.mp4)
-            setTimeout(() => {
-                arenaVideo.src = `/caracter/move/${winnerAnimal}/${winnerAnimal}.mp4`;
-                arenaVideo.play();
-                
-                arenaVideo.onended = () => {
-                    const vicText = document.getElementById('victory-text');
-                    vicText.style.display = 'block';
+            arenaVideo.onended = () => {
+                // 2. AŞAMA: Kazananın Videosu
+                setTimeout(() => {
+                    arenaVideo.src = `/caracter/move/${winnerAnimal}/${winnerAnimal}.mp4`;
+                    arenaVideo.play();
                     
-                    if(data.winner === myNick) {
-                        vicText.innerText = "VICTORY!";
-                        vicText.className = "display-3 mt-3 text-success";
-                    } else {
-                        vicText.innerText = "DEFEAT";
-                        vicText.className = "display-3 mt-3 text-danger";
-                    }
-                    
-                    // 4 saniye sonra geri dön
-                    setTimeout(() => { window.location.href = '/chat'; }, 4000);
-                };
-            }, 500);
-        };
+                    arenaVideo.onended = () => {
+                        const vicText = document.getElementById('victory-text');
+                        if (vicText) {
+                            vicText.style.display = 'block';
+                            if(data.winner === myNick) {
+                                vicText.innerText = "TEBRİKLER! KAZANDIN";
+                                vicText.style.color = "#28a745";
+                            } else {
+                                vicText.innerText = "MAĞLUP OLDUN";
+                                vicText.style.color = "#dc3545";
+                            }
+                        }
+                        // 4 saniye sonra yönlendir
+                        setTimeout(() => { window.location.href = '/chat'; }, 4000);
+                    };
+                }, 500);
+            };
+        }
     });
 </script>
