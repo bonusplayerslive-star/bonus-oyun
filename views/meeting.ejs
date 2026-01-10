@@ -351,7 +351,20 @@
 
     window.onclick = () => document.getElementById('context-menu').style.display = 'none';
     startMedia();
+
+// Bakiyeyi anlık güncellemek için
+socket.on('update-bpl', (newBalance) => {
+    document.getElementById('user-bpl').innerText = newBalance;
+});
+
+// Hediye bildirimi geldiğinde mesaj olarak göster
+socket.on('error', (msg) => {
+    Swal.fire("Hata", msg, "error");
+});
+
+
 </script>
 
 </body>
 </html>
+
