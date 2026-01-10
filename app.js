@@ -491,7 +491,7 @@ app.use((req, res, next) => {
         message: 'Aradığınız sayfa BPL sisteminde bulunamadı!',
         user: res.locals.user 
     });
-});
+
 
 // Global Hata Yakalayıcı
 app.use((err, req, res, next) => {
@@ -511,6 +511,7 @@ server.listen(PORT, () => {
     ===========================================
     `);
 });
+
 
 
 
