@@ -198,11 +198,66 @@ io.on('connection', async (socket) => {
     const user = await User.findById(uId);
     if (!user) return;
 
-    // Chat Odası
+  // --- GÜVENLİ SOCKET YÖNETİMİ ---
+const onlineUsers = new Map(); // Nickname -> SocketId eşleşmesi için kritik
+
+io.on('connection', async (socket) => {
+    const uId = socket.request.session?.userId;
+    if (!uId) return;
+    const user = await User.findById(uId);
+    if (!user) return;
+
+    // Kullanıcıyı odaya al ve online listesine kaydet
+    onlineUsers.set(user.nickname, socket.id);
     socket.join("general-chat");
+
+    // 1. Standart Mesajlaşma (Senin yapın korundu)
     socket.on('chat-message', (data) => {
-        io.to("general-chat").emit('new-message', { sender: user.nickname, text: data.text });
+        io.to("general-chat").emit('new-message', { 
+            sender: user.nickname, 
+            text: data.text 
+        });
     });
+
+    // 2. Güvenli Hediye Sistemi (Veritabanı kontrollü)
+    socket.on('send-gift-bpl', async (data) => {
+        try {
+            const amount = parseInt(data.amount);
+            const sender = await User.findById(uId);
+            const receiver = await User.findOne({ nickname: data.toNickname });
+
+            // Bakiye kontrolü: Gönderdikten sonra en az 25 BPL kalmalı
+            if (receiver && sender.bpl >= (amount + 25)) {
+                sender.bpl -= amount;
+                receiver.bpl += amount;
+                await sender.save();
+                await receiver.save();
+
+                // Alıcıya özel bildirim gönder
+                const targetSid = onlineUsers.get(data.toNickname);
+                if (targetSid) {
+                    io.to(targetSid).emit('gift-received', { from: user.nickname, amount: amount });
+                }
+                // Gönderene onay ver
+                socket.emit('gift-success', { newBpl: sender.bpl });
+            } else {
+                socket.emit('error-message', 'Yetersiz bakiye veya 25 BPL limiti engeli!');
+            }
+        } catch (e) { console.error("Hediye hatası:", e); }
+    });
+
+    // 3. Arena Daveti (Sadece ilgili kişiye gider)
+    socket.on('arena-invite-request', (data) => {
+        const targetSid = onlineUsers.get(data.to);
+        if (targetSid) {
+            io.to(targetSid).emit('arena-invite-received', { from: user.nickname });
+        }
+    });
+
+    socket.on('disconnect', () => {
+        onlineUsers.delete(user.nickname);
+    });
+});
 
 // --- MEETING ODASI MANTIĞI ---
 socket.on('join-meeting', (roomId) => {
@@ -276,6 +331,7 @@ socket.on('send-gift-bpl', async (data) => {
 });
 const PORT = process.env.PORT || 10000;
 server.listen(PORT, () => console.log(`🚀 SİSTEM AKTİF: ${PORT}`));
+
 
 
 
