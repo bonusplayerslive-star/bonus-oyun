@@ -204,14 +204,47 @@ io.on('connection', async (socket) => {
         io.to("general-chat").emit('new-message', { sender: user.nickname, text: data.text });
     });
 
-    // Meeting & Video Odası
-    socket.on('join-meeting', (roomId) => {
+// --- MEETING ODASI MANTIĞI ---
+socket.on('join-meeting', (roomId) => {
+    const roomSize = io.sockets.adapter.rooms.get(roomId)?.size || 0;
+    
+    if (roomSize < 5) { // En fazla 5 kişi sınırı
         socket.join(roomId);
-        socket.to(roomId).emit('user-connected', socket.id);
-    });
+        console.log(`${user.nickname} odaya katıldı: ${roomId}`);
+    } else {
+        socket.emit('error-message', 'Bu masa dolu! (Max 5 Kişi)');
+    }
 });
 
+// Sadece odaya özel mesajlaşma (Global Chat'ten ayrı)
+socket.on('meeting-message', (data) => {
+    // data.room kullanıcının bulunduğu 50 BPL'lik özel oda ID'sidir
+    io.to(data.room).emit('new-meeting-message', {
+        sender: user.nickname,
+        text: data.text,
+        time: new Date().toLocaleTimeString()
+    });
+});
+// Arena davetini ilet
+socket.on('arena-invite-request', (data) => {
+    const targetSocketId = onlineUsers.get(data.to); // Online kullanıcı listesinden socket bul
+    if (targetSocketId) {
+        io.to(targetSocketId).emit('arena-invite-received', {
+            from: data.from,
+            roomId: data.roomId
+        });
+    }
+});
+socket.on('arena-invite-received', (data) => {
+    const accept = confirm(data.from + " seni Arena'da düelloya davet ediyor! Kabul ediyor musun?");
+    if (accept) {
+        window.location.href = '/arena?vs=' + data.from; // Doğrudan arena sayfasına ve o kişiye yönlendir
+    }
+});
+
+    
 const PORT = process.env.PORT || 10000;
 server.listen(PORT, () => console.log(`🚀 SİSTEM AKTİF: ${PORT}`));
+
 
 
