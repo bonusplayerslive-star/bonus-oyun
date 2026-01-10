@@ -191,7 +191,19 @@ app.post('/api/select-animal', authRequired, async (req, res) => {
 
 // --- 6. SOCKET.IO (CHAT, MEETING, HEDIYE & ARENA) ---
 const onlineUsers = new Map(); // Global olarak tanımlı kalmalı
+// Global online listesini herkese periyodik gönder
+setInterval(() => {
+    const onlineUsers = Array.from(io.sockets.sockets.values()).map(s => ({
+        nickname: s.nickname,
+        id: s.id
+    }));
+    io.emit('update-global-online', onlineUsers);
+}, 5000);
 
+socket.on('mute-user', (data) => {
+    // data.targetPeerId'ye sahip kullanıcıya susturma sinyali gönder
+    io.to(data.roomId).emit('command-mute', { peerId: data.targetPeerId });
+});
 io.on('connection', async (socket) => {
     const uId = socket.request.session?.userId;
     if (!uId) return;
@@ -438,6 +450,7 @@ async function startBattle(p1, p2, io) {
 }
 const PORT = process.env.PORT || 10000;
 server.listen(PORT, () => console.log(`🚀 SİSTEM AKTİF: ${PORT}`));
+
 
 
 
