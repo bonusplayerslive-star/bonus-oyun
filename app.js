@@ -403,7 +403,7 @@ app.post('/api/enter-arena', authRequired, async (req, res) => {
         res.status(500).json({ success: false });
     }
 });
-let arenaQueue = [];
+
 
 socket.on('join-arena', (data) => {
     const userId = socket.request.session.userId;
@@ -498,6 +498,7 @@ async function startBattle(p1, p2, io) {
 }
 const PORT = process.env.PORT || 10000;
 server.listen(PORT, () => console.log(`🚀 SİSTEM AKTİF: ${PORT}`));
+
 
 
 
