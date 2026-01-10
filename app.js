@@ -80,15 +80,36 @@ const authRequired = (req, res, next) => {
 };
 
 const adminRequired = async (req, res, next) => {
-    if (!req.session || !req.session.userId) return res.status(401).send('Yetkisiz erişim.');
+ // app.js - Satır 83'ten itibaren bu bloğu komple değiştir
+app.post('/auth/register', async (req, res) => { // 'async' buraya gelecek
+    const { nickname, email, password } = req.body;
     try {
-        const user = await User.findById(req.session.userId);
-        if (user && user.role === 'admin') return next();
-        res.status(403).render('error', { message: 'Bu alan için Admin yetkisi gerekiyor.' });
-    } catch (e) {
-        res.status(500).send("Admin yetki kontrolü sırasında hata oluştu.");
+        const existing = await User.findOne({ $or: [{ email: email.toLowerCase() }, { nickname: nickname.trim() }] });
+        if (existing) return res.status(400).send("Bu bilgiler zaten kullanımda.");
+
+        const salt = await bcrypt.genSalt(10);
+        const hashedPassword = await bcrypt.hash(password, salt);
+
+        const newUser = new User({
+            nickname: nickname.trim(),
+            email: email.toLowerCase().trim(),
+            password: hashedPassword,
+            bpl: 2500,
+            inventory: [],
+            selectedAnimal: "none",
+            stats: { wins: 0, losses: 0 }
+        });
+
+        // --- DOĞRU YER BURASI ---
+        const savedUser = await newUser.save(); //
+        req.session.userId = savedUser._id; // Oturumu aç
+        res.redirect('/profil'); // Profile yönlendir
+
+    } catch (err) {
+        console.error("Register Hatası:", err);
+        res.status(500).send("Kayıt başarısız: " + err.message);
     }
-};
+}); // Fonksiyon burada bitmeli!
 // --- 4. ANA SAYFA VE AUTH ROTALARI ---
 
 app.get('/', (req, res) => {
@@ -493,6 +514,7 @@ server.listen(PORT, () => {
     ===========================================
     `);
 });
+
 
 
 
