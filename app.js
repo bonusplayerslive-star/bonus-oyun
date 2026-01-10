@@ -79,14 +79,16 @@ app.get('/', (req, res) => {
     res.render('index', { title: 'BPL Ultimate' });
 });
 
-// Kayıt Rotası (Parantezler Düzeltildi)
+// --- AUTH ROTALARI ---
 app.post('/auth/register', async (req, res) => {
     const { nickname, email, password } = req.body;
     try {
         const existing = await User.findOne({ $or: [{ email: email.toLowerCase() }, { nickname: nickname.trim() }] });
-        if (existing) return res.status(400).send("Bu bilgiler kullanımda.");
+        if (existing) return res.status(400).send("Bu bilgiler zaten kullanımda.");
 
-        const hashedPassword = await bcrypt.hash(password, 10);
+        const salt = await bcrypt.genSalt(10);
+        const hashedPassword = await bcrypt.hash(password, salt);
+
         const newUser = new User({
             nickname: nickname.trim(),
             email: email.toLowerCase().trim(),
@@ -100,6 +102,7 @@ app.post('/auth/register', async (req, res) => {
         const savedUser = await newUser.save();
         req.session.userId = savedUser._id;
         res.redirect('/profil');
+
     } catch (err) {
         console.error("Kayıt Hatası:", err);
         res.status(500).send("Kayıt başarısız: " + err.message);
@@ -206,4 +209,5 @@ app.use((req, res) => res.status(404).render('error', { message: 'Sayfa bulunama
 
 const PORT = process.env.PORT || 3000;
 server.listen(PORT, () => console.log(`🚀 Sunucu ${PORT} üzerinde aktif!`));
+
 
