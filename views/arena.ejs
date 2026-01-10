@@ -1,16 +1,16 @@
 <%- include('header') %>
 <style>
     .arena-container { min-height: 80vh; display: flex; flex-direction: column; align-items: center; justify-content: center; background: rgba(0,0,0,0.8); border-radius: 20px; padding: 20px; margin-top: 20px; border: 2px solid var(--gold); }
-    #video-player { width: 100%; max-width: 800px; border-radius: 15px; border: 3px solid var(--neon-green); display: none; box-shadow: 0 0 30px rgba(57, 255, 20, 0.4); }
-    .bet-btn { font-family: 'Orbitron'; transition: 0.3s; margin: 5px; }
+    #arena-video { width: 100%; max-width: 800px; border-radius: 15px; border: 3px solid var(--gold); display: none; box-shadow: 0 0 30px rgba(255, 215, 0, 0.4); }
+    .bet-btn { font-family: 'Rajdhani', sans-serif; transition: 0.3s; margin: 5px; min-width: 120px; font-weight: bold; }
     .bet-btn:hover { transform: scale(1.1); box-shadow: 0 0 15px var(--gold); }
-    #status-text { font-family: 'Orbitron'; font-size: 1.5rem; text-shadow: 0 0 10px red; }
+    #status-text { font-family: 'Cinzel', serif; font-size: 1.5rem; text-shadow: 0 0 10px red; }
 </style>
 
 <div class="container text-center">
     <div class="arena-container">
         <div id="bet-screen">
-            <h2 class="font-orbitron text-warning mb-4">ARENA BAHİSİNİ SEÇ</h2>
+            <h2 class="text-warning mb-4">ARENA BAHİSİNİ SEÇ</h2>
             <div class="row justify-content-center">
                 <button onclick="startSearch(25, 50)" class="btn btn-outline-success bet-btn col-5 col-md-2">25 → 50 BPL</button>
                 <button onclick="startSearch(35, 100)" class="btn btn-outline-info bet-btn col-5 col-md-2">35 → 100 BPL</button>
@@ -21,15 +21,15 @@
         </div>
 
         <div id="wait-screen" style="display: none;">
-            <h1 id="timer" class="display-1 font-orbitron text-danger">13</h1>
-            <h3 class="font-orbitron">RAKİP ARANIYOR...</h3>
+            <h1 id="timer" class="display-1 text-danger">13</h1>
+            <h3 class="text-white">RAKİP ARANIYOR...</h3>
             <div class="spinner-grow text-warning" role="status"></div>
         </div>
 
         <div id="battle-screen" style="display: none;">
-            <h2 id="battle-title" class="font-orbitron text-uppercase mb-3">SAVAŞ BAŞLADI!</h2>
+            <h2 id="battle-title" class="text-warning text-uppercase mb-3">SAVAŞ BAŞLADI!</h2>
             <video id="arena-video" playsinline></video>
-            <h1 id="victory-text" class="display-3 font-orbitron mt-3" style="display: none;">VICTORY</h1>
+            <h1 id="victory-text" class="display-3 mt-3" style="display: none;">VICTORY</h1>
         </div>
     </div>
 </div>
@@ -37,79 +37,59 @@
 <script src="/socket.io/socket.io.js"></script>
 <script>
     const socket = io();
-    let myAnimal = "<%= user.selectedAnimal %>";
-    let arenaVideo = document.getElementById('arena-video');
+    const myNick = "<%= user.nickname %>";
+    const myAnimal = "<%= user.selectedAnimal %>";
+    const arenaVideo = document.getElementById('arena-video');
 
     function startSearch(bet, prize) {
         document.getElementById('bet-screen').style.display = 'none';
         document.getElementById('wait-screen').style.display = 'block';
         
-        socket.emit('arena-join-queue', { bet: bet, prize: prize, animal: myAnimal });
+        socket.emit('arena-join-queue', { bet: bet, prize: prize });
 
         let count = 13;
-        let countdown = setInterval(() => {
+        const countdown = setInterval(() => {
             count--;
             document.getElementById('timer').innerText = count;
             if(count <= 0) clearInterval(countdown);
         }, 1000);
     }
 
-    ssocket.on('arena-match-found', (data) => {
-    document.getElementById('wait-screen').style.display = 'none';
-    document.getElementById('battle-screen').style.display = 'block';
-    const arenaVideo = document.getElementById('arena-video');
-    arenaVideo.style.display = 'block';
+    socket.on('arena-match-found', (data) => {
+        document.getElementById('wait-screen').style.display = 'none';
+        document.getElementById('battle-screen').style.display = 'block';
+        arenaVideo.style.display = 'block';
 
-    // Dosya yolunu resimlerdeki yapıya göre güncelleyin: /caracter/move/Hayvan/Hayvan1.mp4
-    // app.js'den gelen rakip hayvan ismini (data.opponent.animal) kullanın
-    const opponentAnimal = data.opponent.animal; 
-    const winnerAnimal = data.winnerAnimal; // Sunucudan kazananın hayvan ismi gelmeli
+        // Klasör yapına uygun yol: /caracter/move/Hayvan/Hayvan1.mp4
+        const opponentAnimal = data.opponent.animal;
+        const winnerAnimal = data.winnerAnimal;
 
-    // 1. Aşama: Rakip saldırısı
-    arenaVideo.src = `/caracter/move/${opponentAnimal}/${opponentAnimal}1.mp4`; 
-    arenaVideo.play().catch(err => console.error("Video oynatılamadı:", err));
-
-    arenaVideo.onended = () => {
-        // 2. Aşama: Kazananın videosu
-        setTimeout(() => {
-            arenaVideo.src = `/caracter/move/${winnerAnimal}/${winnerAnimal}.mp4`;
-            arenaVideo.play();
-            
-            arenaVideo.onended = () => {
-                const vicText = document.getElementById('victory-text');
-                vicText.style.display = 'block';
-                vicText.innerText = (data.winner === myNick) ? "ZAFER!" : "MAĞLUBİYET";
-                setTimeout(() => { window.location.href = '/chat'; }, 3000);
-            };
-        }, 500);
-    };
-});
-        // 1. Rakip Hamlesi Videosu
-        arenaVideo.src = `/videos/${data.opponentAnimal}1.mp4`;
-        arenaVideo.play();
+        // 1. Aşama: Rakip Saldırıyor (Hayvan1.mp4)
+        arenaVideo.src = `/caracter/move/${opponentAnimal}/${opponentAnimal}1.mp4`;
+        arenaVideo.play().catch(e => console.error("Video hatası:", e));
 
         arenaVideo.onended = () => {
-            // 2. Kazananın Final Videosu
+            // 2. Aşama: Kazananın Videosu (Hayvan.mp4)
             setTimeout(() => {
-                arenaVideo.src = `/videos/${data.winnerAnimal}.mp4`;
+                arenaVideo.src = `/caracter/move/${winnerAnimal}/${winnerAnimal}.mp4`;
                 arenaVideo.play();
                 
                 arenaVideo.onended = () => {
                     const vicText = document.getElementById('victory-text');
                     vicText.style.display = 'block';
-                    if(data.winner === "<%= user.nickname %>") {
-                        vicText.innerText = "VICTORY + " + data.prize + " BPL";
-                        vicText.className = "display-3 font-orbitron mt-3 text-success pulse";
+                    
+                    if(data.winner === myNick) {
+                        vicText.innerText = "VICTORY!";
+                        vicText.className = "display-3 mt-3 text-success";
                     } else {
                         vicText.innerText = "DEFEAT";
-                        vicText.className = "display-3 font-orbitron mt-3 text-danger";
+                        vicText.className = "display-3 mt-3 text-danger";
                     }
                     
-                    // 3 Saniye sonra Chat'e at
-                    setTimeout(() => { window.location.href = '/chat'; }, 3000);
+                    // 4 saniye sonra geri dön
+                    setTimeout(() => { window.location.href = '/chat'; }, 4000);
                 };
             }, 500);
         };
     });
 </script>
-
