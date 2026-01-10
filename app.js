@@ -1,10 +1,10 @@
 /**
- * BPL ULTIMATE - FULL SYSTEM (ARENA, MARKET, MEETING, WALLET)
+ * BPL ULTIMATE - GÜNCELLENMİŞ FULL SİSTEM
  */
 const express = require('express');
 const mongoose = require('mongoose');
 const session = require('express-session');
-const MongoStore = require('connect-mongo').default;
+const MongoStore = require('connect-mongo'); // .default hataya sebep olabilir, düzeltildi
 const http = require('http');
 const socketIo = require('socket.io');
 const path = require('path');
@@ -14,9 +14,11 @@ const User = require('./models/User');
 
 const app = express();
 const server = http.createServer(app);
-const io = socketIo(server);
+const io = socketIo(server, {
+    cors: { origin: "*", methods: ["GET", "POST"] } // Bağlantı sorunları için
+});
 
-// --- 1. VERİTABANI VE SESSION GÜVENLİĞİ ---
+// --- 1. VERİTABANI VE SESSION ---
 const MONGO_URI = process.env.MONGO_URI;
 const SESSION_SECRET = process.env.SESSION_SECRET || 'bpl_ultimate_megasecret_2024';
 
@@ -34,7 +36,7 @@ const sessionMiddleware = session({
     resave: false,
     saveUninitialized: false,
     store: MongoStore.create({ mongoUrl: MONGO_URI, ttl: 24 * 60 * 60 }),
-    cookie: { secure: false, maxAge: 24 * 60 * 60 * 1000 }
+    cookie: { secure: false, maxAge: 24 * 60 * 60 * 1000, httpOnly: true }
 });
 app.use(sessionMiddleware);
 
@@ -59,13 +61,12 @@ const authRequired = (req, res, next) => {
     res.redirect('/');
 };
 
-// --- 3. AUTH (KAYIT VE GİRİŞ) SİSTEMİ ---
+// --- 3. AUTH ROTALARI ---
 app.get('/', (req, res) => {
     if (req.session.userId) return res.redirect('/profil');
     res.render('index', { title: 'BPL Ultimate' });
 });
 
-// Kayıt rotasındaki 404 hatası ve parantez hataları burada çözüldü
 app.post('/register', async (req, res) => {
     const { nickname, email, password } = req.body;
     try {
@@ -79,33 +80,36 @@ app.post('/register', async (req, res) => {
             password: hashedPassword,
             bpl: 2500,
             inventory: [],
-            selectedAnimal: "none",
-            stats: { wins: 0, losses: 0 }
+            selectedAnimal: "none"
         });
 
         const savedUser = await newUser.save();
         req.session.userId = savedUser._id;
         res.redirect('/profil');
-    } catch (err) {
-        console.error("Kayıt Hatası:", err);
-        res.status(500).send("Sistem hatası: " + err.message);
-    }
+    } catch (err) { res.status(500).send("Kayıt hatası: " + err.message); }
 });
 
-// --- 4. TÜM OYUN SAYFALARI (SAVAŞ, MARKET, DAVET, CÜZDAN) ---
-app.get('/profil', authRequired, (req, res) => res.render('profil', { user: res.locals.user }));
-app.get('/market', authRequired, (req, res) => res.render('market', { user: res.locals.user }));
-app.get('/arena', authRequired, (req, res) => res.render('arena', { user: res.locals.user }));
-app.get('/development', authRequired, (req, res) => res.render('development', { user: res.locals.user }));
-app.get('/wallet', authRequired, (req, res) => res.render('wallet', { user: res.locals.user }));
-app.get('/meeting', authRequired, (req, res) => res.render('meeting', { user: res.locals.user }));
+// --- 4. SAYFA ROTALARI ---
+app.get('/profil', authRequired, (req, res) => res.render('profil'));
+app.get('/market', authRequired, (req, res) => res.render('market'));
+app.get('/arena', authRequired, (req, res) => res.render('arena'));
+app.get('/development', authRequired, (req, res) => res.render('development'));
+app.get('/wallet', authRequired, (req, res) => {
+    // EJS hatasını önlemek için veriyi garanti altına alıyoruz
+    res.render('wallet', { bpl: res.locals.user.bpl || 0 });
+});
+app.get('/meeting', authRequired, (req, res) => res.render('meeting'));
+app.get('/chat', authRequired, (req, res) => res.render('chat')); // Chat rotası eklendi
 
-// --- 5. MARKET API (HEDİYE/SATIN ALMA) ---
+// --- 5. MARKET & GELİŞTİRME API (25 BPL SINIRI) ---
 app.post('/api/buy-item', authRequired, async (req, res) => {
     const { itemName, price } = req.body;
     try {
         const user = await User.findById(req.session.userId);
-        if (user.bpl < price) return res.status(400).json({ success: false, error: 'BPL Yetersiz!' });
+        // Stratejik limit 25 BPL olarak güncellendi
+        if ((user.bpl - price) < 25) {
+            return res.status(400).json({ success: false, error: 'Limit Engelli: Bakiyeniz 25 BPL altına düşemez!' });
+        }
         
         user.bpl -= price;
         user.inventory.push({
@@ -118,24 +122,44 @@ app.post('/api/buy-item', authRequired, async (req, res) => {
     } catch (err) { res.status(500).json({ success: false }); }
 });
 
-// --- 6. ARENA VE CHAT (SAVAŞ SİSTEMİ) ---
-const onlineUsers = new Map();
+// --- 6. SOCKET.IO (MEETING, ARENA, CHAT) ---
+const rooms = {};
+
 io.on('connection', async (socket) => {
     const uId = socket.request.session?.userId;
     if (!uId) return;
     const user = await User.findById(uId);
     if (!user) return;
-    
-    onlineUsers.set(user.nickname, socket.id);
-    socket.join("general-chat");
 
+    // --- Global Chat ---
+    socket.join("general-chat");
     socket.on('chat-message', (data) => {
-        io.to("general-chat").emit('new-message', { sender: user.nickname, text: data.text });
+        io.to("general-chat").emit('new-message', { 
+            sender: user.nickname, 
+            text: data.text,
+            time: new Date().toLocaleTimeString()
+        });
     });
 
-    socket.on('disconnect', () => onlineUsers.delete(user.nickname));
+    // --- Meeting & Video Room ---
+    socket.on('join-meeting', (roomId) => {
+        socket.join(roomId);
+        socket.to(roomId).emit('user-connected', socket.id);
+        
+        socket.on('disconnect', () => {
+            socket.to(roomId).emit('user-disconnected', socket.id);
+        });
+    });
+
+    // WebRTC Sinyalleşme (Kamera için şart)
+    socket.on('signal', (data) => {
+        io.to(data.to).emit('signal', {
+            from: socket.id,
+            signal: data.signal
+        });
+    });
 });
 
-// --- 7. SUNUCU BAŞLATMA ---
-const PORT = process.env.PORT || 3000;
-server.listen(PORT, () => console.log(`🚀 BPL ULTIMATE TÜM SİSTEMLER AKTİF: ${PORT}`));
+// --- 7. START ---
+const PORT = process.env.PORT || 10000;
+server.listen(PORT, () => console.log(`🚀 SİSTEM AKTİF: ${PORT}`));
