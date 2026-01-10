@@ -377,11 +377,12 @@ async function startBattle(p1, p2, io) {
         arenaQueue = arenaQueue.filter(p => p.socketId !== socket.id);
         console.log(`❌ ${socket.nickname || 'Bilinmeyen'} ayrıldı.`);
     });
-}); // io.on('connection') bloğunu burada kapatıyoruz.
+});
 }
 
 const PORT = process.env.PORT || 10000;
 server.listen(PORT, () => console.log(`🚀 SİSTEM AKTİF: ${PORT}`));
+
 
 
 
