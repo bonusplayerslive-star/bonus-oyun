@@ -280,8 +280,72 @@ io.on('connection', async (socket) => {
     });
 });
 
+
+
+// --- ARENA MATCHMAKING & BOT SİSTEMİ ---
+let arenaQueue = []; // Bekleyen oyuncular havuzu
+
+const BOTS = [
+    { name: "Aslan", hp: 120, atk: 25, def: 15, img: "/caracter/profile/Lion.jpg" },
+    { name: "Kurt", hp: 100, atk: 30, def: 10, img: "/caracter/profile/Wolf.jpg" },
+    { name: "Goril", hp: 80, atk: 35, def: 5, img: "/caracter/profile/Gorilla.jpg" },
+    { name: "Gergedan", hp: 150, atk: 20, def: 20, img: "/caracter/profile/Rhino.jpg" }
+];
+
+app.post('/api/enter-arena', authRequired, async (req, res) => {
+    try {
+        const user = await User.findById(req.session.userId);
+        if (!user.selectedAnimal || user.selectedAnimal === "none") {
+            return res.status(400).json({ success: false, error: 'Önce profilinden bir hayvan seçmelisiniz!' });
+        }
+
+        const playerAnimal = user.inventory.find(i => i.name === user.selectedAnimal);
+        
+        // Oyuncuyu sıraya ekle
+        const ticket = {
+            id: user._id,
+            nickname: user.nickname,
+            animal: playerAnimal,
+            socketId: onlineUsers.get(user.nickname)
+        };
+
+        // Eğer sırada bekleyen varsa eşleştir
+        if (arenaQueue.length > 0 && arenaQueue[0].id.toString() !== user._id.toString()) {
+            const opponent = arenaQueue.shift();
+            return res.json({ 
+                success: true, 
+                type: 'pvp', 
+                opponent: { nickname: opponent.nickname, animal: opponent.animal } 
+            });
+        }
+
+        // Kimse yoksa sıraya gir
+        arenaQueue.push(ticket);
+
+        // 13 Saniye bekle, hala sıradaysa bot ata
+        setTimeout(async () => {
+            const index = arenaQueue.findIndex(t => t.id.toString() === user._id.toString());
+            if (index !== -1) {
+                arenaQueue.splice(index, 1);
+                const randomBot = BOTS[Math.floor(Math.random() * BOTS.length)];
+                
+                // Bot atamasını socket üzerinden veya response ile bildir
+                const sid = onlineUsers.get(user.nickname);
+                if (sid) {
+                    io.to(sid).emit('arena-match-found', { type: 'bot', opponent: randomBot });
+                }
+            }
+        }, 13000);
+
+        res.json({ success: true, type: 'waiting' });
+    } catch (err) {
+        res.status(500).json({ success: false });
+    }
+});
+
 const PORT = process.env.PORT || 10000;
 server.listen(PORT, () => console.log(`🚀 SİSTEM AKTİF: ${PORT}`));
+
 
 
 
