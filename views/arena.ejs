@@ -2,233 +2,225 @@
 <html lang="tr">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>BPL ARENA | ÖLÜMCÜL KARŞILAŞMA</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>BPL PROFİL | <%= user.nickname %></title>
     <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
-    <link href="https://fonts.googleapis.com/css2?family=Orbitron:wght@400;700&display=swap" rel="stylesheet">
-    <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
-    <script src="/socket.io/socket.io.js"></script>
-    
+    <link href="https://fonts.googleapis.com/css2?family=Orbitron:wght@400;700&family=Rajdhani:wght@300;500;700&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css">
     <style>
-        :root { --neon-green: #39FF14; --neon-red: #ff003c; --neon-yellow: #ffc107; }
+        :root { --neon-green: #39FF14; --dark-bg: #050505; --glass: rgba(0, 0, 0, 0.85); --gold: #ffc107; }
+        body { background: var(--dark-bg); color: white; font-family: 'Rajdhani', sans-serif; overflow-x: hidden; }
         
-        body { 
-            background: #000; 
-            color: #fff; 
-            font-family: 'Orbitron', sans-serif; 
-            min-height: 100vh;
-            margin: 0;
-            overflow-x: hidden;
-            overflow-y: auto;
+        body::before {
+            content: ""; position: fixed; top: 0; left: 0; width: 100%; height: 100%;
+            background: url('/caracter/page/welcome.jpg') no-repeat center center fixed;
+            background-size: cover; opacity: 0.15; z-index: -1;
         }
 
-        #video-overlay { 
-            display: none; 
-            position: fixed; 
-            inset: 0; 
-            background: rgba(0,0,0,0.98); 
-            z-index: 9999; 
-            flex-direction: column; 
-            align-items: center; 
-            justify-content: center; 
-            padding: 10px;
+        .header-section { 
+            background: rgba(0,0,0,0.9); border-bottom: 2px solid var(--neon-green);
+            padding: 15px 0; margin-bottom: 30px; backdrop-filter: blur(10px);
+        }
+        .logo-img { height: 50px; filter: drop-shadow(0 0 5px var(--neon-green)); }
+        
+        .glass-panel {
+            background: var(--glass); border: 1px solid rgba(57, 255, 20, 0.2);
+            border-radius: 15px; padding: 20px; height: 100%;
+        }
+        
+        .stat-card {
+            background: rgba(0,0,0,0.7); border: 1px solid rgba(255,255,255,0.1);
+            border-radius: 12px; padding: 15px; transition: 0.3s; margin-bottom: 20px;
+        }
+        .stat-card:hover { border-color: var(--neon-green); transform: translateY(-5px); }
+        
+        .inventory-img { 
+            width: 100%; aspect-ratio: 1/1; object-fit: cover; 
+            border-radius: 10px; border: 2px solid var(--neon-green); margin-bottom: 10px;
+        }
+        
+        .bpl-badge { color: var(--neon-green); font-family: 'Orbitron'; font-weight: bold; font-size: 1.3rem; }
+        .nav-btn { width: 100%; margin-bottom: 12px; font-weight: bold; font-family: 'Orbitron'; font-size: 0.8rem; letter-spacing: 1px; transition: 0.3s; }
+        
+        .progress { background: #1a1a1a; border-radius: 10px; border: 1px solid #333; height: 8px; }
+        .stat-label { font-size: 0.7rem; color: #aaa; font-family: 'Orbitron'; text-transform: uppercase; }
+
+        .btn-market-special {
+            background: var(--neon-green); color: black; border: none;
+            box-shadow: 0 0 15px var(--neon-green); animation: pulse 2s infinite;
+        }
+        @keyframes pulse {
+            0% { box-shadow: 0 0 5px var(--neon-green); }
+            50% { box-shadow: 0 0 20px var(--neon-green); }
+            100% { box-shadow: 0 0 5px var(--neon-green); }
         }
 
-        .battle-view { 
-            width: 100%; 
-            max-width: 950px; 
-            border: 2px solid var(--neon-green); 
-            position: relative; 
-            box-shadow: 0 0 30px rgba(57, 255, 20, 0.2); 
+        .action-container {
+            background: rgba(0,0,0,0.5); border-radius: 8px;
+            padding: 12px; margin-top: 15px; border: 1px solid rgba(255,255,255,0.05);
         }
+        
+        .btn-arena-select { background: var(--gold); color: #000; font-weight: bold; border: none; }
+        .btn-dev-select { background: transparent; border: 1px solid #0dcaf0; color: #0dcaf0; margin-top: 8px; }
+        .btn-dev-select:hover { background: #0dcaf0; color: black; }
 
-        video { width: 100%; display: block; filter: contrast(1.1) brightness(1.1); }
-
-        .player-header { 
-            display: flex; 
-            justify-content: space-between; 
-            width: 100%; 
-            max-width: 950px; 
-            margin-bottom: 15px; 
-        }
-
-        .char-card { text-align: center; width: 30%; }
-        .char-card img { 
-            width: 60px; height: 60px; 
-            border-radius: 50%; 
-            border: 2px solid var(--neon-green); 
-            margin-bottom: 5px; 
-            object-fit: cover; 
-        }
-
-        .vs-label { 
-            font-size: 1.5rem; 
-            color: var(--neon-red); 
-            text-shadow: 0 0 10px var(--neon-red); 
-            align-self: center; 
-        }
-
-        .bet-card { 
-            background: rgba(20,20,20,0.8); 
-            border: 1px solid #333; 
-            transition: 0.3s; 
-            cursor: pointer; 
-            padding: 15px 5px; 
-            border-radius: 10px; 
-            text-align: center;
-            height: 100%;
-        }
-
-        .bet-card h3 { font-size: 1.1rem; margin-bottom: 5px; }
-        .bet-card p { font-size: 0.8rem; margin: 0; }
-        .bet-card:hover { border-color: var(--neon-green); }
-        .bet-card.active { 
-            border-color: var(--neon-green); 
-            box-shadow: 0 0 15px rgba(57, 255, 20, 0.4); 
-            background: #111; 
-        }
-
-        .win-banner { 
-            position: absolute; top: 50%; left: 50%; 
-            transform: translate(-50%, -50%) scale(0); 
-            font-size: 2.5rem; font-weight: 900; 
-            z-index: 10001; text-align: center; 
-            transition: 0.5s cubic-bezier(0.175, 0.885, 0.32, 1.275); 
-            width: 100%; 
-        }
-
-        .banner-active { transform: translate(-50%, -50%) scale(1); }
-        #timer { font-size: 4rem; color: var(--neon-red); text-shadow: 0 0 20px var(--neon-red); }
-        .status-text { margin-top: 10px; color: var(--neon-green); font-size: 0.9rem; font-weight: bold; }
+        .font-orbitron { font-family: 'Orbitron'; }
     </style>
 </head>
 <body>
 
-    <div id="video-overlay">
-        <div class="player-header">
-            <div class="char-card">
-                <img src="/caracter/profile/<%= user.selectedAnimal %>.png">
-                <div class="text-white small" style="font-size: 0.7rem;"><%= user.nickname %></div>
-            </div>
-            <div class="vs-label">VS</div>
-            <div class="char-card">
-                <img id="opp-img" src="/img/searching.png">
-                <div id="opp-name" class="text-white small" style="font-size: 0.7rem;">ARANIYOR...</div>
+    <div class="header-section">
+        <div class="container d-flex justify-content-between align-items-center">
+            <a href="/profil"><img src="/caracter/page/logo.jpeg" alt="BPL LOGO" class="logo-img"></a>
+            <div class="text-end">
+                <h5 class="mb-0 text-uppercase font-orbitron" style="color: var(--neon-green);"><%= user.nickname %></h5>
+                <span class="bpl-badge"><i class="fas fa-coins me-1"></i><%= (user.bpl || 0).toLocaleString() %> BPL</span>
             </div>
         </div>
-        <div class="battle-view">
-            <div id="result-banner" class="win-banner"></div>
-            <video id="battle-video" playsinline muted autoplay></video>
-        </div>
-        <div id="battle-status" class="status-text text-uppercase">BAĞLANTI KURULUYOR...</div>
     </div>
 
-    <div class="container py-4">
-        <div id="lobby-ui" class="text-center">
-            <h1 class="mb-4 text-uppercase" style="color:var(--neon-green); text-shadow: 0 0 10px var(--neon-green);">ARENA</h1>
-            
-            <div id="bet-selection">
-                <h4 class="mb-4 text-white-50">SALDIRI MODU SEÇİN</h4>
-                <div class="row g-2 justify-content-center">
-                    <div class="col-6 col-md-3" onclick="setMultiplier(1, this)">
-                        <div class="bet-card active"><h3>NORMAL</h3><p>25 BPL</p></div>
+    <div class="container">
+        <div class="row">
+            <div class="col-md-3 mb-4">
+                <div class="glass-panel text-center">
+                    <h6 class="text-muted border-bottom border-secondary pb-2 mb-3 font-orbitron">SİSTEM MENÜSÜ</h6>
+                    <a href="/market" class="btn btn-market-special nav-btn mb-4"><i class="fas fa-shopping-cart me-2"></i>BPL MARKET</a>
+                    
+                    <a href="/development" class="btn btn-outline-warning nav-btn"><i class="fas fa-tools me-2"></i>GELİŞTİRME</a>
+                    <a href="/arena" class="btn btn-outline-danger nav-btn"><i class="fas fa-crosshairs me-2"></i>ARENA (BATTLE)</a>
+                    <a href="/chat" class="btn btn-outline-info nav-btn"><i class="fas fa-comments me-2"></i>GLOBAL CHAT</a>
+                    <a href="/meeting" class="btn btn-outline-primary nav-btn" style="border-color: #ffc107; color: #ffc107;">
+                        <i class="fas fa-video me-2"></i>BEŞGEN MASA
+                    </a>
+                    <a href="/wallet" class="btn btn-outline-light nav-btn"><i class="fas fa-wallet me-2"></i>CÜZDAN</a>
+                    <hr class="border-secondary">
+                    <a href="/logout" class="btn btn-dark nav-btn text-danger border-danger"><i class="fas fa-power-off me-2"></i>ÇIKIŞ YAP</a>
+                </div>
+            </div>
+
+            <div class="col-md-9">
+                <div class="glass-panel">
+                    <div class="d-flex justify-content-between align-items-center mb-4">
+                        <h4 class="font-orbitron mb-0 text-uppercase"><i class="fas fa-boxes me-2 text-success"></i>ENVANTER</h4>
+                        <span class="badge rounded-pill bg-dark border border-secondary p-2">Varlık: <%= (user.inventory ? user.inventory.length : 0) %></span>
                     </div>
-                    <div class="col-6 col-md-3" onclick="setMultiplier(2, this)">
-                        <div class="bet-card"><h3>2X GÜÇ</h3><p>55 BPL</p></div>
-                    </div>
-                    <div class="col-6 col-md-3" onclick="setMultiplier(4, this)">
-                        <div class="bet-card"><h3>4X ÖFKE</h3><p>75 BPL</p></div>
-                    </div>
-                    <div class="col-6 col-md-3" onclick="setMultiplier(6, this)">
-                        <div class="bet-card"><h3 style="color: #ff00ff;">6X MAX</h3><p>85 BPL</p></div>
+
+                    <div class="row">
+                        <% if(!user.inventory || user.inventory.length === 0) { %>
+                            <div class="col-12 text-center py-5">
+                                <i class="fas fa-dragon fa-4x mb-3 text-secondary" style="opacity: 0.2;"></i>
+                                <h3 class="font-orbitron">ENVANTER BOŞ</h3>
+                                <p class="text-muted">Henüz bir karakterin yok. Marketten hemen bir tane edin!</p>
+                                <a href="/market" class="btn btn-outline-success mt-3">KARAKTER SATIN AL</a>
+                            </div>
+                        <% } else { %>
+                            <% user.inventory.forEach((item) => { %>
+                                <div class="col-md-4 mb-4">
+                                    <div class="stat-card text-center">
+                                        <div style="position: relative;">
+                                            <img src="/caracter/profile/<%= item.name %>.jpg" onerror="this.src='/caracter/page/logo.jpeg'" class="inventory-img">
+                                            <span style="position: absolute; top: 10px; right: 10px; background: var(--neon-green); color: black; padding: 2px 8px; border-radius: 5px; font-weight: bold; font-family: 'Orbitron'; font-size: 0.7rem;">
+                                                LVL <%= item.level || 1 %>
+                                            </span>
+                                        </div>
+
+                                        <h5 class="text-uppercase my-2 font-orbitron" style="color: var(--neon-green);"><%= item.name %></h5>
+                                        
+                                        <div class="px-2">
+                                            <% 
+                                                let hp = (item.stats && item.stats.hp) ? item.stats.hp : 100;
+                                                let stamina = (typeof item.stamina !== 'undefined') ? item.stamina : 100;
+                                            %>
+                                            <div class="d-flex justify-content-between stat-label mb-1">
+                                                <span>HP</span>
+                                                <span><%= hp %> / 100</span>
+                                            </div>
+                                            <div class="progress mb-2">
+                                                <div class="progress-bar bg-danger" style="width: <%= hp %>%"></div>
+                                            </div>
+
+                                            <div class="d-flex justify-content-between stat-label mb-1">
+                                                <span>ENERJİ (STAMINA)</span>
+                                                <span>%<%= stamina %></span>
+                                            </div>
+                                            <div class="progress mb-3">
+                                                <div class="progress-bar bg-warning" style="width: <%= stamina %>%"></div>
+                                            </div>
+
+                                            <div class="action-container">
+                                                <button onclick="selectForArena('<%= item.name %>')" class="btn btn-arena-select btn-sm w-100 font-orbitron mb-2">
+                                                    ARENA İÇİN SEÇ
+                                                </button>
+                                                <button onclick="window.location.href='/development'" class="btn btn-dev-select btn-sm w-100 font-orbitron mb-2">
+                                                    GELİŞTİRME YAP
+                                                </button>
+                                                <button onclick="refillStamina('<%= item.name %>')" class="btn btn-link btn-sm text-success p-0" style="text-decoration: none; font-size: 0.7rem;">
+                                                    <i class="fas fa-bolt"></i> ENERJİ VER (10 BPL)
+                                                </button>
+                                            </div>
+                                        </div>
+                                    </div>
+                                </div>
+                            <% }) %>
+                        <% } %>
                     </div>
                 </div>
+            </div>
+        </div>
+    </div>
+
+    <script src="/socket.io/socket.io.js"></script>
+    <script>
+        const socket = io();
+        
+        // Register user only if ID exists
+        <% if (user && user._id) { %>
+            socket.emit('register-user', { id: "<%= user._id %>", nickname: "<%= user.nickname %>" });
+        <% } %>
+
+        async function selectForArena(name) {
+            try {
+                const res = await fetch('/select-animal', {
+                    method: 'POST',
+                    headers: {'Content-Type': 'application/json'},
+                    body: JSON.stringify({ animalName: name })
+                });
+                const data = await res.json();
+                if(data.status === 'success') {
+                    alert(name + " savaşa hazır!");
+                } else {
+                    alert("Hata: " + (data.msg || "Karakter seçilemedi."));
+                }
+            } catch (err) {
+                console.error("Hata:", err);
+                alert("Bağlantı hatası oluştu.");
+            }
+        }
+
+        async function refillStamina(name) {
+            if(!confirm(name + " enerjisini 10 BPL karşılığında yenilemek istiyor musunuz?")) return;
+
+            try {
+                const res = await fetch('/refill-stamina', {
+                    method: 'POST',
+                    headers: {'Content-Type': 'application/json'},
+                    body: JSON.stringify({ animalName: name })
+                });
+                const data = await res.json();
                 
-                <div class="mt-5">
-                    <button id="start-btn" onclick="startSearch()" class="btn btn-danger btn-lg px-5 py-3 fw-bold w-100">
-                        SALDIRIYI BAŞLAT
-                    </button>
-                </div>
-            </div>
-
-            <div id="matching-ui" style="display:none;">
-                <div id="timer">13</div>
-                <h3 class="mt-3" style="color:var(--neon-green); font-size: 1.2rem;">RAKİP ARANIYOR...</h3>
-                <div class="spinner-border text-success mt-3" role="status"></div>
-                <div class="mt-3 text-white-50 small">Rastgele eşleşme veya Bot bekleniyor...</div>
-            </div>
-        </div>
-    </div>
-<script>
-// arena.ejs içindeki script kısmı
-async function handleBattle(data) {
-    isMatchFound = true;
-    clearInterval(timerInt);
-    
-    // Oyuncu Bilgileri
-    const me = data.players.find(p => p.nick === myNick);
-    const opponent = data.players.find(p => p.nick !== myNick);
-
-    document.getElementById('matching-ui').style.display = 'none';
-    document.getElementById('opp-name').innerText = opponent.nick;
-    document.getElementById('opp-img').src = opponent.img; // Dinamik resim yolu
-    
-    document.getElementById('video-overlay').style.display = 'flex';
-
-    // SIRA 1: Rakibin Saldırısı (Herkes rakibin hamlesini izler)
-    // Örn: Tiger1.mp4
-    await playVideoAsync(opponent.animal, `${opponent.animal}1`, `${opponent.nick.toUpperCase()} HAMLE YAPIYOR!`);
-
-    // SIRA 2: Kazananın Zafer Videosu
-    // Örn: Tiger.mp4
-    const winner = data.isWin ? me : opponent;
-    
-    // UI Güncelleme
-    resultBanner.innerText = data.isWin ? "VICTORY" : "DEFEAT";
-    resultBanner.style.color = data.isWin ? "var(--neon-green)" : "var(--neon-red)";
-    resultBanner.classList.add('banner-active');
-
-    await playVideoAsync(winner.animal, winner.animal, `${winner.nick.toUpperCase()} KAZANDI!`);
-    
-    // 3 Saniye bekle ve profile dön
-    setTimeout(() => {
-        window.location.href = "/profil";
-    }, 3000);
-}
-
-// arena.ejs içinde
-function playVideoAsync(animal, file, text) {
-    return new Promise((resolve) => {
-        statusMsg.innerText = text;
-        
-        // Klasör ismi için: tiger -> Tiger
-        const formattedAnimal = animal.charAt(0).toUpperCase() + animal.slice(1).toLowerCase();
-        
-        // Dosya ismi için: tiger1 -> Tiger1 (Eğer file verisi küçük gelirse diye)
-        const formattedFile = file.charAt(0).toUpperCase() + file.slice(1);
-        
-        // Sonuç: /caracter/move/Tiger/Tiger1.mp4
-        videoElement.src = `/caracter/move/${formattedAnimal}/${formattedFile}.mp4`;
-        
-        videoElement.onended = resolve;
-        videoElement.play().catch(e => {
-            console.error("Video oynatılamadı, 2 saniye bekleniyor...", e);
-            // Video yüklenmezse oyun takılmasın diye 2 saniye sonra devam et
-            setTimeout(resolve, 2000); 
-        });
-    });
-}
-<video id="arenaVideo" preload="auto" ...></video>
-    });
-}
-    });
-}
-    });
-}
-</script>
+                if(data.status === 'success') {
+                    alert("Enerji Fullendi! Kalan BPL: " + data.newBpl);
+                    location.reload();
+                } else if(data.status === 'low_balance') {
+                    alert("Yetersiz BPL bakiyesi!");
+                } else {
+                    alert("Hata: " + (data.msg || "İşlem başarısız."));
+                }
+            } catch (err) {
+                console.error("Hata:", err);
+                alert("Sunucuya ulaşılamadı.");
+            }
+        }
+    </script>
 </body>
 </html>
-
-
-
-
