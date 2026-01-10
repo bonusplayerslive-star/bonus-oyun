@@ -479,7 +479,7 @@ app.use((err, req, res, next) => {
     console.error(err.stack);
     res.status(500).render('error', { 
         message: 'Sunucuda kritik bir hata oluştu!',
-    console.error("⛔ [FATAL ERROR]:", err.stack);
+
         user: res.locals.user || null
     });
 });
@@ -499,6 +499,7 @@ server.listen(PORT, () => {
     ===========================================
     `);
 });
+
 
 
 
