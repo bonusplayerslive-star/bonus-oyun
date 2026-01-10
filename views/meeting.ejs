@@ -96,7 +96,7 @@
 <script>
     const socket = io();
     const myNick = "<%= user.nickname %>";
-    const currentRoom = new URLSearchParams(window.location.search).get('room');
+let roomParam = new URLSearchParams(window.location.search).get('room');
     const myPeer = new Peer();
     let myStream;
     let selectedTarget = null; // Menüde seçilen kişi
@@ -240,3 +240,4 @@
 </script>
 </body>
 </html>
+
