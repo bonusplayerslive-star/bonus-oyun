@@ -167,22 +167,32 @@ app.post('/api/upgrade-stat', authRequired, async (req, res) => {
     }
 });
 
-        // Değişikliği uygula
-        const animal = user.inventory[animalIndex];
-        if (statName === 'hp') {
-            animal.maxHp += 10;
+    // app.js - Geliştirme API (Async eklemeyi unutma)
+app.post('/api/upgrade-stat', authRequired, async (req, res) => { // Buraya async ekledik
+    try {
+        const { animalName, statType } = req.body;
+        const user = await User.findById(req.session.userId);
+        
+        const animal = user.inventory.find(a => a.name === animalName);
+        if (!animal) return res.status(404).json({ success: false, error: 'Hayvan bulunamadı!' });
+
+        const cost = (statType === 'def') ? 10 : 15;
+        if (user.bpl < cost + 25) return res.status(400).json({ success: false, error: 'Yetersiz bakiye!' });
+
+        if (statType === 'hp') {
+            animal.maxHp = (animal.maxHp || 100) + 10;
             animal.hp = animal.maxHp;
-        } else if (statName === 'atk') {
+        } else if (statType === 'atk') {
             animal.atk += 5;
-        } else if (statName === 'def') {
+        } else if (statType === 'def') {
             animal.def += 5;
         }
 
         user.bpl -= cost;
-        user.markModified('inventory'); // MongoDB'ye dizinin değiştiğini söyle
-        await user.save();
+        user.markModified('inventory');
+        await user.save(); // Artık async fonksiyon içinde olduğu için hata vermez
 
-        res.json({ success: true, newBpl: user.bpl });
+        res.json({ success: true, newBalance: user.bpl });
     } catch (err) {
         res.status(500).json({ success: false });
     }
@@ -361,9 +371,17 @@ async function startBattle(p1, p2, io) {
         sender: "SİSTEM",
         text: `📢 Arena: ${winner.nickname}, ${loser.nickname}'i mağlup etti!`
     });
+
+    socket.on('disconnect', () => {
+        onlineUsers.delete(socket.nickname);
+        arenaQueue = arenaQueue.filter(p => p.socketId !== socket.id);
+        console.log(`❌ ${socket.nickname || 'Bilinmeyen'} ayrıldı.`);
+    });
+}); // io.on('connection') bloğunu burada kapatıyoruz.
 }
 
 const PORT = process.env.PORT || 10000;
 server.listen(PORT, () => console.log(`🚀 SİSTEM AKTİF: ${PORT}`));
+
 
 
