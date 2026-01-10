@@ -1,132 +1,83 @@
 /**
- * BPL ULTIMATE - CORE APPLICATION FILE
- * -----------------------------------------
- * Sürüm: 2.0.1 (Production Ready)
- * Özellikler: Market, Arena v2, Meeting, Wallet, Admin Panel, 
- * Gelişmiş Loglama, Gerçek Zamanlı Socket Odaları.
+ * BPL ULTIMATE - CORE APPLICATION
  */
-
 const express = require('express');
 const mongoose = require('mongoose');
 const session = require('express-session');
-const MongoStore = require('connect-mongo').default;
+const MongoStore = require('connect-mongo');
 const http = require('http');
 const socketIo = require('socket.io');
 const path = require('path');
 const bcrypt = require('bcryptjs');
-const nodemailer = require('nodemailer'); // Mail onayı ve şifre işlemleri için
 
-// Modellerin yüklenmesi
 const User = require('./models/User');
 
 const app = express();
 const server = http.createServer(app);
 const io = socketIo(server);
 
-// --- 1. VERİTABANI VE ÇEVRESEL AYARLAR ---
+// --- 1. VERİTABANI VE SESSION ---
 const MONGO_URI = process.env.MONGO_URI;
-const SESSION_SECRET = process.env.SESSION_SECRET || 'bpl_ultimate_megasecret_2024';
+const SESSION_SECRET = process.env.SESSION_SECRET || 'bpl_ultimate_secret_2024';
 
 mongoose.connect(MONGO_URI)
-    .then(() => console.log('✅ [DATABASE] MongoDB bağlantısı başarıyla kuruldu.'))
-    .catch(err => console.error('❌ [DATABASE] MongoDB hatası:', err));
-// --- 2. MIDDLEWARE YAPILANDIRMASI ---
+    .then(() => console.log('✅ MongoDB Bağlandı'))
+    .catch(err => console.error('❌ MongoDB Hatası:', err));
+
 app.set('view engine', 'ejs');
-app.set('views', path.join(__dirname, 'views'));
 app.use(express.static(path.join(__dirname, 'public')));
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
 
-// --- SESSION AYARLARI (DÜZELTİLDİ) ---
 const sessionMiddleware = session({
     secret: SESSION_SECRET,
     resave: false,
     saveUninitialized: false,
-    store: MongoStore.create({ 
-        mongoUrl: MONGO_URI,
-        ttl: 24 * 60 * 60 // 1 gün
-    }),
-    cookie: { 
-        secure: false, // Render/Heroku'da SSL yoksa false kalmalı
-        maxAge :24 * 60 * 60 * 1000
-    }
-}); // <--- BURADAKİ PARANTEZ VE NOKTALI VİRGÜL EKSİKTİ
-
-// Session middleware'ini uygulamaya tanıtıyoruz
+    store: MongoStore.create({ mongoUrl: MONGO_URI, ttl: 24 * 60 * 60 }),
+    cookie: { secure: false, maxAge: 24 * 60 * 60 * 1000 }
+});
 app.use(sessionMiddleware);
 
-// --- TEK VE GÜÇLÜ USER MIDDLEWARE ---
+io.use((socket, next) => {
+    sessionMiddleware(socket.request, {}, next);
+});
+
+// --- 2. MIDDLEWARES ---
 app.use(async (req, res, next) => {
-    res.locals.user = null; 
+    res.locals.user = null;
     if (req.session && req.session.userId) {
         try {
             const user = await User.findById(req.session.userId);
-            if (user) {
-                res.locals.user = user;
-            } else {
-                req.session.userId = null; 
-            }
-        } catch (e) {
-            console.error("User Middleware Hatası:", e);
-        }
+            if (user) res.locals.user = user;
+        } catch (e) { console.error("Middleware Hatası:", e); }
     }
     next();
 });
 
-// --- YETKİ KONTROLLERİ ---
 const authRequired = (req, res, next) => {
     if (req.session && req.session.userId) return next();
     res.redirect('/');
 };
 
-const adminRequired = async (req, res, next) => {
- // app.js - Satır 83'ten itibaren bu bloğu komple değiştir
-app.post('/auth/register', async (req, res) => { // 'async' buraya gelecek
-    const { nickname, email, password } = req.body;
-    try {
-        const existing = await User.findOne({ $or: [{ email: email.toLowerCase() }, { nickname: nickname.trim() }] });
-        if (existing) return res.status(400).send("Bu bilgiler zaten kullanımda.");
+const adminRequired = (req, res, next) => {
+    if (res.locals.user && res.locals.user.role === 'admin') return next();
+    res.status(403).send("Admin yetkisi gerekiyor.");
+};
 
-        const salt = await bcrypt.genSalt(10);
-        const hashedPassword = await bcrypt.hash(password, salt);
-
-        const newUser = new User({
-            nickname: nickname.trim(),
-            email: email.toLowerCase().trim(),
-            password: hashedPassword,
-            bpl: 2500,
-            inventory: [],
-            selectedAnimal: "none",
-            stats: { wins: 0, losses: 0 }
-        });
-
-        // --- DOĞRU YER BURASI ---
-        const savedUser = await newUser.save(); //
-        req.session.userId = savedUser._id; // Oturumu aç
-        res.redirect('/profil'); // Profile yönlendir
-
-    } catch (err) {
-        console.error("Register Hatası:", err);
-        res.status(500).send("Kayıt başarısız: " + err.message);
-    }
-}); // Fonksiyon burada bitmeli!
-// --- 4. ANA SAYFA VE AUTH ROTALARI ---
-
+// --- 3. AUTH ROTALARI ---
 app.get('/', (req, res) => {
-    // Eğer zaten giriş yapmışsa direkt profil, yapmamışsa index/login
     if (req.session.userId) return res.redirect('/profil');
-    res.render('index', { title: 'BPL Ultimate - Giriş' });
+    res.render('index', { title: 'BPL Ultimate' });
 });
 
+// Kayıt Rotası (Parantezler Düzeltildi)
 app.post('/auth/register', async (req, res) => {
     const { nickname, email, password } = req.body;
     try {
         const existing = await User.findOne({ $or: [{ email: email.toLowerCase() }, { nickname: nickname.trim() }] });
-        if (existing) return res.status(400).send("Bu bilgiler zaten kullanımda.");
+        if (existing) return res.status(400).send("Bu bilgiler kullanımda.");
 
-        const salt = await bcrypt.genSalt(10);
-        const hashedPassword = await bcrypt.hash(password, salt);
-
+        const hashedPassword = await bcrypt.hash(password, 10);
         const newUser = new User({
             nickname: nickname.trim(),
             email: email.toLowerCase().trim(),
@@ -138,400 +89,111 @@ app.post('/auth/register', async (req, res) => {
         });
 
         const savedUser = await newUser.save();
-        
-        // --- BU SATIR SENİ UYUTACAK SATIR ---
-        req.session.userId = savedUser._id; // Kayıt biter bitmez oturumu aç
-        res.redirect('/profil'); // Giriş yapmış olarak profile gönder
-
-    } catch (err) {
-        console.error("Register Hatası:", err);
-        res.status(500).send("Kayıt başarısız oldu.");
-    }
-});
-
-        const savedUser = await newUser.save();
-        
-        // --- KRİTİK: OTURUMU AÇ VE PROFİLE GÖNDER ---
-        req.session.userId = savedUser._id; 
-        res.redirect('/profil'); 
-
+        req.session.userId = savedUser._id;
+        res.redirect('/profil');
     } catch (err) {
         console.error("Kayıt Hatası:", err);
         res.status(500).send("Kayıt başarısız: " + err.message);
     }
 });
 
+app.post('/register', (req, res) => res.redirect(307, '/auth/register'));
+
 app.post('/auth/login', async (req, res) => {
     const { email, password } = req.body;
     try {
         const user = await User.findOne({ email: email.toLowerCase().trim() });
         if (!user) return res.status(400).send("Kullanıcı bulunamadı.");
-
         const isMatch = await bcrypt.compare(password, user.password);
-        if (!isMatch) return res.status(400).send("Hatalı şifre.");
-
-        // Oturumu başlat
+        if (!isMatch) return res.status(400).send("Şifre yanlış.");
         req.session.userId = user._id;
-        
-        // Son giriş zamanını güncelle
-        user.lastLogin = new Date();
-        await user.save();
-
         res.redirect('/profil');
-    } catch (err) {
-        console.error("Login Hatası:", err);
-        res.status(500).render('error', { message: "Giriş işlemi başarısız." });
-    }
-});
-// --- 5. OYUN İÇİ SAYFALAR (GET) ---
-// Bu middleware her sayfa geçişinde çalışır
-const authGuard = async (req, res, next) => {
-    if (!req.session.userId) {
-        return res.redirect('/login');
-    }
-    
-    const user = await User.findById(req.session.userId);
-    
-    // Kullanıcı DB'den silindiyse veya session bozulduysa
-    if (!user) {
-        req.session.destroy();
-        return res.redirect('/login');
-    }
-
-    // Her istekte kullanıcı verisini güncel tut
-    res.locals.user = user;
-    next();
-};
-
-// Kullanımı:
-app.get('/profil', authGuard, (req, res) => {
-    res.render('profil', { user: res.locals.user });
+    } catch (err) { res.status(500).send("Giriş hatası."); }
 });
 
-app.get('/market', authRequired, async (req, res) => {
-    res.render('market', { user: res.locals.user });
+app.get('/logout', (req, res) => {
+    req.session.destroy();
+    res.redirect('/');
 });
 
-app.get('/arena', authRequired, async (req, res) => {
-    // Online kullanıcıları çekmek için logic buraya eklenebilir
-    res.render('arena', { user: res.locals.user });
-});
+// --- 4. OYUN SAYFALARI ---
+app.get('/profil', authRequired, (req, res) => res.render('profil', { user: res.locals.user }));
+app.get('/market', authRequired, (req, res) => res.render('market', { user: res.locals.user }));
+app.get('/arena', authRequired, (req, res) => res.render('arena', { user: res.locals.user }));
+app.get('/development', authRequired, (req, res) => res.render('development', { user: res.locals.user }));
+app.get('/wallet', authRequired, (req, res) => res.render('wallet', { user: res.locals.user }));
+app.get('/meeting', authRequired, (req, res) => res.render('meeting', { user: res.locals.user }));
 
-app.get('/meeting', authRequired, async (req, res) => {
-    res.render('meeting', { user: res.locals.user });
-});
-
-app.get('/wallet', authRequired, async (req, res) => {
-    res.render('wallet', { user: res.locals.user });
-});
-
-// --- 5. OYUN İÇİ SAYFALAR (GET) ---
-
-// Geliştirme sayfası rotası
-app.get('/development', authRequired, async (req, res) => {
-    res.render('development', { user: res.locals.user });
-});
-
-// --- 6. MARKET VE EKONOMİ API'LERİ ---
-
+// --- 5. MARKET VE GELİŞTİRME API ---
 app.post('/api/buy-item', authRequired, async (req, res) => {
     const { itemName, price } = req.body;
     try {
         const user = await User.findById(req.session.userId);
+        if (user.inventory.length >= 3) return res.status(400).json({ success: false, error: 'Karakter sınırı 3!' });
+        if (user.bpl < price) return res.status(400).json({ success: false, error: 'Bakiye yetersiz!' });
         
-        // 1. KONTROL: En fazla 3 karakter sınırı
-        if (user.inventory && user.inventory.length >= 3) {
-            return res.status(400).json({ success: false, error: 'Maksimum karakter sınırına (3) ulaştınız!' });
-        }
-
-        // 2. KONTROL: Bakiye kontrolü (Market için stratejik limit yok demiştin)
-        if (user.bpl < price) {
-            return res.status(400).json({ success: false, error: 'Yetersiz bakiye!' });
-        }
-
-        const alreadyOwned = user.inventory.some(i => i.name === itemName);
-        if (alreadyOwned) return res.status(400).json({ success: false, error: 'Bu karaktere zaten sahipsiniz.' });
-
         user.bpl -= price;
         user.inventory.push({
             name: itemName,
             img: `/caracter/profile/${itemName}.jpg`,
-            stamina: 100, 
-            level: 1,
-            hp: 100,      // Doğrudan erişim için dışarıda
-            maxHp: 100,   // Geliştirme sayfası için gerekli
-            atk: 50,      
-            def: 30,      
-            experience: 0,
-            lastBattle: null 
+            stamina: 100, hp: 100, maxHp: 100, atk: 50, def: 30, level: 1
         });
         await user.save();
         res.json({ success: true, newBpl: user.bpl });
-    } catch (err) {
-        res.status(500).json({ success: false, error: 'İşlem sırasında bir hata oluştu.' });
-    }
+    } catch (err) { res.status(500).json({ success: false }); }
 });
 
-// GELİŞTİRME API: Stat yükseltme ve Kalıcı Kayıt
 app.post('/api/upgrade-stat', authRequired, async (req, res) => {
     const { animalName, statType } = req.body;
-    // Senin EJS'ndeki fiyatlandırma: DEF=10, Diğerleri=15
     const cost = (statType === 'def') ? 10 : 15;
-
     try {
         const user = await User.findById(req.session.userId);
-        
         if (user.bpl < cost) return res.status(400).json({ success: false, error: 'Yetersiz BPL.' });
+        const idx = user.inventory.findIndex(a => a.name === animalName);
+        if (idx === -1) return res.status(404).json({ success: false });
 
-        const animalIndex = user.inventory.findIndex(a => a.name === animalName);
-        if (animalIndex === -1) return res.status(404).json({ success: false, error: 'Karakter bulunamadı.' });
-
-        // Stat artış oranları
         let increase = (statType === 'hp') ? 10 : 5;
-
         user.bpl -= cost;
-        
-        // Kalıcı geliştirme (Mongo'ya kayıt)
         if (statType === 'hp') {
-            user.inventory[animalIndex].maxHp += increase;
-            user.inventory[animalIndex].hp += increase; // Canı da doldur
+            user.inventory[idx].maxHp += increase;
+            user.inventory[idx].hp = user.inventory[idx].maxHp;
         } else {
-            user.inventory[animalIndex][statType] += increase;
+            user.inventory[idx][statType] += increase;
         }
-        
-        // Seviye atlama mantığı (Her 5 geliştirmede 1 seviye gibi basit bir kural)
-        const totalStats = user.inventory[animalIndex].maxHp + user.inventory[animalIndex].atk + user.inventory[animalIndex].def;
-        user.inventory[animalIndex].level = Math.floor(totalStats / 50);
-
         await user.save();
         res.json({ success: true, newBalance: user.bpl });
-    } catch (err) {
-        res.status(500).json({ success: false, error: 'Sunucu hatası.' });
-    }
-});
-// --- 7. ADMIN PANELİ VE GÜVENLİK ---
-
-app.get('/admin', adminRequired, async (req, res) => {
-    const allUsers = await User.find().select('-password');
-    res.render('admin_panel', { users: allUsers });
+    } catch (err) { res.status(500).json({ success: false }); }
 });
 
-app.post('/admin/add-bpl', adminRequired, async (req, res) => {
-    const { targetUserId, amount } = req.body;
-    await User.findByIdAndUpdate(targetUserId, { $inc: { bpl: amount } });
-    res.json({ success: true });
-});
-
-// --- 8. REAL-TIME ENGINE (SOCKET.IO) ---
-
-// --- BOT TANIMLAMALARI ---
-const ARENA_BOTS = [
-    { nick: "Black", animal: "Tiger", winRate: 0.50, stats: { atk: 60, def: 50, hp: 120 } },
-    { nick: "Deccal", animal: "Rhino", winRate: 0.60, stats: { atk: 70, def: 80, hp: 150 } },
-    { nick: "Kara Melek", animal: "Lion", winRate: 0.40, stats: { atk: 55, def: 45, hp: 110 } },
-    { nick: "Rass", animal: "Tiger", winRate: 0.55, stats: { atk: 65, def: 55, hp: 130 } }
-];
-
-const pvpQueue = [];
-
-// --- 8. TÜM SİSTEMLER ENTEGRE (CHAT, ARENA, BOT, BPL, STAMINA) ---
+// --- 6. ADMIN VE SOCKET ---
+const onlineUsers = new Map();
 io.on('connection', async (socket) => {
-    const userId = socket.request.session?.userId;
-    if (!userId) return;
+    const uId = socket.request.session?.userId;
+    if (!uId) return;
+    const user = await User.findById(uId);
+    if (!user) return;
+    
+    onlineUsers.set(user.nickname, socket.id);
+    socket.join("general-chat");
 
-    try {
-        const user = await User.findById(userId);
-        if (!user) return;
-        
-        onlineUsers.set(user.nickname, socket.id);
-        socket.join("general-chat");
-
-        // --- GLOBAL CHAT ---
-        socket.on('chat-message', (data) => {
-            if (!data.text || data.text.trim() === "") return;
-            io.to("general-chat").emit('new-message', {
-                sender: user.nickname,
-                text: data.text,
-                time: new Date().toLocaleTimeString()
-            });
-        });
-
-        // --- ARENA DAVETİ ---
-        socket.on('send-challenge', async (data) => {
-            try {
-                const currentUser = await User.findById(userId);
-                const myAnimal = currentUser.inventory.find(a => a.name === currentUser.selectedAnimal);
-
-                if (!myAnimal || myAnimal.stamina < 40) {
-                    return socket.emit('error', { msg: "Karakterin çok yorgun! (Min. 40 Stamina)" });
-                }
-                if (currentUser.bpl < data.betAmount) {
-                    return socket.emit('error', { msg: "Bakiyen yetersiz!" });
-                }
-
-                const targetSocketId = onlineUsers.get(data.targetNick);
-                if (targetSocketId) {
-                    io.to(targetSocketId).emit('receive-arena-invitation', {
-                        senderNick: currentUser.nickname,
-                        roomId: `room_${currentUser.nickname}_${data.targetNick}`,
-                        bet: data.betAmount,
-                        senderAnimal: myAnimal.name
-                    });
-                }
-            } catch (err) { console.error("Davet Hatası:", err); }
-        });
-
-        // --- PVP EŞLEŞME ---
-        socket.on('find-match', async (data) => {
-            try {
-                const currentUser = await User.findById(userId);
-                const myAnimal = currentUser.inventory.find(a => a.name === currentUser.selectedAnimal);
-                
-                if (!myAnimal || myAnimal.stamina < 10) {
-                    return socket.emit('error', { msg: "Karakterin çok yorgun!" });
-                }
-
-                const opponentIndex = pvpQueue.findIndex(p => p.userId !== userId);
-
-                if (opponentIndex > -1) {
-                    const opponent = pvpQueue.splice(opponentIndex, 1)[0];
-                    const isWin = Math.random() > 0.5; // Basit kazanan belirleme
-                    const prize = 150 * data.multiplier;
-
-                    const battleData = {
-                        prize,
-                        players: [
-                            { nick: currentUser.nickname, animal: myAnimal.name, img: `/caracter/profile/${myAnimal.name}.jpg` },
-                            { nick: opponent.nick, animal: opponent.animalName, img: `/caracter/profile/${opponent.animalName}.jpg` }
-                        ]
-                    };
-
-                    socket.emit('pvp-found', { ...battleData, isWin });
-                    io.to(opponent.socketId).emit('pvp-found', { ...battleData, isWin: !isWin });
-
-                    await updateArenaResults(userId, isWin, prize, data.multiplier);
-                    await updateArenaResults(opponent.userId, !isWin, prize, opponent.multiplier);
-                } else {
-                    pvpQueue.push({
-                        socketId: socket.id, userId, nick: currentUser.nickname,
-                        animalName: myAnimal.name, animalStats: myAnimal, multiplier: data.multiplier
-                    });
-                }
-            } catch (err) { console.error("PVP Hatası:", err); }
-        });
-
-        // --- BOT SAVAŞI ---
-        socket.on('start-bot-battle', async (data) => {
-            try {
-                const idx = pvpQueue.findIndex(p => p.userId === userId);
-                if(idx > -1) pvpQueue.splice(idx, 1);
-
-                const currentUser = await User.findById(userId);
-                const myAnimal = currentUser.inventory.find(a => a.name === currentUser.selectedAnimal);
-                
-                if (!myAnimal || myAnimal.stamina < 10) return socket.emit('error', { msg: "Yetersiz stamina!" });
-
-                const isWin = Math.random() > 0.4;
-                const prize = isWin ? (120 * data.multiplier) : 0;
-
-                socket.emit('battle-result', {
-                    isWin, prize, opponentName: "Arena Botu", opponentAnimal: "Wolf",
-                    players: [
-                        { nick: currentUser.nickname, animal: myAnimal.name, img: `/caracter/profile/${myAnimal.name}.jpg` },
-                        { nick: "Arena Botu", animal: "Wolf", img: `/caracter/profile/Wolf.jpg` }
-                    ]
-                });
-
-                await updateArenaResults(userId, isWin, prize, data.multiplier);
-            } catch (err) { console.error("Bot Hatası:", err); }
-        });
-
-        socket.on('disconnect', () => {
-            onlineUsers.delete(user.nickname);
-            const idx = pvpQueue.findIndex(p => p.socketId === socket.id);
-            if(idx > -1) pvpQueue.splice(idx, 1);
-        });
-
-    } catch (err) {
-        console.error("Socket Bağlantı Hatası:", err);
-    }
-}); // <--- SOCKET BLOĞU BURADA BİTİYOR
-
-// --- 9. YARDIMCI FONKSİYONLAR ---
-async function updateArenaResults(uid, isWin, prize, mult) {
-    try {
-        const user = await User.findById(uid);
-        if (!user) return;
-
-        const cost = 25 * mult;
-        const staminaDrain = 10 * mult; 
-
-        let newBpl = Math.max(0, user.bpl - cost + (isWin ? prize : 0));
-        const animalIndex = user.inventory.findIndex(a => a.name === user.selectedAnimal);
-        
-        const updateObj = { 
-            $set: { bpl: newBpl }, 
-            $inc: { "stats.wins": isWin ? 1 : 0, "stats.losses": isWin ? 0 : 1 } 
-        };
-
-        if (animalIndex !== -1) {
-            let currentStam = user.inventory[animalIndex].stamina || 100;
-            updateObj.$set[`inventory.${animalIndex}.stamina`] = Math.max(0, currentStam - staminaDrain);
-        }
-
-        await User.findByIdAndUpdate(uid, updateObj);
-    } catch (e) { console.error("DB Güncelleme Hatası:", e); }
-}
-
-// --- 10. ERROR HANDLING VE 404 ---
-app.use((req, res, next) => {
-    res.status(404).render('error', { 
-        message: 'Aradığınız sayfa BPL sisteminde bulunamadı!',
-        user: res.locals.user || null
+    socket.on('chat-message', (data) => {
+        io.to("general-chat").emit('new-message', { sender: user.nickname, text: data.text });
     });
+
+    socket.on('start-bot-battle', async (data) => {
+        const myAnimal = user.inventory.find(a => a.name === user.selectedAnimal);
+        if (!myAnimal || myAnimal.stamina < 10) return socket.emit('error', { msg: "Stamina az!" });
+        const isWin = Math.random() > 0.4;
+        const prize = isWin ? (120 * data.multiplier) : 0;
+        socket.emit('battle-result', { isWin, prize, opponentName: "Bot", opponentAnimal: "Wolf" });
+        // Stat güncelleme mantığı buraya eklenebilir
+    });
+
+    socket.on('disconnect', () => onlineUsers.delete(user.nickname));
 });
 
-app.use((err, req, res, next) => {
-    console.error(err.stack);
-    res.status(500).render('error', { 
-        message: 'Sunucuda kritik bir hata oluştu!',
-        user: res.locals.user || null
-    });
-});
+// --- 7. HATA YAKALAMA VE START ---
+app.use((req, res) => res.status(404).render('error', { message: 'Sayfa bulunamadı!', user: res.locals.user }));
 
-
-
-
-// --- 10. SERVER START ---
 const PORT = process.env.PORT || 3000;
-server.listen(PORT, () => {
-    console.log(`
-    ===========================================
-    🚀 BPL ULTIMATE SUNUCUSU AKTİF!
-    📡 Port: ${PORT}
-    🌐 Mod: Production
-    🔐 Session: Aktif (MongoDB Store)
-    ===========================================
-    `);
-});
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
+server.listen(PORT, () => console.log(`🚀 Sunucu ${PORT} üzerinde aktif!`));
