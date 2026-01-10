@@ -54,11 +54,36 @@
         }, 1000);
     }
 
-    socket.on('arena-match-found', (data) => {
-        document.getElementById('wait-screen').style.display = 'none';
-        document.getElementById('battle-screen').style.display = 'block';
-        arenaVideo.style.display = 'block';
+    ssocket.on('arena-match-found', (data) => {
+    document.getElementById('wait-screen').style.display = 'none';
+    document.getElementById('battle-screen').style.display = 'block';
+    const arenaVideo = document.getElementById('arena-video');
+    arenaVideo.style.display = 'block';
 
+    // Dosya yolunu resimlerdeki yapıya göre güncelleyin: /caracter/move/Hayvan/Hayvan1.mp4
+    // app.js'den gelen rakip hayvan ismini (data.opponent.animal) kullanın
+    const opponentAnimal = data.opponent.animal; 
+    const winnerAnimal = data.winnerAnimal; // Sunucudan kazananın hayvan ismi gelmeli
+
+    // 1. Aşama: Rakip saldırısı
+    arenaVideo.src = `/caracter/move/${opponentAnimal}/${opponentAnimal}1.mp4`; 
+    arenaVideo.play().catch(err => console.error("Video oynatılamadı:", err));
+
+    arenaVideo.onended = () => {
+        // 2. Aşama: Kazananın videosu
+        setTimeout(() => {
+            arenaVideo.src = `/caracter/move/${winnerAnimal}/${winnerAnimal}.mp4`;
+            arenaVideo.play();
+            
+            arenaVideo.onended = () => {
+                const vicText = document.getElementById('victory-text');
+                vicText.style.display = 'block';
+                vicText.innerText = (data.winner === myNick) ? "ZAFER!" : "MAĞLUBİYET";
+                setTimeout(() => { window.location.href = '/chat'; }, 3000);
+            };
+        }, 500);
+    };
+});
         // 1. Rakip Hamlesi Videosu
         arenaVideo.src = `/videos/${data.opponentAnimal}1.mp4`;
         arenaVideo.play();
@@ -87,3 +112,4 @@
         };
     });
 </script>
+
