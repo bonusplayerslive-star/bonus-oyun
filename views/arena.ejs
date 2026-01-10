@@ -1,50 +1,172 @@
 <%- include('header') %>
-<div class="container text-center">
-    <div class="arena-container">
-        <div id="bet-screen">
-            <% if (user.selectedAnimal === 'none' || !user.selectedAnimal) { %>
-                <div class="alert alert-danger">
-                    Önce profilinden bir karakter seçmelisin!
-                    <a href="/profil" class="btn btn-sm btn-warning">Profile Git</a>
-                </div>
-            <% } else { %>
-                <h2 class="text-warning mb-4 font-orbitron">ARENA BAHİSİNİ SEÇ</h2>
-                <div class="row justify-content-center gap-2">
-                    <button onclick="startSearch(25, 50)" class="btn btn-outline-success bet-btn col-5 col-md-2">25 → 50 BPL</button>
-                    <button onclick="startSearch(35, 100)" class="btn btn-outline-info bet-btn col-5 col-md-2">35 → 100 BPL</button>
-                    <button onclick="startSearch(75, 200)" class="btn btn-outline-warning bet-btn col-5 col-md-2">75 → 200 BPL</button>
-                    <button onclick="startSearch(120, 450)" class="btn btn-outline-danger bet-btn col-5 col-md-2">120 → 450 BPL</button>
-                </div>
-                <p class="text-muted mt-3 small">*Bakiyeniz yetersizse işlem gerçekleşmez.</p>
-            <% } %>
-        </div>
 
-        <div id="wait-screen" style="display: none;">
-            <h1 id="timer" class="display-1 text-danger font-orbitron">10</h1>
-            <h3 class="text-white">RAKİP ARANIYOR...</h3>
-            <div class="spinner-grow text-warning" role="status"></div>
-        </div>
+<style>
+    /* Arena Atmosferi */
+    body {
+        background: radial-gradient(circle, #1a1a2e 0%, #0f0f1a 100%) !important;
+        color: #fff;
+        overflow-x: hidden;
+    }
 
-        <div id="battle-screen" style="display: none;">
-            <h2 id="battle-title" class="text-warning text-uppercase mb-3 font-orbitron">SAVAŞ BAŞLADI!</h2>
-            <video id="arena-video" playsinline style="width:100%; max-width:800px; border:3px solid gold; border-radius:15px;"></video>
-            <h1 id="victory-text" class="display-3 mt-3 font-orbitron" style="display: none; text-shadow: 0 0 20px gold;"></h1>
-        </div>
+    .arena-main-container {
+        min-height: 80vh;
+        display: flex;
+        flex-direction: column;
+        justify-content: center;
+        align-items: center;
+        padding: 20px;
+    }
+
+    /* Başlık Efekti */
+    .arena-title {
+        font-family: 'Orbitron', sans-serif;
+        text-transform: uppercase;
+        letter-spacing: 5px;
+        text-shadow: 0 0 15px #ffc107;
+        font-weight: 900;
+        margin-bottom: 40px;
+    }
+
+    /* Bahis Kartları */
+    .bet-card {
+        transition: all 0.3s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+        border: 2px solid rgba(255, 255, 255, 0.1);
+        background: rgba(255, 255, 255, 0.05);
+        backdrop-filter: blur(10px);
+        cursor: pointer;
+        border-radius: 15px;
+        padding: 20px;
+        text-align: center;
+        margin: 10px;
+    }
+
+    .bet-card:hover {
+        transform: translateY(-10px);
+        box-shadow: 0 0 30px var(--glow-color);
+        border-color: var(--glow-color);
+    }
+
+    /* Renk Kodları */
+    .bet-green { --glow-color: #00ff88; color: #00ff88; }
+    .bet-blue { --glow-color: #00d4ff; color: #00d4ff; }
+    .bet-gold { --glow-color: #ffcc00; color: #ffcc00; }
+    .bet-red { --glow-color: #ff4444; color: #ff4444; }
+
+    /* Video Alanı */
+    #battle-area {
+        position: relative;
+        max-width: 850px;
+        width: 100%;
+        border-radius: 20px;
+        overflow: hidden;
+        box-shadow: 0 0 50px rgba(0, 0, 0, 0.8);
+        border: 4px solid #ffc107;
+        background: #000;
+        display: none; /* Başlangıçta gizli */
+    }
+
+    .video-overlay-glow {
+        position: absolute;
+        top: 0; left: 0; right: 0; bottom: 0;
+        box-shadow: inset 0 0 50px rgba(255, 193, 7, 0.4);
+        pointer-events: none;
+        z-index: 5;
+    }
+
+    /* Sayaç Efekti */
+    .countdown-number {
+        font-size: 120px;
+        font-weight: 900;
+        background: linear-gradient(to bottom, #fff, #ffc107);
+        -webkit-background-clip: text;
+        -webkit-text-fill-color: transparent;
+        filter: drop-shadow(0 0 20px rgba(255,193,7,0.6));
+    }
+
+    @keyframes shake {
+        0% { transform: translate(1px, 1px) rotate(0deg); }
+        20% { transform: translate(-3px, 0px) rotate(-1deg); }
+        40% { transform: translate(3px, 2px) rotate(1deg); }
+        60% { transform: translate(-1px, -1px) rotate(1deg); }
+        100% { transform: translate(1px, -2px) rotate(-1deg); }
+    }
+</style>
+
+<div class="arena-main-container">
+    <div id="bet-screen" class="w-100 text-center">
+        <% if (user.selectedAnimal === 'none' || !user.selectedAnimal) { %>
+            <div class="alert alert-warning d-inline-block p-4" style="border-radius: 15px; background: rgba(255,193,7,0.1); border: 1px solid #ffc107;">
+                <h4 class="text-warning">Karakter Seçilmedi!</h4>
+                <p>Arenaya girmeden önce bir dövüşçü seçmelisin.</p>
+                <a href="/profil" class="btn btn-warning fw-bold px-4">PROFİLE GİT</a>
+            </div>
+        <% } else { %>
+            <h1 class="arena-title text-warning">ARENA BAHİSİ</h1>
+            <div class="row justify-content-center px-3">
+                <div class="col-6 col-md-2" onclick="startSearch(25, 50)">
+                    <div class="bet-card bet-green">
+                        <h5 class="fw-bold">BAŞLANGIÇ</h5>
+                        <hr style="border-color: inherit;">
+                        <h3 class="fw-bold">25 ➔ 50</h3>
+                        <small>BPL TOKEN</small>
+                    </div>
+                </div>
+                <div class="col-6 col-md-2" onclick="startSearch(35, 100)">
+                    <div class="bet-card bet-blue">
+                        <h5 class="fw-bold">AMATÖR</h5>
+                        <hr style="border-color: inherit;">
+                        <h3 class="fw-bold">35 ➔ 100</h3>
+                        <small>BPL TOKEN</small>
+                    </div>
+                </div>
+                <div class="col-6 col-md-2" onclick="startSearch(75, 200)">
+                    <div class="bet-card bet-gold">
+                        <h5 class="fw-bold">PROFESYONEL</h5>
+                        <hr style="border-color: inherit;">
+                        <h3 class="fw-bold">75 ➔ 200</h3>
+                        <small>BPL TOKEN</small>
+                    </div>
+                </div>
+                <div class="col-6 col-md-2" onclick="startSearch(120, 450)">
+                    <div class="bet-card bet-red">
+                        <h5 class="fw-bold">EFSANE</h5>
+                        <hr style="border-color: inherit;">
+                        <h3 class="fw-bold">120 ➔ 450</h3>
+                        <small>BPL TOKEN</small>
+                    </div>
+                </div>
+            </div>
+        <% } %>
+    </div>
+
+    <div id="wait-screen" class="text-center" style="display: none;">
+        <div class="countdown-number" id="timer">10</div>
+        <h2 class="text-white mt-3 fw-bold">RAKİP ARANIYOR...</h2>
+        <div class="spinner-border text-warning mt-3" style="width: 3rem; height: 3rem;" role="status"></div>
+    </div>
+
+    <div id="battle-area">
+        <div class="video-overlay-glow"></div>
+        <div id="battle-content"></div>
     </div>
 </div>
 
 <script src="/socket.io/socket.io.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
+
 <script>
     const socket = io();
-    const myNick = "<%= user.nickname %>";
-    const arenaVideo = document.getElementById('arena-video');
 
     function startSearch(bet, prize) {
-        // Bakiye kontrolü (Client-side ön kontrol)
         const currentBpl = parseInt("<%= user.bpl %>");
         if (currentBpl < bet) {
-            Swal.fire('Yetersiz BPL', 'Bu bahis için yeterli bakiyeniz yok!', 'error');
+            Swal.fire({
+                icon: 'error',
+                title: 'Yetersiz Bakiye',
+                text: 'En az ' + bet + ' BPL gerekiyor!',
+                background: '#1a1a2e',
+                color: '#fff'
+            });
             return;
         }
 
@@ -63,45 +185,49 @@
     }
 
     socket.on('arena-match-found', (data) => {
-        document.getElementById('wait-screen').style.display = 'none';
-        document.getElementById('battle-screen').style.display = 'block';
+        console.log("Maç Verisi:", data);
         
-        // Veri güvenliği kontrolü
-        const opponentAnimal = data.opponentAnimal || 'Tiger'; 
-        const winnerAnimal = data.winnerAnimal || 'Lion';
-        const isWinner = (data.winnerNick === myNick);
+        // Ekran sarsıntısı efekti
+        document.body.style.animation = "shake 0.5s ease-in-out";
+        
+        // Elementleri hazırla
+        const waitScreen = document.getElementById('wait-screen');
+        const battleArea = document.getElementById('battle-area');
+        const battleContent = document.getElementById('battle-content');
 
-        // 1. HAMLE: Rakip saldırır
-        arenaVideo.src = `/caracter/move/${opponentAnimal}/${opponentAnimal}1.mp4`;
-        arenaVideo.style.display = 'block';
-        arenaVideo.play();
+        waitScreen.style.display = 'none';
+        battleArea.style.display = 'block';
 
-        arenaVideo.onended = () => {
-            // 2. HAMLE: Kazanan son vuruşu yapar ve zafer videosu döner
+        // Hayvan ismi kontrolü (object gelirse name'i al)
+        const winnerAnimalName = (typeof data.winnerAnimal === 'object') ? data.winnerAnimal.name : data.winnerAnimal;
+        const finalAnimal = (winnerAnimalName && winnerAnimalName !== 'none') ? winnerAnimalName : 'Lion';
+
+        battleContent.innerHTML = `
+            <div style="position: relative; z-index: 10; padding: 20px;">
+                <h2 style="color: #ffc107; font-weight: 900; text-shadow: 0 0 15px rgba(255,193,7,0.5);">🔥 SAVAŞ BAŞLADI 🔥</h2>
+                <div class="d-flex justify-content-between mb-2">
+                    <span class="badge bg-danger p-2">RAKİP: ${data.opponent.nickname}</span>
+                    <span class="badge bg-success p-2">ÖDÜL: ${data.prize} BPL</span>
+                </div>
+                <video id="battle-video" autoplay playsinline style="width:100%; border-radius:10px;">
+                    <source src="/caracter/move/${finalAnimal}/${finalAnimal}.mp4" type="video/mp4">
+                    Tarayıcınız video desteklemiyor.
+                </video>
+                <div id="result-overlay" style="display:none; margin-top:15px; border-top: 1px solid rgba(255,255,255,0.2); padding-top:15px;">
+                    <h1 class="text-warning fw-bold">KAZANAN</h1>
+                    <h2 class="text-white">${data.winnerNick}</h2>
+                </div>
+            </div>
+        `;
+
+        const video = document.getElementById('battle-video');
+        video.onended = () => {
+            document.getElementById('result-overlay').style.display = 'block';
             setTimeout(() => {
-                arenaVideo.src = `/caracter/move/${winnerAnimal}/${winnerAnimal}.mp4`;
-                arenaVideo.play();
-                
-                arenaVideo.onended = () => {
-                    const vicText = document.getElementById('victory-text');
-                    vicText.style.display = 'block';
-                    
-                    if(isWinner) {
-                        vicText.innerText = "ZAFER SENİN!";
-                        vicText.style.color = "#39FF14";
-                        Swal.fire('TEBRİKLER!', `${data.prize} BPL kazandın!`, 'success');
-                    } else {
-                        vicText.innerText = "MAĞLUP OLDUN";
-                        vicText.style.color = "#FF3131";
-                    }
-                    
-                    setTimeout(() => { window.location.href = '/profil'; }, 5000);
-                };
-            }, 800);
+                window.location.reload();
+            }, 3000);
         };
     });
 
-    socket.on('error', (msg) => {
-        Swal.fire('Hata', msg, 'error').then(() => location.reload());
-    });
+    const currentRoom = "arena";
 </script>
