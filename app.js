@@ -259,7 +259,38 @@ io.on('connection', (socket) => {
             time: new Date().toLocaleTimeString()
         });
     });
+socket.on('send-gift-vip', async (data) => {
+    const { targetNick, amount, room } = data;
+    const sender = await User.findById(socket.request.session.userId);
+    const receiver = await User.findOne({ nickname: targetNick });
 
+    if (!sender || !receiver) return;
+
+    // Şart: Bakiye 5500 ve üzeri olmalı
+    if (sender.bpl < 5500) {
+        return socket.emit('error-msg', 'Hediye göndermek için en az 5500 BPL gerekir!');
+    }
+
+    const totalCost = amount; // Gönderilen miktar
+    const tax = amount * 0.25; // %25 kesinti
+    const netAmount = amount - tax; // Karşıya giden
+
+    if (sender.bpl - totalCost < 25) return; // Limit kontrolü
+
+    sender.bpl -= totalCost;
+    receiver.bpl += netAmount;
+
+    await sender.save();
+    await receiver.save();
+
+    io.to(room).emit('new-meeting-message', {
+        sender: 'SİSTEM',
+        text: `${sender.nickname}, ${targetNick} kullanıcısına ${amount} BPL hediye gönderdi! (%25 kesinti uygulandı)`
+    });
+    
+    // Bakiyeleri güncellemek için refresh sinyali
+    socket.emit('update-bpl', sender.bpl);
+});
     // 3. ARENA DAVET SİSTEMİ
     socket.on('arena-invite-request', (data) => {
         const targetSocketId = onlineUsers.get(data.to);
@@ -372,7 +403,25 @@ app.post('/api/enter-arena', authRequired, async (req, res) => {
         res.status(500).json({ success: false });
     }
 });
+let arenaQueue = [];
 
+socket.on('join-arena', (data) => {
+    const userId = socket.request.session.userId;
+    arenaQueue.push({ userId, socketId: socket.id });
+
+    // 13 Saniye sonra kontrol et
+    setTimeout(async () => {
+        const stillInQueue = arenaQueue.find(q => q.socketId === socket.id);
+        if (stillInQueue) {
+            // Hala kuyruktaysa rakip gelmemiştir, BOT ata
+            arenaQueue = arenaQueue.filter(q => q.socketId !== socket.id);
+            socket.emit('match-found', { 
+                opponent: { nickname: "BOT_KOMUTAN", hp: 120, atk: 25, def: 15, isBot: true },
+                role: 'player1'
+            });
+        }
+    }, 13000); // 13 saniye
+});
 
 io.on('connection', (socket) => {
     // Arena Giriş ve Eşleşme
@@ -449,6 +498,7 @@ async function startBattle(p1, p2, io) {
 }
 const PORT = process.env.PORT || 10000;
 server.listen(PORT, () => console.log(`🚀 SİSTEM AKTİF: ${PORT}`));
+
 
 
 
