@@ -231,12 +231,13 @@ io.on('connection', async (socket) => {
     socket.on('arena-join-queue', async (data) => {
         if (arenaQueue.find(p => p.nickname === user.nickname)) return;
 
-        const player = {
-            nickname: user.nickname,
-            socketId: socket.id,
-            animal: user.selectedAnimal,
-            power: (user.inventory.find(i => i.name === user.selectedAnimal)?.level || 1) * 10 + Math.random() * 50
-        };
+       // app.js içinde socket.on('arena-join-queue') kısmındaki player nesnesini şu şekilde garantiye al:
+const player = {
+    nickname: user.nickname,
+    socketId: socket.id,
+    animal: user.selectedAnimal, // Burası 'Lion', 'Bear' vb. olmalı
+    power: (user.inventory.find(i => i.name === user.selectedAnimal)?.level || 1) * 10 + Math.random() * 50
+};
 
         if (arenaQueue.length > 0) {
             const opponent = arenaQueue.shift();
@@ -296,5 +297,6 @@ async function startBattle(p1, p2, io) {
 // Sunucuyu başlat
 const PORT = process.env.PORT || 10000;
 server.listen(PORT, () => console.log(`🚀 SİSTEM AKTİF: ${PORT}`));
+
 
 
