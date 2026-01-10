@@ -100,18 +100,17 @@ app.get('/wallet', authRequired, (req, res) => {
     res.render('wallet', { bpl: res.locals.user.bpl || 0 });
 });
 
-// --- 5. MARKET API (25 BPL LİMİTİ AYARLANDI) ---
+// --- 5. MARKET VE GELİŞTİRME API ---
+
+// Satın Alma API (Limit 25 BPL olarak güncellendi)
 app.post('/api/buy-item', authRequired, async (req, res) => {
     const { itemName, price } = req.body;
     try {
         const user = await User.findById(req.session.userId);
         
-        // Yeni kural: 25 BPL'den az kalacaksa alışverişe izin verme
-        if ((user.bpl - price) < 25) {
-            return res.status(400).json({ 
-                success: false, 
-                error: 'Limit Engelli: Bakiyeniz 25 BPL altına düşemez!' 
-            });
+        // Stratejik limit kontrolü: 25 BPL altına düşemez
+        if ((user.bpl - price) < 25) { 
+            return res.status(400).json({ success: false, error: 'Limit Engelli: Bakiyeniz 25 BPL altına düşemez!' });
         }
         
         user.bpl -= price;
@@ -124,6 +123,73 @@ app.post('/api/buy-item', authRequired, async (req, res) => {
         res.json({ success: true, newBpl: user.bpl });
     } catch (err) { res.status(500).json({ success: false }); }
 });
+
+// Geliştirme API (Geliştirme sayfasındaki 404 hatasını çözer)
+app.post('/api/upgrade-stat', authRequired, async (req, res) => {
+    const { animalIndex, statName, cost } = req.body;
+    try {
+        const user = await User.findById(req.session.userId);
+        
+        // Geliştirme yaparken de bakiye 25 BPL altına düşmemeli
+        if ((user.bpl - cost) < 25) {
+            return res.status(400).json({ success: false, error: 'Bakiye 25 BPL altına düşemez!' });
+        }
+
+        const animal = user.inventory[animalIndex];
+        if (!animal) return res.status(404).json({ success: false, error: 'Hayvan bulunamadı!' });
+
+        // İlgili özelliği artır
+        if (statName === 'hp') {
+            animal.maxHp += 10;
+            animal.hp = animal.maxHp;
+        } else if (statName === 'atk') {
+            animal.atk += 5;
+        } else if (statName === 'def') {
+            animal.def += 5;
+        }
+
+        user.bpl -= cost;
+        // Mongoose'un dizideki değişikliği fark etmesi için:
+        user.markModified('inventory'); 
+        await user.save();
+
+        res.json({ success: true, newBpl: user.bpl, newValue: animal[statName === 'hp' ? 'maxHp' : statName] });
+    } catch (err) {
+        console.error("Geliştirme Hatası:", err);
+        res.status(500).json({ success: false });
+    }
+});
+
+// Arena için hayvan seçme rotası
+app.post('/api/select-animal', authRequired, async (req, res) => {
+    const { animalIndex } = req.body;
+    try {
+        const user = await User.findById(req.session.userId);
+        if (!user.inventory[animalIndex]) {
+            return res.status(404).json({ success: false, error: 'Hayvan bulunamadı!' });
+        }
+        
+        // Kullanıcının seçili hayvanını güncelle
+        user.selectedAnimal = user.inventory[animalIndex].name;
+        await user.save();
+        
+        res.json({ success: true, message: 'Hayvan başarıyla seçildi!' });
+    } catch (err) {
+        console.error("Arena Seçim Hatası:", err);
+        res.status(500).json({ success: false });
+    }
+});
+
+
+
+
+
+
+
+
+
+
+
 
 // --- 6. SOCKET.IO (CHAT & MEETING ODA MANTIĞI) ---
 io.on('connection', async (socket) => {
@@ -147,4 +213,5 @@ io.on('connection', async (socket) => {
 
 const PORT = process.env.PORT || 10000;
 server.listen(PORT, () => console.log(`🚀 SİSTEM AKTİF: ${PORT}`));
+
 
