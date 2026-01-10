@@ -34,10 +34,14 @@
         }
         .stat-card:hover { border-color: var(--neon-green); transform: translateY(-5px); }
         
+        /* Resimlerin düzgün görünmesi için yol düzeltmesi */
         .inventory-img { 
             width: 100%; aspect-ratio: 1/1; object-fit: cover; 
             border-radius: 10px; border: 2px solid var(--neon-green); margin-bottom: 10px;
         }
+
+        /* Seçili hayvanı vurgulamak için efekt */
+        .selected-animal-card { border: 2px solid var(--gold) !important; box-shadow: 0 0 15px var(--gold); }
         
         .bpl-badge { color: var(--neon-green); font-family: 'Orbitron'; font-weight: bold; font-size: 1.3rem; }
         .nav-btn { width: 100%; margin-bottom: 12px; font-weight: bold; font-family: 'Orbitron'; font-size: 0.8rem; letter-spacing: 1px; transition: 0.3s; }
@@ -61,6 +65,7 @@
         }
         
         .btn-arena-select { background: var(--gold); color: #000; font-weight: bold; border: none; }
+        .btn-arena-select.active { background: #28a745; color: #fff; }
         .btn-dev-select { background: transparent; border: 1px solid #0dcaf0; color: #0dcaf0; margin-top: 8px; }
         .btn-dev-select:hover { background: #0dcaf0; color: black; }
 
@@ -85,7 +90,6 @@
                 <div class="glass-panel text-center">
                     <h6 class="text-muted border-bottom border-secondary pb-2 mb-3 font-orbitron">SİSTEM MENÜSÜ</h6>
                     <a href="/market" class="btn btn-market-special nav-btn mb-4"><i class="fas fa-shopping-cart me-2"></i>BPL MARKET</a>
-                    
                     <a href="/development" class="btn btn-outline-warning nav-btn"><i class="fas fa-tools me-2"></i>GELİŞTİRME</a>
                     <a href="/arena" class="btn btn-outline-danger nav-btn"><i class="fas fa-crosshairs me-2"></i>ARENA (BATTLE)</a>
                     <a href="/chat" class="btn btn-outline-info nav-btn"><i class="fas fa-comments me-2"></i>GLOBAL CHAT</a>
@@ -116,7 +120,7 @@
                         <% } else { %>
                             <% user.inventory.forEach((item) => { %>
                                 <div class="col-md-4 mb-4">
-                                    <div class="stat-card text-center">
+                                    <div class="stat-card text-center <%= user.selectedAnimal === item.name ? 'selected-animal-card' : '' %>">
                                         <div style="position: relative;">
                                             <img src="/caracter/profile/<%= item.name %>.jpg" onerror="this.src='/caracter/page/logo.jpeg'" class="inventory-img">
                                             <span style="position: absolute; top: 10px; right: 10px; background: var(--neon-green); color: black; padding: 2px 8px; border-radius: 5px; font-weight: bold; font-family: 'Orbitron'; font-size: 0.7rem;">
@@ -128,34 +132,33 @@
                                         
                                         <div class="px-2">
                                             <% 
-                                                let hp = (item.stats && item.stats.hp) ? item.stats.hp : 100;
-                                                let stamina = (typeof item.stamina !== 'undefined') ? item.stamina : 100;
+                                                let hpVal = item.hp || 100;
+                                                let maxHpVal = item.maxHp || 100;
+                                                let hpPercent = (hpVal / maxHpVal) * 100;
+                                                let staPercent = (item.stamina || 100);
                                             %>
                                             <div class="d-flex justify-content-between stat-label mb-1">
                                                 <span>HP</span>
-                                                <span><%= hp %> / 100</span>
+                                                <span><%= hpVal %> / <%= maxHpVal %></span>
                                             </div>
                                             <div class="progress mb-2">
-                                                <div class="progress-bar bg-danger" style="width: <%= hp %>%"></div>
+                                                <div class="progress-bar bg-danger" style="width: <%= hpPercent %>%"></div>
                                             </div>
 
                                             <div class="d-flex justify-content-between stat-label mb-1">
-                                                <span>ENERJİ (STAMINA)</span>
-                                                <span>%<%= stamina %></span>
+                                                <span>STAMINA</span>
+                                                <span>%<%= staPercent %></span>
                                             </div>
                                             <div class="progress mb-3">
-                                                <div class="progress-bar bg-warning" style="width: <%= stamina %>%"></div>
+                                                <div class="progress-bar bg-warning" style="width: <%= staPercent %>%"></div>
                                             </div>
 
                                             <div class="action-container">
-                                                <button onclick="selectForArena('<%= item.name %>')" class="btn btn-arena-select btn-sm w-100 font-orbitron mb-2">
-                                                    ARENA İÇİN SEÇ
+                                                <button onclick="selectForArena('<%= item.name %>')" class="btn btn-arena-select btn-sm w-100 font-orbitron mb-2 <%= user.selectedAnimal === item.name ? 'active' : '' %>">
+                                                    <%= user.selectedAnimal === item.name ? 'SEÇİLİ KARAKTER' : 'ARENA İÇİN SEÇ' %>
                                                 </button>
-                                                <button onclick="window.location.href='/development'" class="btn btn-dev-select btn-sm w-100 font-orbitron mb-2">
+                                                <button onclick="window.location.href='/development'" class="btn btn-dev-select btn-sm w-100 font-orbitron">
                                                     GELİŞTİRME YAP
-                                                </button>
-                                                <button onclick="refillStamina('<%= item.name %>')" class="btn btn-link btn-sm text-success p-0" style="text-decoration: none; font-size: 0.7rem;">
-                                                    <i class="fas fa-bolt"></i> ENERJİ VER (10 BPL)
                                                 </button>
                                             </div>
                                         </div>
@@ -169,56 +172,36 @@
         </div>
     </div>
 
-    <script src="/socket.io/socket.io.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
     <script>
-        const socket = io();
-        
-        // Register user only if ID exists
-        <% if (user && user._id) { %>
-            socket.emit('register-user', { id: "<%= user._id %>", nickname: "<%= user.nickname %>" });
-        <% } %>
-
         async function selectForArena(name) {
             try {
-                const res = await fetch('/select-animal', {
+                // app.js'deki API yoluyla eşitlendi: /api/select-animal
+                const res = await fetch('/api/select-animal', {
                     method: 'POST',
                     headers: {'Content-Type': 'application/json'},
-                    body: JSON.stringify({ animalName: name })
+                    body: JSON.stringify({ animalName: name }) // İsim gönderiyoruz
                 });
-                const data = await res.json();
-                if(data.status === 'success') {
-                    alert(name + " savaşa hazır!");
-                } else {
-                    alert("Hata: " + (data.msg || "Karakter seçilemedi."));
-                }
-            } catch (err) {
-                console.error("Hata:", err);
-                alert("Bağlantı hatası oluştu.");
-            }
-        }
-
-        async function refillStamina(name) {
-            if(!confirm(name + " enerjisini 10 BPL karşılığında yenilemek istiyor musunuz?")) return;
-
-            try {
-                const res = await fetch('/refill-stamina', {
-                    method: 'POST',
-                    headers: {'Content-Type': 'application/json'},
-                    body: JSON.stringify({ animalName: name })
-                });
+                
                 const data = await res.json();
                 
-                if(data.status === 'success') {
-                    alert("Enerji Fullendi! Kalan BPL: " + data.newBpl);
-                    location.reload();
-                } else if(data.status === 'low_balance') {
-                    alert("Yetersiz BPL bakiyesi!");
+                if(data.success) {
+                    Swal.fire({
+                        title: 'BAŞARILI!',
+                        text: name + ' savaşa hazırlandı.',
+                        icon: 'success',
+                        background: '#050505',
+                        color: '#fff',
+                        confirmButtonColor: '#39FF14'
+                    }).then(() => {
+                        location.reload(); // Sayfayı yenile ki "Seçili" görünsün
+                    });
                 } else {
-                    alert("Hata: " + (data.msg || "İşlem başarısız."));
+                    Swal.fire('Hata', data.error || 'Seçim yapılamadı.', 'error');
                 }
             } catch (err) {
                 console.error("Hata:", err);
-                alert("Sunucuya ulaşılamadı.");
+                Swal.fire('Hata', 'Sunucu bağlantısı koptu.', 'error');
             }
         }
     </script>
