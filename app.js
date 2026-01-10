@@ -100,11 +100,8 @@ app.get('/', (req, res) => {
 app.post('/auth/register', async (req, res) => {
     const { nickname, email, password } = req.body;
     try {
-        // 1. Validasyon: Alanlar boş mu?
-        if(!nickname || !email || !password) return res.status(400).send("Tüm alanları doldurun.");
-
         const existing = await User.findOne({ $or: [{ email: email.toLowerCase() }, { nickname: nickname.trim() }] });
-        if (existing) return res.status(400).send("Nickname veya Email zaten kullanımda.");
+        if (existing) return res.status(400).send("Bu bilgiler zaten kullanımda.");
 
         const salt = await bcrypt.genSalt(10);
         const hashedPassword = await bcrypt.hash(password, salt);
@@ -113,23 +110,33 @@ app.post('/auth/register', async (req, res) => {
             nickname: nickname.trim(),
             email: email.toLowerCase().trim(),
             password: hashedPassword,
-            bpl: 2500, 
+            bpl: 2500,
             inventory: [],
             selectedAnimal: "none",
-            stats: { wins: 0, losses: 0 },
-            lastLogin: new Date(),
-            ipAddress: req.headers['x-forwarded-for'] || req.ip // Render için daha doğru IP
+            stats: { wins: 0, losses: 0 }
         });
 
         const savedUser = await newUser.save();
         
-        // 2. Kayıt sonrası oturum aç
-        req.session.userId = savedUser._id;
-        res.redirect('/profil');
+        // --- BU SATIR SENİ UYUTACAK SATIR ---
+        req.session.userId = savedUser._id; // Kayıt biter bitmez oturumu aç
+        res.redirect('/profil'); // Giriş yapmış olarak profile gönder
 
     } catch (err) {
         console.error("Register Hatası:", err);
-        res.status(500).render('error', { message: "Kayıt sırasında teknik bir hata oluştu." });
+        res.status(500).send("Kayıt başarısız oldu.");
+    }
+});
+
+        const savedUser = await newUser.save();
+        
+        // --- KRİTİK: OTURUMU AÇ VE PROFİLE GÖNDER ---
+        req.session.userId = savedUser._id; 
+        res.redirect('/profil'); 
+
+    } catch (err) {
+        console.error("Kayıt Hatası:", err);
+        res.status(500).send("Kayıt başarısız: " + err.message);
     }
 });
 
@@ -486,6 +493,7 @@ server.listen(PORT, () => {
     ===========================================
     `);
 });
+
 
 
 
