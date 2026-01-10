@@ -173,35 +173,29 @@ this.onerror=function(){this.src='/caracter/page/Logo.jpeg'};"
 
 <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
 <script>
-    // Dinamik bakiye takibi (Backend'den gelen ilk değer)
     let currentBalance = parseInt("<%= user.bpl %>");
-    const SAFETY_LIMIT = 300;
+    const SAFETY_LIMIT = 25; // Backend ile aynı limit
 
     function upgradeStat(animalName, statType) {
         const cost = (statType === 'def') ? 10 : 15;
 
-        // 1. ÖN KONTROL: Bakiye 5500'ün altına düşer mi?
         if (currentBalance - cost < SAFETY_LIMIT) {
             Swal.fire({
                 title: 'KAYNAK YETERSİZ',
-                text: `Stratejik bakiye sınırı (300 BPL) nedeniyle bu işlemi yapamazsınız. Mevcut: ${currentBalance} BPL`,
+                text: `Bakiyeniz 25 BPL altına düşemez. Mevcut: ${currentBalance} BPL`,
                 icon: 'error',
                 background: '#111',
-                color: '#fff',
-                confirmButtonColor: '#ff003c'
+                color: '#fff'
             });
             return;
         }
 
         Swal.fire({
             title: 'GELİŞTİRME ONAYI',
-            text: `${animalName} birimi için ${statType.toUpperCase()} takviyesi yapılacaktır.`,
+            text: `${animalName} için ${statType.toUpperCase()} takviyesi (Maliyet: ${cost} BPL)`,
             icon: 'question',
             showCancelButton: true,
-            confirmButtonColor: '#39FF14',
-            cancelButtonColor: '#333',
             confirmButtonText: 'ONAYLA',
-            cancelButtonText: 'İPTAL',
             background: '#111',
             color: '#fff'
         }).then((result) => {
@@ -209,37 +203,34 @@ this.onerror=function(){this.src='/caracter/page/Logo.jpeg'};"
                 fetch('/api/upgrade-stat', {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ animalName, statType })
+                    // Backend'in beklediği değişken isimleri: animalName ve statType
+                    body: JSON.stringify({ animalName, statType }) 
                 })
                 .then(res => res.json())
                 .then(data => {
                     if (data.success) {
-                        currentBalance = data.newBalance; // Yerel bakiyeyi güncelle
+                        currentBalance = data.newBalance; 
                         document.getElementById('balanceDisplay').innerHTML = `<i class="fas fa-coins me-1"></i>${data.newBalance} <small>BPL</small>`;
                         
                         Swal.fire({
-                            title: 'TEKNASYON TAMAMLANDI',
+                            title: 'BAŞARILI!',
                             text: 'Birim özellikleri güncellendi.',
                             icon: 'success',
-                            timer: 1500,
-                            showConfirmButton: false,
                             background: '#111',
-                            color: '#fff'
-                        }).then(() => {
-                            location.reload(); // Değerleri görsel olarak yenile
-                        });
+                            color: '#fff',
+                            timer: 1000
+                        }).then(() => location.reload());
                     } else {
                         Swal.fire('HATA', data.error || 'İşlem başarısız.', 'error');
                     }
                 })
-                .catch(err => {
-                    Swal.fire('BAĞLANTI HATASI', 'Sunucu yanıt vermiyor.', 'error');
-                });
+                .catch(err => Swal.fire('HATA', 'Sunucuya bağlanılamadı.', 'error'));
             }
         });
     }
 </script>
 
 <%- include('footer') %>
+
 
 
