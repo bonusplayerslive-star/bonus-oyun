@@ -6,7 +6,22 @@
     .bet-btn:hover { transform: scale(1.1); box-shadow: 0 0 15px var(--gold); }
     #status-text { font-family: 'Cinzel', serif; font-size: 1.5rem; text-shadow: 0 0 10px red; }
 </style>
-
+<div id="bet-screen">
+    <% if (user.selectedAnimal === 'none' || !user.selectedAnimal) { %>
+        <div class="alert alert-danger">
+            Önce profilinden bir hayvan seçmelisin!
+            <a href="/profil" class="btn btn-sm btn-warning">Profile Git</a>
+        </div>
+    <% } else { %>
+        <h2 class="text-warning mb-4">ARENA BAHİSİNİ SEÇ</h2>
+        <div class="row justify-content-center">
+            <button onclick="startSearch(25, 50)" class="btn btn-outline-success bet-btn col-5 col-md-2">25 → 50 BPL</button>
+            <button onclick="startSearch(35, 100)" class="btn btn-outline-info bet-btn col-5 col-md-2">35 → 100 BPL</button>
+            <button onclick="startSearch(75, 200)" class="btn btn-outline-warning bet-btn col-5 col-md-2">75 → 200 BPL</button>
+            <button onclick="startSearch(120, 450)" class="btn btn-outline-danger bet-btn col-5 col-md-2">120 → 450 BPL</button>
+        </div>
+    <% } %>
+</div>
 <div class="container text-center">
     <div class="arena-container">
         <div id="bet-screen">
@@ -105,3 +120,4 @@
         }
     });
 </script>
+
