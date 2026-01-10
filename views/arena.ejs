@@ -157,6 +157,19 @@
 <script>
     const socket = io();
 
+    // Büyük harf duyarlılığı için yardımcı fonksiyon
+    function formatAnimalName(name) {
+        if (!name) return 'Lion';
+        const map = {
+            'peregrinefalcon': 'Peregrinefalcon',
+            'falcon': 'Falcon',
+            'kurd': 'Kurd',
+            'kurt': 'Kurd',
+            'lion': 'Lion'
+        };
+        return map[name.toLowerCase()] || name;
+    }
+
     function startSearch(bet, prize) {
         const currentBpl = parseInt("<%= user.bpl %>");
         if (currentBpl < bet) {
@@ -185,63 +198,78 @@
     }
 
     socket.on('arena-match-found', (data) => {
-        console.log("Maç Verisi:", data);
-        
-        // Ekran sarsıntısı efekti
+        console.log("Maç Başladı:", data);
         document.body.style.animation = "shake 0.5s ease-in-out";
         
-        const waitScreen = document.getElementById('wait-screen');
-        const battleArea = document.getElementById('battle-area');
+        document.getElementById('wait-screen').style.display = 'none';
+        document.getElementById('battle-area').style.display = 'block';
+
+        const opponentNick = (typeof data.opponent === 'object') ? (data.opponent.nickname || "Rakip") : data.opponent;
+        
+        // Hamle yapacak olanın (rakibin) ve kazananın isimlerini formatla
+        const winnerAnimal = formatAnimalName(typeof data.winnerAnimal === 'object' ? data.winnerAnimal.name : data.winnerAnimal);
+        const opponentAnimal = formatAnimalName(typeof data.opponentAnimal === 'object' ? data.opponentAnimal.name : data.opponentAnimal);
+
         const battleContent = document.getElementById('battle-content');
 
-        waitScreen.style.display = 'none';
-        battleArea.style.display = 'block';
-
-        // 1. DÜZELTME: [object Object] hatasını engellemek için rakip ismini temizle
-        const opponentNick = (typeof data.opponent === 'object') ? (data.opponent.nickname || "Rakip") : data.opponent;
-
-        // 2. DÜZELTME: Klasör ve Dosya İsimleri (GitHub'daki gibi Büyük Harf hassasiyeti)
-        let animalName = (typeof data.winnerAnimal === 'object') ? data.winnerAnimal.name : data.winnerAnimal;
-        
-        // Eğer veritabanında 'peregrinefalcon' küçükse ama klasörün 'Peregrinefalcon' ise burayı eşle:
-        if (animalName === 'peregrinefalcon') animalName = 'Peregrinefalcon';
-        if (animalName === 'falcon') animalName = 'Falcon';
-        if (animalName === 'kurd' || animalName === 'kurt') animalName = 'Kurd';
-        if (animalName === 'lion') animalName = 'Lion';
-        
-        const finalAnimal = (animalName && animalName !== 'none') ? animalName : 'Lion';
-
+        // İlk HTML (Hamle Videosu ile başlar)
         battleContent.innerHTML = `
             <div style="position: relative; z-index: 10; padding: 20px;">
-                <h2 style="color: #ffc107; font-weight: 900; text-shadow: 0 0 15px rgba(255,193,7,0.5);">🔥 SAVAŞ BAŞLADI 🔥</h2>
+                <h2 id="battle-title" style="color: #ffc107; font-weight: 900; text-shadow: 0 0 15px rgba(255,193,7,0.5);">⚔️ SAVAŞ HAMLESİ ⚔️</h2>
                 <div class="d-flex justify-content-between mb-2">
                     <span class="badge bg-danger p-2" style="font-size:1rem;">RAKİP: ${opponentNick}</span>
                     <span class="badge bg-success p-2" style="font-size:1rem;">ÖDÜL: ${data.prize} BPL</span>
                 </div>
-                <video id="battle-video" autoplay playsinline style="width:100%; border-radius:10px; border: 2px solid gold;">
-                    <source src="/caracter/move/${finalAnimal}/${finalAnimal}.mp4" type="video/mp4">
+                <video id="battle-video" autoplay playsinline style="width:100%; border-radius:10px; border: 2px solid gold; background:#000;">
+                    <source id="video-src" src="/caracter/move/${opponentAnimal}/${opponentAnimal}1.mp4" type="video/mp4">
                     Tarayıcınız video desteği sunmuyor.
                 </video>
-                <div id="result-overlay" style="display:none; margin-top:15px; border-top: 1px solid rgba(255,255,255,0.2); padding-top:15px;">
-                    <h1 class="text-warning fw-bold">KAZANAN</h1>
+                <div id="result-overlay" style="display:none; margin-top:15px; border-top: 2px solid #ffc107; padding-top:15px;">
+                    <h1 class="text-warning fw-bold">🏆 KAZANAN 🏆</h1>
                     <h2 class="text-white" style="text-shadow: 0 0 10px #00ff00;">${data.winnerNick}</h2>
                 </div>
             </div>
         `;
 
         const video = document.getElementById('battle-video');
+        const videoSrc = document.getElementById('video-src');
+        const battleTitle = document.getElementById('battle-title');
         
-        // Video Bulunamazsa Varsayılan Video (Hata Önleyici)
-        video.onerror = function() {
-            console.error("Video bulunamadı, Lion yükleniyor...");
-            video.src = "/caracter/move/Lion/Lion.mp4";
+        let isSecondVideo = false;
+
+        // Video bittiğinde çalışacak mantık
+        video.onended = () => {
+            if (!isSecondVideo) {
+                // Hamle videosu bitti, Zafer videosuna geç
+                isSecondVideo = true;
+                battleTitle.innerHTML = "🎉 ZAFER ANI 🎉";
+                battleTitle.style.color = "#00ff88";
+                
+                // Kaynağı değiştir (hayvanadı.mp4)
+                videoSrc.src = `/caracter/move/${winnerAnimal}/${winnerAnimal}.mp4`;
+                video.load();
+                video.play();
+                
+                // Kazanan yazısını göster
+                document.getElementById('result-overlay').style.display = 'block';
+            } else {
+                // Zafer videosu da bitti, sayfayı yenile
+                setTimeout(() => {
+                    window.location.reload();
+                }, 4000);
+            }
         };
 
-        video.onended = () => {
-            document.getElementById('result-overlay').style.display = 'block';
-            setTimeout(() => {
-                window.location.reload();
-            }, 4000);
+        // Video yüklenemezse (Fallback)
+        video.onerror = function() {
+            console.error("Video bulunamadı, Lion deneniyor...");
+            if (!isSecondVideo) {
+                 videoSrc.src = "/caracter/move/Lion/Lion1.mp4";
+            } else {
+                 videoSrc.src = "/caracter/move/Lion/Lion.mp4";
+            }
+            video.load();
+            video.play();
         };
     });
 
