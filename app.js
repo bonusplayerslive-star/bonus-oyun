@@ -210,7 +210,26 @@ io.on('connection', async (socket) => {
             text: data.text 
         });
     });
+let chatHistory = [];
 
+// Mesajı hafızaya ekle ve 1 saat (3600000 ms) sonra sil
+function addToHistory(sender, text) {
+    const msg = { sender, text, time: Date.now() };
+    chatHistory.push(msg);
+    setTimeout(() => {
+        chatHistory = chatHistory.filter(m => m !== msg);
+    }, 3600000); 
+}
+
+io.on('connection', (socket) => {
+    // Giriş yapan kullanıcıya geçmişi gönder
+    socket.emit('load-history', chatHistory);
+
+    socket.on('chat-message', (data) => {
+        addToHistory(socket.nickname, data.text);
+        io.emit('new-message', { sender: socket.nickname, text: data.text });
+    });
+});
     // 2. MEETING (ÖZEL MASA) MANTIĞI
     socket.on('join-meeting', (roomId) => {
         const roomSize = io.sockets.adapter.rooms.get(roomId)?.size || 0;
@@ -419,6 +438,7 @@ async function startBattle(p1, p2, io) {
 }
 const PORT = process.env.PORT || 10000;
 server.listen(PORT, () => console.log(`🚀 SİSTEM AKTİF: ${PORT}`));
+
 
 
 
