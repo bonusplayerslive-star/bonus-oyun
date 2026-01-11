@@ -267,8 +267,22 @@ socket.on('meeting-invite-received', (data) => {
 });
 
 socket.on('force-join-meeting', (data) => {
-    // Davet gönderdiğin an seni odaya yönlendirir
-    window.location.href = `/meeting?room=${data.room}&role=host`;
+    // Role bilgisini URL'ye ekliyoruz ki meeting.ejs kimin patron olduğunu bilsin
+    window.location.href = `/meeting?room=${data.room}&role=${data.role}`;
+});
+
+socket.on('meeting-invite-received', (data) => {
+    // Karşı taraf kabul edince o 'guest' olarak girecek
+    Swal.fire({
+        title: 'TOPLANTI!',
+        text: `${data.from} seni bekliyor.`,
+        icon: 'info',
+        showCancelButton: true
+    }).then((res) => {
+        if (res.isConfirmed) {
+            window.location.href = `/meeting?room=${data.room}&role=guest`;
+        }
+    });
 });
 
 // Davet alan kişi için (Kabul ettiğinde çalışır)
@@ -295,6 +309,7 @@ socket.on('force-arena-match', (data) => {
 </script>
 </body>
 </html>
+
 
 
 
