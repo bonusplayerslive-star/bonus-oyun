@@ -245,6 +245,29 @@
             window.location.href = "/meeting?room=" + myNick + "&role=host";
         }
     }
+
+
+socket.on('meeting-invite-received', (data) => {
+    Swal.fire({
+        title: 'STRATEJİ DAVETİ!',
+        text: `${data.from} seni VIP masasına çağırıyor.`,
+        icon: 'warning',
+        showCancelButton: true,
+        confirmButtonText: 'KATIL',
+        cancelButtonText: 'REDDET',
+        background: '#000',
+        color: '#ffd700',
+        confirmButtonColor: '#28a745'
+    }).then((result) => {
+        if (result.isConfirmed) {
+            // BURASI KRİTİK: data.room gönderenin ismidir.
+            window.location.href = `/meeting?room=${data.room}`;
+        }
+    });
+});
+
+
 </script>
 </body>
 </html>
+
