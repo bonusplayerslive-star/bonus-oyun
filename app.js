@@ -220,20 +220,48 @@ io.on('connection', async (socket) => {
         io.to("general-chat").emit('new-message', { sender: socket.nickname, text: data.text });
     });
 
-    // Meeting Olayları
-    socket.on('join-meeting', (data) => {
-        const { roomId, peerId, nickname } = data;
-        socket.join(roomId);
-        socket.emit('update-bpl', user.bpl);
-        io.to(roomId).emit('room-info', { owner: roomId });
-        socket.to(roomId).emit('user-connected', { peerId, nickname });
-    });
+    // --- app.js İçindeki Socket Bölümüne Eklenecekler ---
 
-    socket.on('send-meeting-invite', (data) => {
-        const targetSocketId = onlineUsers.get(data.target);
-        if (targetSocketId) io.to(targetSocketId).emit('meeting-invite-received', { from: socket.nickname });
-    });
+socket.on('create-meeting-room', async (data) => {
+    const user = await User.findById(socket.userId);
+    if (user.bpl < 50) return socket.emit('error', 'Oda kurmak için 50 BPL gerekir!');
+    
+    user.bpl -= 50;
+    await user.save();
+    socket.emit('update-bpl', user.bpl);
+    
+    // Odayı sistemde tanımla
+    socket.join(data.room);
+    console.log(`Room created: ${data.room} by ${user.nickname}`);
+});
 
+socket.on('join-meeting', (data) => {
+    const room = io.sockets.adapter.rooms.get(data.roomId);
+    const userCount = room ? room.size : 0;
+
+    if (userCount >= 5) { // 5 Kişi Limiti
+        return socket.emit('error', 'Bu oda dolu! (Maks 5 kişi)');
+    }
+
+    socket.join(data.roomId);
+    // Diğerlerine yeni birinin geldiğini ve kamerasını açması gerektiğini bildir
+    socket.to(data.roomId).emit('user-connected', {
+        peerId: data.peerId,
+        nickname: data.nickname
+    });
+});
+
+// Host Yetki Komutları
+socket.on('host-action', (data) => {
+    // Sadece oda sahibi komut gönderebilir (Basit kontrol: oda adı = nick)
+    if (socket.nickname === data.room) {
+        if (data.action === 'mute') {
+            io.to(data.targetPeerId).emit('command-mute');
+        } else if (data.action === 'kick') {
+            io.to(data.targetPeerId).emit('command-kick');
+        }
+    }
+});
     // Hediye Sistemi
     socket.on('send-gift-bpl', async (data) => {
         const { to, amount } = data;
@@ -309,3 +337,4 @@ io.on('connection', async (socket) => {
 // --- SERVER BAŞLATMA ---
 const PORT = process.env.PORT || 10000;
 server.listen(PORT, () => console.log(`🚀 SİSTEM AKTİF: ${PORT}`));
+
