@@ -26,7 +26,6 @@
         #context-menu { position: fixed; display: none; background: #111; border: 1px solid var(--gold); border-radius: 8px; z-index: 9999; width: 180px; box-shadow: 0 0 20px #000; }
         .menu-item { padding: 12px 15px; cursor: pointer; transition: 0.2s; font-size: 0.8rem; border-bottom: 1px solid #222; }
         .menu-item:hover { background: var(--gold); color: #000; }
-        @media (max-width: 992px) { .master-container { grid-template-columns: 1fr; grid-template-rows: 140px 1fr 240px; } .video-grid { flex-direction: row; height: 140px; width: 100%; } .v-slot { width: 160px; height: 120px; flex-shrink: 0; } .chat-sidebar { height: 240px; } }
     </style>
 </head>
 <body>
@@ -47,7 +46,7 @@
     <div class="video-grid" id="video-wrapper">
         <div class="v-slot is-host" id="local-slot">
             <video id="localVideo" autoplay muted playsinline></video>
-            <div class="name-tag">SEN (LİDER)</div>
+            <div class="name-tag" id="local-name-tag">SEN</div>
         </div>
     </div>
 
@@ -56,6 +55,7 @@
             <div>
                 <i class="fas fa-shield-halved fa-3x mb-3 text-warning" style="opacity: 0.3;"></i>
                 <p class="font-cinzel text-muted small">VIP STRATEJİ ODASI LİMİTİ: 5 KİŞİ</p>
+                <p id="role-display" class="text-info x-small"></p>
             </div>
         </div>
     </div>
@@ -92,9 +92,13 @@
     const myNick = "<%= user.nickname %>";
     const urlParams = new URLSearchParams(window.location.search);
     const currentRoom = urlParams.get('room') || 'global';
-    const isRoomOwner = (myNick === currentRoom);
+    const myRole = urlParams.get('role') || 'guest'; // 'host' veya 'guest'
+    const isRoomOwner = (myRole === 'host');
 
+    // Başlığı ve Rol Etiketini Güncelle
     document.getElementById('room-owner-name').innerText = currentRoom.toUpperCase() + " MASASI";
+    document.getElementById('local-name-tag').innerText = isRoomOwner ? "SEN (LİDER)" : "SEN (KATILIMCI)";
+    document.getElementById('role-display').innerText = isRoomOwner ? "YETKİ: ODA SAHİBİ" : "YETKİ: KATILIMCI";
 
     let myStream;
     let myPeer = new Peer();
@@ -138,7 +142,6 @@
         document.getElementById('video-wrapper').append(slot);
     }
 
-    // CHAT
     function sendMsg() {
         const input = document.getElementById('m-input');
         if (input.value.trim()) {
@@ -156,12 +159,9 @@
         chat.scrollTop = chat.scrollHeight;
     });
 
-    // KICK / ERROR SİSTEMİ
     socket.on('command-kick', () => {
         Swal.fire("Oda Dağıldı", "Oturum sona erdi.", "info").then(() => window.location.href = "/chat");
     });
-
-    socket.on('error', (msg) => { Swal.fire("Bilgi", msg, "warning"); });
 
     function inviteUser() {
         const nick = document.getElementById('invite-nick').value;
@@ -188,6 +188,7 @@
         selectedUser = { nick, peerId };
         const menu = document.getElementById('context-menu');
         document.getElementById('menu-user-title').innerText = nick;
+        // Sadece host olan kişiye susturma/atma yetkisi gösterilir
         document.getElementById('host-mute-opt').style.display = isRoomOwner ? 'block' : 'none';
         document.getElementById('host-kick-opt').style.display = isRoomOwner ? 'block' : 'none';
         menu.style.display = 'block'; menu.style.left = e.clientX + 'px'; menu.style.top = e.clientY + 'px';
@@ -197,6 +198,10 @@
         if (!selectedUser) return;
         if (action === 'kick' && isRoomOwner) {
             socket.emit('host-action', { action: 'kick', targetNick: selectedUser.nick, room: currentRoom });
+        } else if (action === 'gift') {
+            // Hediyeleşme sistemini buraya bağlayabilirsin
+            const { value: amount } = await Swal.fire({ title: 'Miktar', input: 'number', showCancelButton: true });
+            if (amount) socket.emit('send-gift-bpl', { to: selectedUser.nick, amount });
         }
         document.getElementById('context-menu').style.display = 'none';
     }
