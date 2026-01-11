@@ -144,23 +144,35 @@ app.get('/logout', (req, res) => {
     res.redirect('/');
 });
 
-// --- 5. MARKET VE GELİŞTİRME API ---
+// --- 5. MARKET API (GÜNCELLENMİŞ: 3 HAYVAN SINIRI) ---
 app.post('/api/buy-item', authRequired, async (req, res) => {
     const { itemName, price } = req.body;
     try {
         const user = await User.findById(req.session.userId);
-        if ((user.bpl - price) < 25) return res.status(400).json({ success: false, error: 'Bakiye 25 altına düşemez!' });
+        
+        // KRİTİK KONTROL 1: Envanter dolu mu?
+        if (user.inventory.length >= 3) {
+            return res.status(400).json({ success: false, error: 'Envanter dolu! En fazla 3 hayvan alabilirsin.' });
+        }
+
+        // KRİTİK KONTROL 2: Bakiye 25 altına düşüyor mu?
+        if ((user.bpl - price) < 25) {
+            return res.status(400).json({ success: false, error: 'Bakiye 25 altına düşemez!' });
+        }
+
         user.bpl -= price;
         user.inventory.push({
             name: itemName,
             img: `/caracter/profile/${itemName}.jpg`,
             stamina: 100, hp: 100, maxHp: 100, atk: 50, def: 30, level: 1
         });
+        
         await user.save();
         res.json({ success: true, newBpl: user.bpl });
-    } catch (err) { res.status(500).json({ success: false }); }
+    } catch (err) { 
+        res.status(500).json({ success: false }); 
+    }
 });
-
 app.post('/api/select-animal', authRequired, async (req, res) => {
     try {
         const { animalName } = req.body;
@@ -327,3 +339,4 @@ io.on('connection', async (socket) => {
 
 const PORT = process.env.PORT || 3000;
 server.listen(PORT, () => console.log(`🚀 SİSTEM AKTİF: Port ${PORT}`));
+
