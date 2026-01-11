@@ -172,7 +172,38 @@ app.post('/api/buy-item', authRequired, async (req, res) => {
     } catch (err) { 
         res.status(500).json({ success: false }); 
     }
+});// --- HAYVAN SATIŞ API ---
+app.post('/api/sell-item', authRequired, async (req, res) => {
+    const { itemName } = req.body; // Satılacak hayvanın adı
+    const user = await User.findById(req.session.userId);
+
+    // Envanterde bu hayvan var mı kontrol et
+    const itemIndex = user.inventory.findIndex(i => i.name === itemName);
+
+    if (itemIndex > -1) {
+        // Satış bedelini belirle (Örn: Alış fiyatının %50'si veya sabit 700 BPL)
+        const sellPrice = 700; 
+
+        // 1. BPL miktarını arttır
+        user.bpl += sellPrice;
+
+        // 2. Hayvanı envanterden çıkar
+        user.inventory.splice(itemIndex, 1);
+
+        // 3. Eğer seçili hayvan bu ise, seçimi 'none' yap
+        if (user.selectedAnimal === itemName) {
+            user.selectedAnimal = 'none';
+        }
+
+        await user.save();
+        return res.json({ success: true, newBpl: user.bpl });
+    } else {
+        return res.json({ success: false, error: "Hayvan bulunamadı." });
+    }
 });
+
+
+
 app.post('/api/select-animal', authRequired, async (req, res) => {
     try {
         const { animalName } = req.body;
@@ -339,4 +370,5 @@ io.on('connection', async (socket) => {
 
 const PORT = process.env.PORT || 3000;
 server.listen(PORT, () => console.log(`🚀 SİSTEM AKTİF: Port ${PORT}`));
+
 
