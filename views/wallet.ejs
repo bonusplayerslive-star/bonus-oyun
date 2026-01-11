@@ -153,13 +153,15 @@
                 </div>
             <% } else { %>
                 <% 
-                    const animalTranslate = {
-                        "YILAN": "snake", "SNAKE": "snake", "KAPLAN": "tiger", "TIGER": "tiger",
-                        "AYI": "bear", "BEAR": "bear", "TIMSAH": "crocodile", "CROCODILE": "crocodile",
-                        "KARTAL": "eagle", "EAGLE": "eagle", "KURT", "WOLF": "kurd", "KURD": 
-                        "ASLAN": "lion", "LION": "lion", "GORIL": "gorilla", "GORILLA": "gorilla",
-                        "GERGEDAN": "rhino", "RHINO": "rhino", "GÖKDOĞAN": "peregrinefalcon"
-                    };
+                <% 
+    const animalTranslate = {
+        "YILAN": "snake", "SNAKE": "snake", "KAPLAN": "tiger", "TIGER": "tiger",
+        "AYI": "bear", "BEAR": "bear", "TIMSAH": "crocodile", "CROCODILE": "crocodile",
+        "KARTAL": "eagle", "EAGLE": "eagle", "KURT": "wolf", "WOLF": "wolf",
+        "ASLAN": "lion", "LION": "lion", "GORIL": "gorilla", "GORILLA": "gorilla",
+        "GERGEDAN": "rhino", "RHINO": "rhino", "GÖKDOĞAN": "peregrinefalcon"
+    };
+%>
                 %>
                 <% user.inventory.forEach((item, index) => { 
                     let itemName = item.name || item;
@@ -277,3 +279,4 @@ function varlikSat(animalName) {
 </body>
 
 </html>
+
