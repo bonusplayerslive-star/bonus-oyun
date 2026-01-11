@@ -357,10 +357,11 @@ io.on('connection', async (socket) => {
         arenaQueue = arenaQueue.filter(p => p.socketId !== socket.id);
         broadcastOnlineList();
     });
-
+});
 // --- SERVER BAŞLATMA ---
 const PORT = process.env.PORT || 10000;
 server.listen(PORT, () => console.log(`🚀 SİSTEM AKTİF: ${PORT}`));
+
 
 
 
