@@ -351,22 +351,57 @@ socket.on('send-meeting-invite', (data) => {
     });
 
 // Sunucu tarafı (app.js) - Taslak Mantık
-socket.on('arena-invite-accept', (data) => {
-    const challenger = socket; // Kabul eden
-    const inviter = getSocketByNickname(data.from); // Davet eden
+// Sunucu tarafı (app.js)
+socket.on('arena-invite-accept', async (data) => {
+    try {
+        const challengerNick = socket.nickname; // Kabul eden (Siz)
+        const inviterNick = data.from; // Davet eden (Arkadaşınız)
 
-    if (inviter) {
-        const roomId = `arena_${inviter.nickname}_${challenger.nickname}`;
-        inviter.join(roomId);
-        challenger.join(roomId);
+        // Veritabanından her iki kullanıcıyı çekiyoruz
+        const user1 = await User.findOne({ nickname: challengerNick });
+        const user2 = await User.findOne({ nickname: inviterNick });
 
-        // İkisine birden "Maç Başladı" bilgisini gönder
-        io.to(roomId).emit('arena-match-found', {
-            opponent: inviter.nickname,
-            prize: 50, // Sabit veya dinamik ödül
-            winnerNick: Math.random() > 0.5 ? inviter.nickname : challenger.nickname,
-            // ... diğer veriler
-        });
+        // Davet edenin hala online olup olmadığını kontrol etmek için (opsiyonel)
+        // const inviterSocketId = [...onlineUsers.entries()].find(([nick, id]) => nick === inviterNick)?.[1];
+        // Not: onlineUsers map yapınıza göre bu satırı düzenleyebilirsiniz.
+
+        if (user1 && user2) {
+            // Önemli: Daveti kabul edenden de bahis bedelini düşelim (Örn: 25 BPL)
+            const betAmount = 25; 
+            if (user1.bpl < betAmount) {
+                return socket.emit('error', 'Bakiyeniz yetersiz!');
+            }
+            user1.bpl -= betAmount;
+            await user1.save();
+            socket.emit('update-bpl', user1.bpl);
+
+            // Oyuncu objelerini hazırlıyoruz (Mevcut startBattle formatında)
+            const p1 = {
+                nickname: user1.nickname,
+                socketId: socket.id,
+                animal: (user1.selectedAnimal && user1.selectedAnimal !== 'none') ? user1.selectedAnimal : 'Lion',
+                power: Math.random() * 100, // Güç hesaplamasını buraya da ekleyebilirsiniz
+                prize: 50 // Sabit ödül
+            };
+
+            const p2 = {
+                nickname: user2.nickname,
+                socketId: null, // Davet eden kişinin socket ID'sini bulabiliyorsanız buraya yazın
+                animal: (user2.selectedAnimal && user2.selectedAnimal !== 'none') ? user2.selectedAnimal : 'Lion',
+                power: Math.random() * 100,
+                prize: 50
+            };
+            
+            // Eğer davet edenin socketId'sini onlineUsers listesinden bulabiliyorsak:
+            // NOT: onlineUsers bir Map ise şöyle bulunabilir:
+            // const targetId = onlineUsers.get(inviterNick); 
+            // p2.socketId = targetId;
+
+            // Maçı başlat
+            startBattle(p1, p2, io);
+        }
+    } catch (err) {
+        console.error("Arena davet kabul hatası:", err);
     }
 });
     
@@ -451,6 +486,7 @@ async function startBattle(p1, p2, io) {
 }
 const PORT = process.env.PORT || 10000;
 server.listen(PORT, () => console.log(`🚀 SİSTEM AKTİF: ${PORT}`));
+
 
 
 
