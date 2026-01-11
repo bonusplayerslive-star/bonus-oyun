@@ -446,6 +446,50 @@ io.on('connection', async (socket) => {
         }
     });
 
+// --- app.js İçine Eklenecek Bölüm ---
+
+io.on('connection', (socket) => {
+    
+    // 1. Oda içi mesajlaşma (Sadece o odadakiler görür)
+    socket.on('meeting-message', (data) => {
+        if (data.room && data.text) {
+            // Mesajı sadece o odadaki (konseydeki) kullanıcılara gönder
+            io.to(data.room).emit('new-meeting-message', {
+                sender: socket.nickname,
+                text: data.text
+            });
+        }
+    });
+
+    // 2. Davet Gönderme (Meeting içinden)
+    socket.on('send-meeting-invite', (data) => {
+        const targetSocketId = onlineUsers.get(data.target);
+        if (targetSocketId) {
+            io.to(targetSocketId.id).emit('meeting-invite-received', {
+                from: data.from,
+                room: data.from // Oda adı daveti gönderenin nicki olur
+            });
+        }
+    });
+
+    // 3. Odaya Katılma (Socket.io Odasına Giriş)
+    socket.on('join-meeting', (data) => {
+        socket.join(data.roomId); // Socket.io odasına dahil et (Mesajlar için kritik!)
+        socket.to(data.roomId).emit('user-connected', data);
+    });
+});
+
+
+
+
+
+
+
+
+
+
+
+    
     socket.on('disconnect', () => {
         onlineUsers.delete(socket.nickname);
         arenaQueue = arenaQueue.filter(p => p.socketId !== socket.id);
@@ -466,5 +510,6 @@ io.on('connection', async (socket) => {
 // --- SERVER BAŞLATMA ---
 const PORT = process.env.PORT || 10000;
 server.listen(PORT, () => console.log(`🚀 SİSTEM AKTİF: ${PORT}`));
+
 
 
