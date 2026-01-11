@@ -293,7 +293,7 @@ socket.on('host-action', (data) => {
 
         // Davet edeni kendi masasına yönlendir (host rolüyle)
         socket.emit('force-join-meeting', { room: socket.nickname, role: 'host' });
-    }
+    
 });
         
         // 2. Karşı tarafa daveti gönder
@@ -380,6 +380,7 @@ socket.on('arena-invite-accept', async (data) => {
 
 const PORT = process.env.PORT || 3000;
 server.listen(PORT, () => console.log(`🚀 SİSTEM AKTİF: Port ${PORT}`));
+
 
 
 
