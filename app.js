@@ -335,7 +335,47 @@ io.on('connection', async (socket) => {
             }
         } catch (e) { console.log("Arena Kuyruk Hatası", e); }
     });
+// --- [HEDİYE SİSTEMİ - CHAT] ---
+    socket.on('send-gift-bpl', async (data) => {
+        try {
+            const amount = parseInt(data.amount);
+            const fromUser = await User.findById(socket.userId);
+            const toUser = await User.findOne({ nickname: data.to });
+            const toSocketId = onlineUsers.get(data.to);
 
+            if (!toUser) return socket.emit('error', 'Hedef kullanıcı bulunamadı.');
+            if (isNaN(amount) || amount <= 0) return socket.emit('error', 'Geçersiz miktar.');
+            if (fromUser.bpl - amount < 25) return socket.emit('error', 'Limit: Bakiyeniz 25 BPL altına düşemez!');
+
+            // Transfer İşlemi
+            fromUser.bpl -= amount;
+            toUser.bpl += amount;
+            await fromUser.save();
+            await toUser.save();
+
+            // Gönderene güncelleme
+            socket.emit('update-bpl', fromUser.bpl);
+            // Alana güncelleme (eğer online ise)
+            if (toSocketId) {
+                io.to(toSocketId).emit('update-bpl', toUser.bpl);
+                io.to(toSocketId).emit('new-message', { sender: "SİSTEM", text: `🎁 ${socket.nickname} sana ${amount} BPL gönderdi!` });
+            }
+            
+            // Global duyuru
+            io.to("general-chat").emit('new-message', { sender: "SİSTEM", text: `📢 ${socket.nickname}, ${data.to} kullanıcısına ${amount} BPL hediye etti!` });
+
+        } catch (err) { console.error("Hediye Hatası:", err); }
+    });
+
+    // --- [ARENA DAVET SİSTEMİ - CHAT] ---
+    socket.on('arena-invite-request', (data) => {
+        const targetSId = onlineUsers.get(data.to);
+        if (targetSId) {
+            io.to(targetSId).emit('arena-invite-received', { from: socket.nickname });
+        } else {
+            socket.emit('error', 'Kullanıcı şu an online değil.');
+        }
+    });
     socket.on('disconnect', () => {
         onlineUsers.delete(socket.nickname);
         arenaQueue = arenaQueue.filter(p => p.socketId !== socket.id);
@@ -345,4 +385,5 @@ io.on('connection', async (socket) => {
 
 const PORT = process.env.PORT || 3000;
 server.listen(PORT, () => console.log(`🚀 SİSTEM AKTİF: Port ${PORT}`));
+
 
