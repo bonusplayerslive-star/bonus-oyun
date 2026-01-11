@@ -1,10 +1,10 @@
 /**
- * BPL ULTIMATE - FINAL FULL SYSTEM (FIXED LIMITS & EJS ERRORS)
+ * BPL ULTIMATE - FINAL FULL SYSTEM (FIXED)
  */
 const express = require('express');
 const mongoose = require('mongoose');
 const session = require('express-session');
-const MongoStore = require('connect-mongo').default; 
+const MongoStore = require('connect-mongo'); // .default kalktı, yeni sürümlerde bu şekilde kullanılır
 const http = require('http');
 const socketIo = require('socket.io');
 const path = require('path');
@@ -125,7 +125,7 @@ app.get('/logout', (req, res) => {
     res.redirect('/');
 });
 
-// --- 5. MARKET VE GELİŞTİRME API ---
+// --- 5. MARKET VE GELİŞTİRME API (SOCKET DIŞINDA - GÜVENLİ) ---
 app.post('/api/buy-item', authRequired, async (req, res) => {
     const { itemName, price } = req.body;
     try {
@@ -170,7 +170,7 @@ app.post('/api/upgrade-stat', authRequired, async (req, res) => {
         user.bpl -= cost;
         if (statType === 'hp') {
             animal.hp += 10;
-            animal.maxHp = (animal.maxHp || 500) + 10;
+            animal.maxHp = (animal.maxHp || 100) + 10;
         } else if (statType === 'atk') {
             animal.atk += 5;
         } else if (statType === 'def') {
@@ -263,67 +263,56 @@ io.on('connection', async (socket) => {
         if (data.room && data.text) io.to(data.room).emit('new-meeting-message', { sender: socket.nickname, text: data.text });
     });
 
-// --- [MEETING DAVET SİSTEMİ - TERTEMİZ VERSİYON] ---
-socket.on('send-meeting-invite', (data) => {
-    const targetSId = onlineUsers.get(data.target);
-    if (targetSId) {
-        // 1. Davet edeni odaya al
-        socket.join(socket.nickname); 
-        
-        // 2. Karşı tarafa daveti gönder
-        io.to(targetSId).emit('meeting-invite-received', { 
-            from: socket.nickname, 
-            room: socket.nickname 
-        });
-
-        // 3. Davet edene "Odaya geç" emri gönder
-        socket.emit('force-join-meeting', { room: socket.nickname, role: 'host' });
-    }
-});
-
-socket.on('host-action', (data) => {
-    if (socket.nickname === data.room) {
-        const targetSId = onlineUsers.get(data.targetNick); 
-        if (targetSId && data.action === 'kick') {
-            io.to(targetSId).emit('command-kick');
+    // --- MEETING DAVET SİSTEMİ ---
+    socket.on('send-meeting-invite', (data) => {
+        const targetSId = onlineUsers.get(data.target);
+        if (targetSId) {
+            socket.join(socket.nickname); 
+            io.to(targetSId).emit('meeting-invite-received', { 
+                from: socket.nickname, 
+                room: socket.nickname 
+            });
+            socket.emit('force-join-meeting', { room: socket.nickname, role: 'host' });
         }
-    }
-});
-// --- [MEETING SİSTEMİ SONU] ---
-socket.on('arena-invite-accept', async (data) => {
-    try {
-        const u1 = await User.findOne({ nickname: socket.nickname }); // Kabul eden
-        const u2 = await User.findOne({ nickname: data.from });      // Davet eden
-        const s2Id = onlineUsers.get(data.from);
+    });
 
-        if (u1 && u2 && s2Id) {
-            if (u1.bpl < 25 || u2.bpl < 25) return socket.emit('error', 'Yetersiz BPL!');
-            
-            // BPL Düşür
-            u1.bpl -= 25; u2.bpl -= 25;
-            await u1.save(); await u2.save();
-            
-            // Bakiyeleri güncelle
-            socket.emit('update-bpl', u1.bpl);
-            io.to(s2Id).emit('update-bpl', u2.bpl);
-
-            // KRİTİK NOKTA: İki tarafı da Arena sayfasına ve aynı odaya yönlendir
-            const arenaRoomId = `arena_${u2.nickname}_vs_${u1.nickname}`;
-            
-            // Kabul edeni gönder
-            socket.emit('force-arena-match', { room: arenaRoomId });
-            // Davet edeni gönder
-            io.to(s2Id).emit('force-arena-match', { room: arenaRoomId });
-
-            // Arka planda savaşı başlat
-            startBattle(
-                { nickname: u1.nickname, socketId: socket.id, animal: u1.selectedAnimal || 'Lion', power: Math.random()*100, prize: 50 },
-                { nickname: u2.nickname, socketId: s2Id, animal: u2.selectedAnimal || 'Lion', power: Math.random()*100, prize: 50 },
-                io
-            );
+    socket.on('host-action', (data) => {
+        if (socket.nickname === data.room) {
+            const targetSId = onlineUsers.get(data.targetNick); 
+            if (targetSId && data.action === 'kick') {
+                io.to(targetSId).emit('command-kick');
+            }
         }
-    } catch (e) { console.log("Arena Davet Kabul Hatası:", e); }
-});
+    });
+
+    socket.on('arena-invite-accept', async (data) => {
+        try {
+            const u1 = await User.findOne({ nickname: socket.nickname });
+            const u2 = await User.findOne({ nickname: data.from });
+            const s2Id = onlineUsers.get(data.from);
+
+            if (u1 && u2 && s2Id) {
+                if (u1.bpl < 25 || u2.bpl < 25) return socket.emit('error', 'Yetersiz BPL!');
+                
+                u1.bpl -= 25; u2.bpl -= 25;
+                await u1.save(); await u2.save();
+                
+                socket.emit('update-bpl', u1.bpl);
+                io.to(s2Id).emit('update-bpl', u2.bpl);
+
+                const arenaRoomId = `arena_${u2.nickname}_vs_${u1.nickname}`;
+                socket.emit('force-arena-match', { room: arenaRoomId });
+                io.to(s2Id).emit('force-arena-match', { room: arenaRoomId });
+
+                startBattle(
+                    { nickname: u1.nickname, socketId: socket.id, animal: u1.selectedAnimal || 'Lion', power: Math.random()*100, prize: 50 },
+                    { nickname: u2.nickname, socketId: s2Id, animal: u2.selectedAnimal || 'Lion', power: Math.random()*100, prize: 50 },
+                    io
+                );
+            }
+        } catch (e) { console.log("Arena Davet Kabul Hatası:", e); }
+    });
+
     socket.on('arena-join-queue', async (data) => {
         try {
             const u = await User.findById(socket.userId);
@@ -348,7 +337,6 @@ socket.on('arena-invite-accept', async (data) => {
     });
 
     socket.on('disconnect', () => {
-        io.to(socket.nickname).emit('command-kick');
         onlineUsers.delete(socket.nickname);
         arenaQueue = arenaQueue.filter(p => p.socketId !== socket.id);
         broadcastOnlineList();
@@ -357,10 +345,3 @@ socket.on('arena-invite-accept', async (data) => {
 
 const PORT = process.env.PORT || 3000;
 server.listen(PORT, () => console.log(`🚀 SİSTEM AKTİF: Port ${PORT}`));
-
-
-
-
-
-
-
