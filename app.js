@@ -401,9 +401,15 @@ socket.on('disconnect', () => {
         arenaQueue = arenaQueue.filter(p => p.socketId !== socket.id);
         broadcastOnlineList();
     });
-// --- SERVER BAŞLATMA ---
-const PORT = process.env.PORT || 10000;
-server.listen(PORT, () => console.log(`🚀 SİSTEM AKTİF: ${PORT}`));
+
+}); // <--- io.on bloğunu kapatan parantez BU OLMALI
+
+// Sunucuyu Başlat (Bu en altta olmalı)
+const PORT = process.env.PORT || 3000;
+server.listen(PORT, () => {
+    console.log(`🚀 SİSTEM AKTİF: Port ${PORT}`);
+});
+
 
 
 
