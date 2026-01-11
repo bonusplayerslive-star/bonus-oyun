@@ -25,8 +25,54 @@
             box-shadow: 0 0 10px rgba(0, 242, 255, 0.2);
         }
 
-        .master-layout { flex: 1; display: grid; grid-template-columns: 280px 1fr 300px; gap: 10px; padding: 5px; overflow: hidden; }
+       /* Masaüstü ayarı (Varsayılan) */
+.master-layout { 
+    flex: 1; 
+    display: grid; 
+    grid-template-columns: 280px 1fr 300px; /* Üç sütun: Video | Ana Ekran | Chat */
+    gap: 10px; 
+    padding: 5px; 
+    overflow-y: auto; /* Mobilde aşağı kayabilsin diye */
+}
 
+/* CEP TELEFONU AYARI (Pürüz Giderici) */
+@media (max-width: 992px) {
+    body {
+        overflow-y: auto; /* Mobilde sayfanın tamamı aşağı kaysın */
+        height: auto;
+    }
+    
+    .master-layout { 
+        display: flex; /* Grid'den vazgeç, Flexbox'a dön */
+        flex-direction: column; /* Her şeyi alt alta diz */
+        grid-template-columns: none; 
+        height: auto;
+    }
+
+    .video-sidebar { 
+        order: 2; /* Videoları ortaya al */
+        max-height: 250px; 
+        display: grid !important; /* Kapalıydı, açtık */
+        grid-template-columns: 1fr 1fr; /* Videoları yanyana 2'li yap */
+    }
+
+    .main-display { 
+        order: 1; /* Ana ekran (Ajan ikonu) en üstte kalsın */
+        height: 200px;
+    }
+
+    .chat-sidebar { 
+        order: 3; /* Chat en altta olsun */
+        display: flex !important; /* Kapalıydı, açtık */
+        height: 400px;
+    }
+
+    .top-nav {
+        flex-direction: column;
+        height: auto;
+        padding: 10px;
+    }
+}
         /* Video Alanları */
         .video-sidebar { 
             background: rgba(0,0,0,0.5); border: 1px solid rgba(0,242,255,0.3); 
@@ -346,5 +392,6 @@ function inviteUser() {
 </script>
 </body>
 </html>
+
 
 
