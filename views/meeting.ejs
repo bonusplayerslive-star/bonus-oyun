@@ -116,18 +116,28 @@
         socket.emit('join-meeting', { roomId: currentRoom, peerId: id, nickname: myNick });
     });
 
-    socket.on('user-connected', data => {
-        if (data.peerId === myPeer.id) return;
-        const call = myPeer.call(data.peerId, myStream, { metadata: { nickname: myNick } });
-        call.on('stream', userStream => addRemoteVideo(data.peerId, userStream, data.nickname));
-        peers[data.peerId] = call;
+// Yeni bir kullanıcı bağlandığında (User Connected)
+socket.on('user-connected', (data) => {
+    console.log('Yeni kullanıcı katıldı:', data.nickname);
+    
+    // Masa sahibi (veya odadaki eskiler), yeni geleni aramalıdır
+    const call = peer.call(data.peerId, window.localStream);
+    
+    const video = document.createElement('video');
+    call.on('stream', userVideoStream => {
+        addVideoStream(video, userVideoStream, data.nickname);
     });
+});
 
-    myPeer.on('call', call => {
-        call.answer(myStream);
-        call.on('stream', userStream => addRemoteVideo(call.peer, userStream, call.metadata.nickname || "Katılımcı"));
-        peers[call.peer] = call;
+// Aramaya cevap verme kısmı
+peer.on('call', call => {
+    call.answer(window.localStream);
+    const video = document.createElement('video');
+    call.on('stream', userVideoStream => {
+        // Arayan kişinin nickini metadata veya socket üzerinden eşleştirerek ekleyin
+        addVideoStream(video, userVideoStream, "KATILIMCI"); 
     });
+});
 
     function addRemoteVideo(peerId, stream, nick) {
         if (document.getElementById(peerId)) return;
@@ -211,3 +221,4 @@
 </script>
 </body>
 </html>
+
