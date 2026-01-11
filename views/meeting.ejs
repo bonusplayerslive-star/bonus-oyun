@@ -32,6 +32,73 @@
             background: rgba(0,0,0,0.5); border: 1px solid rgba(0,242,255,0.3); 
             border-radius: 15px; padding: 10px; overflow-y: auto; display: flex; flex-direction: column; gap: 10px;
         }
+
+
+
+/* --- MOBIL UYUMLULUK AYARLARI --- */
+
+/* Ekran genişliği 992px'den küçükse (Tablet ve Telefonlar) */
+@media (max-width: 992px) {
+    .container-fluid {
+        padding: 5px !important;
+    }
+
+    /* Ana taşıyıcıyı esnek yap ve dikey hizala */
+    .meeting-wrapper { 
+        display: flex;
+        flex-direction: column;
+        gap: 10px;
+        height: auto !important; /* Yüksekliği serbest bırak */
+    }
+
+    /* Video alanlarını yan yana değil alt alta diz */
+    #video-grid {
+        grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)) !important;
+        max-height: 300px;
+        overflow-y: auto;
+    }
+
+    /* Sağ taraftaki VIP Terminal (Chat) kısmını videonun altına at */
+    .vip-terminal {
+        width: 100% !important;
+        height: 400px !important;
+        margin-top: 10px;
+    }
+
+    /* Video pencerelerinin boyutunu küçült */
+    video {
+        height: 120px !important;
+        width: 100% !important;
+        object-fit: cover;
+    }
+
+    /* Üst barı (Global Sektörü) daha kompakt yap */
+    .header-bar {
+        font-size: 0.8rem;
+        padding: 5px 10px !important;
+    }
+}
+
+/* Ekran genişliği 576px'den küçükse (Küçük Telefonlar) */
+@media (max-width: 576px) {
+    .header-bar h4 {
+        font-size: 0.9rem;
+    }
+    
+    #video-grid {
+        grid-template-columns: 1fr 1fr !important; /* Videoları 2'li sıra yap */
+    }
+
+    .btn-action {
+        padding: 5px 8px !important;
+        font-size: 0.7rem;
+    }
+}
+
+
+
+
+
         .v-slot { 
             width: 100%; aspect-ratio: 16/9; border-radius: 10px; border: 1px solid #333; 
             position: relative; background: #000; overflow: hidden;
@@ -255,3 +322,4 @@
 </script>
 </body>
 </html>
+
