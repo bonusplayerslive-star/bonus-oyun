@@ -263,14 +263,22 @@ io.on('connection', async (socket) => {
         if (data.room && data.text) io.to(data.room).emit('new-meeting-message', { sender: socket.nickname, text: data.text });
     });
 
-    socket.on('send-meeting-invite', (data) => {
-        const targetSId = onlineUsers.get(data.target);
-        if (targetSId) {
-            io.to(targetSId).emit('meeting-invite-received', { from: socket.nickname, room: socket.nickname });
-            // DAVET EDENİ DE ODASINA YÖNLENDİR (Dümbüklük Yapmasın Diye)
-            socket.emit('force-join-meeting', { room: socket.nickname });
-        }
-    });
+socket.on('send-meeting-invite', (data) => {
+    const targetSId = onlineUsers.get(data.target);
+    if (targetSId) {
+        // 1. Davet edeni kendi adına açılan odaya hemen al
+        socket.join(socket.nickname); 
+        
+        // 2. Karşı tarafa daveti gönder
+        io.to(targetSId).emit('meeting-invite-received', { 
+            from: socket.nickname, 
+            room: socket.nickname 
+        });
+
+        // 3. Davet edene "Odaya geç" emri gönder (Frontend yönlendirmesi için)
+        socket.emit('force-join-meeting', { room: socket.nickname });
+    }
+});
 
     socket.on('host-action', (data) => {
         if (socket.nickname === data.room) {
@@ -312,4 +320,5 @@ io.on('connection', async (socket) => {
 
 const PORT = process.env.PORT || 3000;
 server.listen(PORT, () => console.log(`🚀 SİSTEM AKTİF: Port ${PORT}`));
+
 
