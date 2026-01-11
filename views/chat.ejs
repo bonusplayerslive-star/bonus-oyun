@@ -266,8 +266,28 @@ socket.on('meeting-invite-received', (data) => {
     });
 });
 
+socket.on('force-join-meeting', (data) => {
+    // Davet gönderdiğin an seni odaya yönlendirir
+    window.location.href = `/meeting?room=${data.room}&role=host`;
+});
 
+// Davet alan kişi için (Kabul ettiğinde çalışır)
+socket.on('meeting-invite-received', (data) => {
+    Swal.fire({
+        title: 'TOPLANTI DAVETİ',
+        text: `${data.from} seni konsey odasına çağırıyor!`,
+        icon: 'info',
+        showCancelButton: true,
+        confirmButtonText: 'KATIL',
+        cancelButtonText: 'REDDET'
+    }).then((result) => {
+        if (result.isConfirmed) {
+            window.location.href = `/meeting?room=${data.room}&role=guest`;
+        }
+    });
+});
 </script>
 </body>
 </html>
+
 
