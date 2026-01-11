@@ -286,7 +286,40 @@ socket.on('send-meeting-invite', (data) => {
             if (targetSId && data.action === 'kick') io.to(targetSId).emit('command-kick');
         }
     });
+socket.on('arena-invite-accept', async (data) => {
+    try {
+        const u1 = await User.findOne({ nickname: socket.nickname }); // Kabul eden
+        const u2 = await User.findOne({ nickname: data.from });      // Davet eden
+        const s2Id = onlineUsers.get(data.from);
 
+        if (u1 && u2 && s2Id) {
+            if (u1.bpl < 25 || u2.bpl < 25) return socket.emit('error', 'Yetersiz BPL!');
+            
+            // BPL Düşür
+            u1.bpl -= 25; u2.bpl -= 25;
+            await u1.save(); await u2.save();
+            
+            // Bakiyeleri güncelle
+            socket.emit('update-bpl', u1.bpl);
+            io.to(s2Id).emit('update-bpl', u2.bpl);
+
+            // KRİTİK NOKTA: İki tarafı da Arena sayfasına ve aynı odaya yönlendir
+            const arenaRoomId = `arena_${u2.nickname}_vs_${u1.nickname}`;
+            
+            // Kabul edeni gönder
+            socket.emit('force-arena-match', { room: arenaRoomId });
+            // Davet edeni gönder
+            io.to(s2Id).emit('force-arena-match', { room: arenaRoomId });
+
+            // Arka planda savaşı başlat
+            startBattle(
+                { nickname: u1.nickname, socketId: socket.id, animal: u1.selectedAnimal || 'Lion', power: Math.random()*100, prize: 50 },
+                { nickname: u2.nickname, socketId: s2Id, animal: u2.selectedAnimal || 'Lion', power: Math.random()*100, prize: 50 },
+                io
+            );
+        }
+    } catch (e) { console.log("Arena Davet Kabul Hatası:", e); }
+});
     socket.on('arena-join-queue', async (data) => {
         try {
             const u = await User.findById(socket.userId);
@@ -320,5 +353,6 @@ socket.on('send-meeting-invite', (data) => {
 
 const PORT = process.env.PORT || 3000;
 server.listen(PORT, () => console.log(`🚀 SİSTEM AKTİF: Port ${PORT}`));
+
 
 
