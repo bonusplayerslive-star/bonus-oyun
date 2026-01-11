@@ -304,7 +304,18 @@ io.on('connection', async (socket) => {
         const { targetNick, amount, room } = data;
         const sender = await User.findById(socket.userId); // uId yerine socket.userId kullanıyoruz
         const receiver = await User.findOne({ nickname: targetNick });
+// Sunucu tarafında (app.js)
+socket.on('send-meeting-invite', (data) => {
+    const targetNickname = data.target;
+    const targetSocketId = getSocketIdByNickname(targetNickname); // Kullanıcının socket ID'sini bulan fonksiyonun
 
+    if (targetSocketId) {
+        // Alıcıya (davet edilen) mesajı gönder
+        io.to(targetSocketId).emit('meeting-invite-received', {
+            from: socket.nickname // Davet eden kişinin adı
+        });
+    }
+});
         // 5500 BPL Sınırı ve Alt Limit Kontrolü
         if (!sender || sender.bpl < 5500) {
             return socket.emit('error', 'Hediye göndermek için en az 5500 BPL bakiyeniz olmalıdır!');
@@ -419,6 +430,7 @@ async function startBattle(p1, p2, io) {
 }
 const PORT = process.env.PORT || 10000;
 server.listen(PORT, () => console.log(`🚀 SİSTEM AKTİF: ${PORT}`));
+
 
 
 
