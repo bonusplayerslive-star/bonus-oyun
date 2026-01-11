@@ -263,11 +263,11 @@ io.on('connection', async (socket) => {
         if (data.room && data.text) io.to(data.room).emit('new-meeting-message', { sender: socket.nickname, text: data.text });
     });
 
-// --- [MEETING DAVET SİSTEMİ - TAMİR EDİLDİ] ---
+// --- [MEETING DAVET SİSTEMİ - TERTEMİZ VERSİYON] ---
 socket.on('send-meeting-invite', (data) => {
     const targetSId = onlineUsers.get(data.target);
     if (targetSId) {
-        // 1. Davet edeni odaya sok
+        // 1. Davet edeni odaya al
         socket.join(socket.nickname); 
         
         // 2. Karşı tarafa daveti gönder
@@ -279,9 +279,8 @@ socket.on('send-meeting-invite', (data) => {
         // 3. Davet edene "Odaya geç" emri gönder
         socket.emit('force-join-meeting', { room: socket.nickname, role: 'host' });
     }
-}); // <--- EKSİK OLAN PARANTEZ BURADAYDI REYİS!
+});
 
-// --- [HOST AKSİYONLARI] ---
 socket.on('host-action', (data) => {
     if (socket.nickname === data.room) {
         const targetSId = onlineUsers.get(data.targetNick); 
@@ -290,29 +289,7 @@ socket.on('host-action', (data) => {
         }
     }
 });
-
-        // Davet edeni kendi masasına yönlendir (host rolüyle)
-        socket.emit('force-join-meeting', { room: socket.nickname, role: 'host' });
-    
-});
-        
-        // 2. Karşı tarafa daveti gönder
-        io.to(targetSId).emit('meeting-invite-received', { 
-            from: socket.nickname, 
-            room: socket.nickname 
-        });
-
-        // 3. Davet edene "Odaya geç" emri gönder (Frontend yönlendirmesi için)
-        socket.emit('force-join-meeting', { room: socket.nickname });
-    }
-});
-
-    socket.on('host-action', (data) => {
-        if (socket.nickname === data.room) {
-            const targetSId = onlineUsers.get(data.targetNick); 
-            if (targetSId && data.action === 'kick') io.to(targetSId).emit('command-kick');
-        }
-    });
+// --- [MEETING SİSTEMİ SONU] ---
 socket.on('arena-invite-accept', async (data) => {
     try {
         const u1 = await User.findOne({ nickname: socket.nickname }); // Kabul eden
@@ -380,6 +357,7 @@ socket.on('arena-invite-accept', async (data) => {
 
 const PORT = process.env.PORT || 3000;
 server.listen(PORT, () => console.log(`🚀 SİSTEM AKTİF: Port ${PORT}`));
+
 
 
 
