@@ -306,15 +306,26 @@ socket.on('meeting-invite-request', (data) => {
         socket.emit('error', 'Kullanıcı şu an online değil.');
     }
 });
-    socket.on('send-meeting-invite', (data) => {
-        const targetSId = onlineUsers.get(data.target);
-        if (targetSId) {
-            socket.join(socket.nickname); 
-            io.to(targetSId).emit('meeting-invite-received', { 
-                from: socket.nickname, 
-                room: socket.nickname,
-                role: 'guest'
-            });
+    // app.js - Davet ve Otomatik Oda Katılım Mantığı
+socket.on('send-meeting-invite', (data) => {
+    const targetSId = onlineUsers.get(data.target);
+    if (targetSId) {
+        // Davet eden kişiyi kendi adına açılan odaya sokar
+        socket.join(socket.nickname); 
+        
+        // Karşı tarafa (guest) davet gönderir
+        io.to(targetSId).emit('meeting-invite-received', { 
+            from: socket.nickname, 
+            room: socket.nickname, // Oda adı davet edenin nicki olur
+            role: 'guest'
+        });
+
+        // Davet edeni host olarak toplantı sayfasına yönlendirir
+        socket.emit('force-join-meeting', { room: socket.nickname, role: 'host' });
+    } else {
+        socket.emit('error', 'Kullanıcı şu an online değil.');
+    }
+});
             socket.emit('force-join-meeting', { room: socket.nickname, role: 'host' });
         }
     });
@@ -423,5 +434,6 @@ socket.on('meeting-invite-request', (data) => {
 
 const PORT = process.env.PORT || 3000;
 server.listen(PORT, () => console.log(`🚀 SİSTEM AKTİF: Port ${PORT}`));
+
 
 
