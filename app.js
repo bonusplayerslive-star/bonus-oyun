@@ -412,7 +412,7 @@ socket.on('send-gift-bpl', async (data) => {
             socket.emit('error', 'Kullanıcı şu an online değil.');
         }
     });
-    // --- [ARENA DAVET SİSTEMİ - CHAT] ---
+   // --- [ARENA DAVET SİSTEMİ - CHAT] ---
     socket.on('arena-invite-request', (data) => {
         const targetSId = onlineUsers.get(data.to);
         if (targetSId) {
@@ -421,12 +421,14 @@ socket.on('send-gift-bpl', async (data) => {
             socket.emit('error', 'Kullanıcı şu an online değil.');
         }
     });
+
     socket.on('disconnect', () => {
         onlineUsers.delete(socket.nickname);
         arenaQueue = arenaQueue.filter(p => p.socketId !== socket.id);
-        broadcastOnlineList();
+        const usersArray = Array.from(onlineUsers.keys()).map(nick => ({ nickname: nick }));
+        io.to("general-chat").emit('update-online-users', usersArray);
     });
-
+}); // <--- io.on('connection') bloğunun asıl kapanış burası!
 
 const PORT = process.env.PORT || 3000;
 server.listen(PORT, () => console.log(`🚀 SİSTEM AKTİF: Port ${PORT}`));
