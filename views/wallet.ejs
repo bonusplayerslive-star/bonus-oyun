@@ -137,6 +137,42 @@
             body: `userId=${userId}&animalIndex=${index}&fiyat=${price}`
         }).then(r => r.json()).then(d => location.reload());
     }
+async function sellAnimal(name) {
+    const result = await Swal.fire({
+        title: 'EMİN MİSİN?',
+        text: `${name} isimli karakterini 700 BPL karşılığında satmak istiyor musun?`,
+        icon: 'warning',
+        showCancelButton: true,
+        confirmButtonColor: '#d33',
+        cancelButtonColor: '#3085d6',
+        confirmButtonText: 'Evet, Sat!',
+        cancelButtonText: 'Vazgeç',
+        background: '#050505',
+        color: '#fff'
+    });
+
+    if (result.isConfirmed) {
+        try {
+            const res = await fetch('/api/sell-item', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ itemName: name })
+            });
+
+            const data = await res.json();
+
+            if (data.success) {
+                Swal.fire('SATILDI!', `Karakter başarıyla satıldı. Yeni bakiyen: ${data.newBpl} BPL`, 'success')
+                .then(() => location.reload());
+            } else {
+                Swal.fire('Hata', data.error, 'error');
+            }
+        } catch (err) {
+            Swal.fire('Hata', 'İşlem başarısız.', 'error');
+        }
+    }
+}
 </script>
 </body>
 </html>
+
