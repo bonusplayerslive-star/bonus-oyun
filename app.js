@@ -264,18 +264,21 @@ io.on('connection', async (socket) => {
     });
 
     // --- MEETING DAVET SİSTEMİ ---
-    socket.on('send-meeting-invite', (data) => {
-        const targetSId = onlineUsers.get(data.target);
-        if (targetSId) {
-            socket.join(socket.nickname); 
-            io.to(targetSId).emit('meeting-invite-received', { 
-                from: socket.nickname, 
-                room: socket.nickname 
-            });
-            socket.emit('force-join-meeting', { room: socket.nickname, role: 'host' });
-        }
-    });
-
+// --- MEETING DAVET SİSTEMİ (FIXED) ---
+socket.on('send-meeting-invite', (data) => {
+    const targetSId = onlineUsers.get(data.target);
+    if (targetSId) {
+        // Odayı kuranın nickiyle aynı oda ismi oluşturuyoruz
+        socket.join(socket.nickname); 
+        io.to(targetSId).emit('meeting-invite-received', { 
+            from: socket.nickname, 
+            room: socket.nickname,
+            role: 'guest' // Misafire rolünü bildiriyoruz
+        });
+        // Masa sahibini (kendini) host olarak yönlendir
+        socket.emit('force-join-meeting', { room: socket.nickname, role: 'host' });
+    }
+});
     socket.on('host-action', (data) => {
         if (socket.nickname === data.room) {
             const targetSId = onlineUsers.get(data.targetNick); 
@@ -285,7 +288,7 @@ io.on('connection', async (socket) => {
         }
     });
 
-    socket.on('arena-invite-accept', async (data) => {
+socket.on('arena-invite-accept', async (data) => {
         try {
             const u1 = await User.findOne({ nickname: socket.nickname });
             const u2 = await User.findOne({ nickname: data.from });
@@ -294,16 +297,22 @@ io.on('connection', async (socket) => {
             if (u1 && u2 && s2Id) {
                 if (u1.bpl < 25 || u2.bpl < 25) return socket.emit('error', 'Yetersiz BPL!');
                 
+                // 1. ADIM: Bakiye düşme işlemleri
                 u1.bpl -= 25; u2.bpl -= 25;
                 await u1.save(); await u2.save();
                 
+                // 2. ADIM: Arayüzdeki BPL rakamlarını güncelleme
                 socket.emit('update-bpl', u1.bpl);
                 io.to(s2Id).emit('update-bpl', u2.bpl);
 
+                // --- BURAYA EKLE / BURAYI KONTROL ET ---
+                // 3. ADIM: Arena odasını oluştur ve her iki tarafı sayfaya fırlat
                 const arenaRoomId = `arena_${u2.nickname}_vs_${u1.nickname}`;
-                socket.emit('force-arena-match', { room: arenaRoomId });
+                socket.emit('force-arena-match', { room: arenaRoomId }); 
                 io.to(s2Id).emit('force-arena-match', { room: arenaRoomId });
+                // ---------------------------------------
 
+                // 4. ADIM: Savaş motorunu çalıştır
                 startBattle(
                     { nickname: u1.nickname, socketId: socket.id, animal: u1.selectedAnimal || 'Lion', power: Math.random()*100, prize: 50 },
                     { nickname: u2.nickname, socketId: s2Id, animal: u2.selectedAnimal || 'Lion', power: Math.random()*100, prize: 50 },
@@ -312,7 +321,6 @@ io.on('connection', async (socket) => {
             }
         } catch (e) { console.log("Arena Davet Kabul Hatası:", e); }
     });
-
     socket.on('arena-join-queue', async (data) => {
         try {
             const u = await User.findById(socket.userId);
@@ -335,32 +343,36 @@ io.on('connection', async (socket) => {
             }
         } catch (e) { console.log("Arena Kuyruk Hatası", e); }
     });
-// --- [HEDİYE SİSTEMİ - CHAT] ---
-    socket.on('send-gift-bpl', async (data) => {
-        try {
-            const amount = parseInt(data.amount);
-            const fromUser = await User.findById(socket.userId);
-            const toUser = await User.findOne({ nickname: data.to });
-            const toSocketId = onlineUsers.get(data.to);
+// --- [HEDİYE SİSTEMİ - GÜNCELLENMİŞ LİMİTLER] ---
+socket.on('send-gift-bpl', async (data) => {
+    try {
+        const amount = parseInt(data.amount);
+        
+        // REYİS BURASI KRİTİK: 100-2000 SINIRI
+        if (isNaN(amount) || amount < 100 || amount > 2000) {
+            return socket.emit('error', 'Hediye miktarı 100 ile 2000 BPL arasında olmalıdır!');
+        }
 
-            if (!toUser) return socket.emit('error', 'Hedef kullanıcı bulunamadı.');
-            if (isNaN(amount) || amount <= 0) return socket.emit('error', 'Geçersiz miktar.');
-            if (fromUser.bpl - amount < 25) return socket.emit('error', 'Limit: Bakiyeniz 25 BPL altına düşemez!');
+        const fromUser = await User.findById(socket.userId);
+        const toUser = await User.findOne({ nickname: data.to });
+        const toSocketId = onlineUsers.get(data.to);
 
-            // Transfer İşlemi
-            fromUser.bpl -= amount;
-            toUser.bpl += amount;
-            await fromUser.save();
-            await toUser.save();
+        if (!toUser) return socket.emit('error', 'Hedef kullanıcı bulunamadı.');
+        if (fromUser.bpl - amount < 25) return socket.emit('error', 'Limit: Bakiyeniz 25 BPL altına düşemez!');
 
-            // Gönderene güncelleme
-            socket.emit('update-bpl', fromUser.bpl);
-            // Alana güncelleme (eğer online ise)
-            if (toSocketId) {
-                io.to(toSocketId).emit('update-bpl', toUser.bpl);
-                io.to(toSocketId).emit('new-message', { sender: "SİSTEM", text: `🎁 ${socket.nickname} sana ${amount} BPL gönderdi!` });
-            }
-            
+        fromUser.bpl -= amount;
+        toUser.bpl += amount;
+        await fromUser.save();
+        await toUser.save();
+
+        socket.emit('update-bpl', fromUser.bpl);
+        if (toSocketId) {
+            io.to(toSocketId).emit('update-bpl', toUser.bpl);
+            io.to(toSocketId).emit('new-message', { sender: "SİSTEM", text: `🎁 ${socket.nickname} sana ${amount} BPL gönderdi!` });
+        }
+        io.to("general-chat").emit('new-message', { sender: "SİSTEM", text: `📢 ${socket.nickname}, ${data.to} kullanıcısına ${amount} BPL hediye etti!` });
+    } catch (err) { console.error("Hediye Hatası:", err); }
+});
             // Global duyuru
             io.to("general-chat").emit('new-message', { sender: "SİSTEM", text: `📢 ${socket.nickname}, ${data.to} kullanıcısına ${amount} BPL hediye etti!` });
 
@@ -385,5 +397,6 @@ io.on('connection', async (socket) => {
 
 const PORT = process.env.PORT || 3000;
 server.listen(PORT, () => console.log(`🚀 SİSTEM AKTİF: Port ${PORT}`));
+
 
 
