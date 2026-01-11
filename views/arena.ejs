@@ -1,5 +1,14 @@
-<%- include('header') %>
 
+
+<%- include('header') %>
+const urlParams = new URLSearchParams(window.location.search);
+const matchRoom = urlParams.get('match');
+
+if (matchRoom) {
+    // Eğer doğrudan bir maç davetiyle gelindiyse 10 saniye bekletme, direkt bağlan
+    console.log("Özel Arena Odasına Bağlanılıyor:", matchRoom);
+    // Burada socket.emit('arena-join-room', {room: matchRoom}) gibi bir tetikleyici kullanabilirsin
+}
 <style>
     /* Arena Tam Ekran Atmosferi */
     body, html {
@@ -235,3 +244,4 @@
 
     // Bot %55 kazanma mantığı ve Online Oyuncu önceliği Backend (app.js) tarafında yönetiliyor.
 </script>
+
