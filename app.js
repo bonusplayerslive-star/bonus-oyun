@@ -357,28 +357,113 @@ io.on('connection', async (socket) => {
     });
 });
 
-async function startBattle(p1, p2, io) {
-    const winner = p1.power >= p2.power ? p1 : p2;
-    const prize = p1.prize; // 50 BPL
+// Bot Listesi
+const BOTS = ['Lion', 'Kurd', 'Peregrinefalcon', 'Rhino'];
 
+async function startBattle(p1, p2, io) {
+    let winner, loser;
+    
+    // 1. KURAL: BOT VARSA %55 KAZANIR
+    const isP1Bot = !p1.socketId;
+    const isP2Bot = !p2.socketId;
+
+    if (isP1Bot || isP2Bot) {
+        const botWon = Math.random() < 0.55; // %55 ihtimal
+        if (isP2Bot) { // Genelde p2 bottur
+            winner = botWon ? p2 : p1;
+        } else {
+            winner = botWon ? p1 : p2;
+        }
+    } else {
+        // İkisi de oyuncuysa şans eşit veya güce göre
+        winner = p1.power >= p2.power ? p1 : p2;
+    }
+    
+    loser = (winner === p1) ? p2 : p1;
+
+    // Ödülü ver (Kazanan bot değilse)
     if (winner.socketId) {
         const winUser = await User.findOne({ nickname: winner.nickname });
-        winUser.bpl += prize;
-        await winUser.save();
-        io.to(winner.socketId).emit('update-bpl', winUser.bpl);
+        if (winUser) {
+            winUser.bpl += p1.prize;
+            await winUser.save();
+            io.to(winner.socketId).emit('update-bpl', winUser.bpl);
+        }
     }
 
-    [p1, p2].forEach(p => {
-        if (p.socketId) {
-            io.to(p.socketId).emit('arena-match-found', {
-                opponent: p === p1 ? p2 : p1,
-                winner: winner.nickname
-            });
-        }
-    });
+    // 2. KURAL: VİDEO İSİMLERİNİ GÖNDER
+    // p1'e giden veri
+    if (p1.socketId) {
+        io.to(p1.socketId).emit('arena-match-found', {
+            opponent: p2.nickname,
+            opponentAnimal: p2.animal, // P1 bunu izleyecek: hayvanadi1.mp4 (Hamle)
+            winnerNick: winner.nickname,
+            winnerAnimal: winner.animal, // Sonra bunu izleyecek: hayvanadi.mp4 (Zafer)
+            prize: p1.prize
+        });
+    }
+
+    // p2'ye giden veri (eğer bot değilse)
+    if (p2.socketId) {
+        io.to(p2.socketId).emit('arena-match-found', {
+            opponent: p1.nickname,
+            opponentAnimal: p1.animal,
+            winnerNick: winner.nickname,
+            winnerAnimal: winner.animal,
+            prize: p1.prize
+        });
+    }
 }
+
+// 3. KURAL: ONLİNE ÖNCELİĞİ VE SIRAYA GİRME
+let arenaQueue = []; // Bekleyen oyuncular listesi
+
+socket.on('arena-join-queue', async (data) => {
+    const user = await User.findOne({ nickname: socket.nickname });
+    if (!user || user.bpl < data.bet) return socket.emit('error', 'Yetersiz bakiye!');
+
+    // Bakiye düş
+    user.bpl -= data.bet;
+    await user.save();
+    socket.emit('update-bpl', user.bpl);
+
+    const player = {
+        nickname: user.nickname,
+        socketId: socket.id,
+        animal: user.selectedAnimal || 'Lion',
+        power: Math.random() * 100,
+        prize: data.prize
+    };
+
+    // SIRADA BEKLEYEN OYUNCU VAR MI? (Online Önceliği)
+    if (arenaQueue.length > 0) {
+        const opponent = arenaQueue.shift(); // İlk sıradaki oyuncuyu al
+        startBattle(player, opponent, io);
+    } else {
+        // Kimse yoksa sıraya ekle
+        arenaQueue.push(player);
+
+        // 10 Saniye sonra hala eşleşmediyse BOT ile başlat
+        setTimeout(async () => {
+            const index = arenaQueue.findIndex(p => p.socketId === socket.id);
+            if (index !== -1) {
+                const waitingPlayer = arenaQueue.splice(index, 1)[0];
+                const botName = BOTS[Math.floor(Math.random() * BOTS.length)];
+                const botObject = {
+                    nickname: botName + "_Bot",
+                    socketId: null, // Socket yoksa bottur
+                    animal: botName,
+                    power: Math.random() * 100,
+                    prize: data.prize
+                };
+                startBattle(waitingPlayer, botObject, io);
+            }
+        }, 10000); // 10 saniye bekleme süresi
+    }
+});
 const PORT = process.env.PORT || 10000;
 server.listen(PORT, () => console.log(`🚀 SİSTEM AKTİF: ${PORT}`));
+
 
 
 
