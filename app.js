@@ -294,13 +294,13 @@ io.on('connection', async (socket) => {
 
 // --- ARENA GLOBAL DEĞİŞKENLER ---
 const BOTS = ['Lion', 'Kurd', 'Peregrinefalcon', 'Rhino'];
-let arenaQueue = []; // Bekleyen oyuncular listesi
+let arenaQueue = []; 
 
 // --- ARENA MOTORU ---
 async function startBattle(p1, p2, io) {
     let winner, loser;
     
-    // 1. KURAL: BOT VARSA %55 İHTİMALLE KAZANIR
+    // 1. KURAL: BOT %55 İHTİMALLE KAZANIR
     const isP1Bot = !p1.socketId;
     const isP2Bot = !p2.socketId;
 
@@ -312,13 +312,13 @@ async function startBattle(p1, p2, io) {
             winner = botWon ? p1 : p2;
         }
     } else {
-        // İki gerçek oyuncu: Güç puanı + küçük şans faktörü
+        // Gerçek oyuncular arası güç savaşı
         winner = p1.power >= p2.power ? p1 : p2;
     }
     
     loser = (winner === p1) ? p2 : p1;
 
-    // Kazanan oyuncu ise ödülünü ver
+    // Kazanan oyuncu ise ödülü ver
     if (winner.socketId) {
         try {
             const winUser = await User.findOne({ nickname: winner.nickname });
@@ -327,15 +327,15 @@ async function startBattle(p1, p2, io) {
                 await winUser.save();
                 io.to(winner.socketId).emit('update-bpl', winUser.bpl);
             }
-        } catch (err) { console.error("BPL Güncelleme Hatası:", err); }
+        } catch (err) { console.error("Ödül Hatası:", err); }
     }
 
-    // 2. KURAL: VİDEO İSİMLERİ VE TAM EKRAN VERİSİ
+    // 2. KURAL: VİDEO YÖNETİMİ (hayvanadi1.mp4 hamle, hayvanadi.mp4 zafer)
     const matchDataForP1 = {
         opponent: p2.nickname,
-        opponentAnimal: p2.animal, // İlk izlenecek: hayvanadi1.mp4 (Hamle)
+        opponentAnimal: p2.animal, 
         winnerNick: winner.nickname,
-        winnerAnimal: winner.animal, // Sonra izlenecek: hayvanadi.mp4 (Zafer)
+        winnerAnimal: winner.animal, 
         prize: p1.prize
     };
 
@@ -351,18 +351,18 @@ async function startBattle(p1, p2, io) {
     if (p2.socketId) io.to(p2.socketId).emit('arena-match-found', matchDataForP2);
 }
 
-// --- IO CONNECTION İÇİ ---
+// --- IO CONNECTION ---
 io.on('connection', (socket) => {
-    
-    // A. DAVET KABULÜ (Direkt Eşleşme)
+
+    // A. DAVET KABULÜ (Direkt Arena)
     socket.on('arena-invite-accept', async (data) => {
         try {
-            const user1 = await User.findOne({ nickname: socket.nickname }); // Kabul eden
-            const user2 = await User.findOne({ nickname: data.from }); // Davet eden
+            const user1 = await User.findOne({ nickname: socket.nickname });
+            const user2 = await User.findOne({ nickname: data.from });
             const inviterSocket = onlineUsers.get(data.from);
 
             if (user1 && user2 && inviterSocket) {
-                const bet = 25; // Sabit davet bahsi
+                const bet = 25;
                 if (user1.bpl < bet || user2.bpl < bet) return socket.emit('error', 'Bakiye yetersiz!');
 
                 user1.bpl -= bet; user2.bpl -= bet;
@@ -371,15 +371,16 @@ io.on('connection', (socket) => {
                 socket.emit('update-bpl', user1.bpl);
                 io.to(inviterSocket.id).emit('update-bpl', user2.bpl);
 
-                const p1 = { nickname: user1.nickname, socketId: socket.id, animal: user1.selectedAnimal || 'Lion', power: Math.random()*100, prize: 50 };
-                const p2 = { nickname: user2.nickname, socketId: inviterSocket.id, animal: user2.selectedAnimal || 'Lion', power: Math.random()*100, prize: 50 };
-                
-                startBattle(p1, p2, io);
+                startBattle(
+                    { nickname: user1.nickname, socketId: socket.id, animal: user1.selectedAnimal || 'Lion', power: Math.random()*100, prize: 50 },
+                    { nickname: user2.nickname, socketId: inviterSocket.id, animal: user2.selectedAnimal || 'Lion', power: Math.random()*100, prize: 50 },
+                    io
+                );
             }
-        } catch (e) { console.log("Davet hatası:", e); }
+        } catch (e) { console.log("Arena Davet Hatası:", e); }
     });
 
-    // B. SIRAYA GİRME (Online Önceliği & Bot)
+    // B. SIRAYA GİRME (Önce İnsan, 10sn Sonra Bot)
     socket.on('arena-join-queue', async (data) => {
         try {
             const user = await User.findOne({ nickname: socket.nickname });
@@ -397,16 +398,15 @@ io.on('connection', (socket) => {
                 prize: data.prize
             };
 
-            // 3. KURAL: ÖNCE ONLİNE OYUNCU
             if (arenaQueue.length > 0) {
                 const opponent = arenaQueue.shift();
                 startBattle(player, opponent, io);
             } else {
                 arenaQueue.push(player);
-                // 10 saniye sonra kimse yoksa Bot gelir
                 setTimeout(async () => {
+                    // idx hatası burada düzeltildi
                     const idx = arenaQueue.findIndex(p => p.socketId === socket.id);
-                    if (index !== -1) {
+                    if (idx !== -1) {
                         const waitingPlayer = arenaQueue.splice(idx, 1)[0];
                         const botName = BOTS[Math.floor(Math.random() * BOTS.length)];
                         startBattle(waitingPlayer, {
@@ -419,17 +419,16 @@ io.on('connection', (socket) => {
                     }
                 }, 10000);
             }
-        } catch (e) { console.log("Sıra hatası:", e); }
+        } catch (e) { console.log("Arena Sıra Hatası:", e); }
     });
 
     socket.on('disconnect', () => {
-        onlineUsers.delete(socket.nickname);
         arenaQueue = arenaQueue.filter(p => p.socketId !== socket.id);
-        broadcastOnlineList();
     });
 });
 const PORT = process.env.PORT || 10000;
 server.listen(PORT, () => console.log(`🚀 SİSTEM AKTİF: ${PORT}`));
+
 
 
 
