@@ -219,8 +219,63 @@
             }
         }
     }
+
+
+async function buyAnimal(itemName, price) {
+    // Önce ön yüzde bir kontrol yapalım (Hız kazandırır)
+    // charCount değişkenini profil.ejs'den hatırlarsın, aynısını buraya da çekebiliriz
+    
+    const result = await Swal.fire({
+        title: 'EMİN MİSİN?',
+        text: `${itemName} almak için ${price} BPL harcanacak.`,
+        icon: 'question',
+        showCancelButton: true,
+        confirmButtonColor: '#39FF14',
+        cancelButtonColor: '#d33',
+        confirmButtonText: 'Evet, Al!',
+        cancelButtonText: 'Vazgeç',
+        background: '#050505',
+        color: '#fff'
+    });
+
+    if (result.isConfirmed) {
+        try {
+            const response = await fetch('/api/buy-item', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ itemName, price })
+            });
+
+            const data = await response.json();
+
+            if (data.success) {
+                Swal.fire({
+                    title: 'HAYIRLI OLSUN!',
+                    text: 'Yeni karakterin envanterine eklendi.',
+                    icon: 'success',
+                    background: '#050505',
+                    color: '#fff'
+                }).then(() => location.href = '/profil');
+            } else {
+                // İŞTE O KRİTİK UYARI BURASI:
+                // Backend'den gelen "Envanter dolu" hatasını burada yakalıyoruz
+                Swal.fire({
+                    title: 'KAPASİTE DOLU!',
+                    text: data.error || 'Bir hata oluştu.',
+                    icon: 'error',
+                    background: '#050505',
+                    color: '#fff',
+                    confirmButtonColor: '#ff4444'
+                });
+            }
+        } catch (err) {
+            Swal.fire('Hata', 'Sunucuya ulaşılamadı.', 'error');
+        }
+    }
+}
 </script>
 </body>
 </html>
+
 
 
