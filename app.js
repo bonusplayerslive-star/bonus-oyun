@@ -143,11 +143,12 @@ app.get('/arena', authRequired, (req, res) => res.render('arena'));
 app.get('/development', authRequired, (req, res) => res.render('development'));
 app.get('/meeting', authRequired, (req, res) => res.render('meeting'));
 app.get('/chat', authRequired, (req, res) => res.render('chat'));
+
+
 // Satır 121 düzeltmesi:
 app.get('/wallet', authRequired, (req, res) => {
-    // Eğer res.locals.user tanımsızsa 0 döner, çökme engellenir
-    const currentBpl = (res.locals.user && res.locals.user.bpl) ? res.locals.user.bpl : 0;
-    res.render('wallet', { bpl: currentBpl });
+    // EJS'ye doğrudan 'user' objesini gönderiyoruz, içindeki bpl ve inventory'e erişebilsin diye
+    res.render('wallet', { user: res.locals.user });
 });
 
 app.get('/logout', (req, res) => {
@@ -434,6 +435,7 @@ socket.on('send-meeting-invite', (data) => {
 
 const PORT = process.env.PORT || 3000;
 server.listen(PORT, () => console.log(`🚀 SİSTEM AKTİF: Port ${PORT}`));
+
 
 
 
