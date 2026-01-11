@@ -8,128 +8,25 @@
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
     <link href="https://fonts.googleapis.com/css2?family=Cinzel:wght@700&family=Rajdhani:wght@400;600;700&display=swap" rel="stylesheet">
     <style>
-        :root {
-            --gold: #ffd700;
-            --gold-glow: rgba(255, 215, 0, 0.4);
-            --bg-dark: #050505;
-            --panel-dark: #0d0d0d;
-            --neon-blue: #00f3ff;
-        }
-
-        body {
-            background: var(--bg-dark);
-            color: #fff;
-            height: 100dvh;
-            margin: 0;
-            display: flex;
-            flex-direction: column;
-            font-family: 'Rajdhani', sans-serif;
-            overflow: hidden;
-        }
-
-        /* ÜST BAR */
-        .top-nav {
-            height: 60px;
-            background: #000;
-            border-bottom: 2px solid var(--gold);
-            display: flex;
-            align-items: center;
-            padding: 0 20px;
-            justify-content: space-between;
-            z-index: 100;
-        }
-
+        :root { --gold: #ffd700; --gold-glow: rgba(255, 215, 0, 0.4); --bg-dark: #050505; --panel-dark: #0d0d0d; --neon-blue: #00f3ff; }
+        body { background: var(--bg-dark); color: #fff; height: 100dvh; margin: 0; display: flex; flex-direction: column; font-family: 'Rajdhani', sans-serif; overflow: hidden; }
+        .top-nav { height: 60px; background: #000; border-bottom: 2px solid var(--gold); display: flex; align-items: center; padding: 0 20px; justify-content: space-between; z-index: 100; }
         .host-badge { border: 1px solid var(--gold); padding: 2px 10px; border-radius: 20px; color: var(--gold); font-size: 0.8rem; font-weight: bold; box-shadow: 0 0 10px var(--gold-glow); }
-
-        /* ANA YAPI: 3 SÜTUNLU SİSTEM */
-        .master-container {
-            flex: 1;
-            display: grid;
-            grid-template-columns: 240px 1fr 320px;
-            overflow: hidden;
-        }
-
-        /* SOL PANEL: DİKEY KAMERALAR */
-        .video-grid {
-            background: var(--panel-dark);
-            border-right: 1px solid #222;
-            display: flex;
-            flex-direction: column;
-            padding: 10px;
-            gap: 15px;
-            overflow-y: auto;
-        }
-
-        .v-slot {
-            width: 100%;
-            aspect-ratio: 4/3;
-            border-radius: 12px;
-            border: 2px solid #333;
-            overflow: hidden;
-            position: relative;
-            background: #000;
-            transition: 0.3s;
-            cursor: pointer;
-        }
-
+        .master-container { flex: 1; display: grid; grid-template-columns: 240px 1fr 320px; overflow: hidden; }
+        .video-grid { background: var(--panel-dark); border-right: 1px solid #222; display: flex; flex-direction: column; padding: 10px; gap: 15px; overflow-y: auto; }
+        .v-slot { width: 100%; aspect-ratio: 4/3; border-radius: 12px; border: 2px solid #333; overflow: hidden; position: relative; background: #000; transition: 0.3s; cursor: pointer; }
         .v-slot.is-host { border-color: var(--gold); box-shadow: 0 0 15px var(--gold-glow); }
-        .v-slot.active-speaker { border-color: #39FF14; transform: scale(1.02); }
-
         video { width: 100%; height: 100%; object-fit: cover; background: #000; pointer-events: none; }
-
-        .name-tag {
-            position: absolute;
-            bottom: 5px;
-            left: 5px;
-            background: rgba(0,0,0,0.7);
-            color: var(--gold);
-            font-size: 0.7rem;
-            padding: 2px 8px;
-            border-radius: 4px;
-            font-family: 'Cinzel';
-        }
-
-        /* ORTA PANEL */
-        .presentation-area {
-            background: radial-gradient(circle, #1a1a1a 0%, #000 100%);
-            display: flex;
-            flex-direction: column;
-            position: relative;
-            border-right: 1px solid #222;
-        }
-
-        /* SAĞ PANEL: VIP CHAT */
-        .chat-sidebar {
-            background: #080808;
-            display: flex;
-            flex-direction: column;
-        }
-
+        .name-tag { position: absolute; bottom: 5px; left: 5px; background: rgba(0,0,0,0.7); color: var(--gold); font-size: 0.7rem; padding: 2px 8px; border-radius: 4px; font-family: 'Cinzel'; }
+        .presentation-area { background: radial-gradient(circle, #1a1a1a 0%, #000 100%); display: flex; flex-direction: column; position: relative; border-right: 1px solid #222; }
+        .chat-sidebar { background: #080808; display: flex; flex-direction: column; }
         .chat-messages { flex: 1; overflow-y: auto; padding: 15px; display: flex; flex-direction: column; }
         .msg { margin-bottom: 10px; font-size: 0.9rem; border-bottom: 1px solid #111; padding-bottom: 5px; word-break: break-word; }
         .msg b { color: var(--neon-blue); text-shadow: 0 0 5px var(--neon-blue); }
-
-        /* HOST ÖZEL MENÜ */
-        #context-menu {
-            position: fixed;
-            display: none;
-            background: #111;
-            border: 1px solid var(--gold);
-            border-radius: 8px;
-            z-index: 9999;
-            width: 180px;
-            box-shadow: 0 0 20px #000;
-        }
+        #context-menu { position: fixed; display: none; background: #111; border: 1px solid var(--gold); border-radius: 8px; z-index: 9999; width: 180px; box-shadow: 0 0 20px #000; }
         .menu-item { padding: 12px 15px; cursor: pointer; transition: 0.2s; font-size: 0.8rem; border-bottom: 1px solid #222; }
         .menu-item:hover { background: var(--gold); color: #000; }
-
-        /* MOBİL UYUMLULUK */
-        @media (max-width: 992px) {
-            .master-container { grid-template-columns: 1fr; grid-template-rows: 140px 1fr 240px; }
-            .video-grid { flex-direction: row; height: 140px; width: 100%; }
-            .v-slot { width: 160px; height: 120px; flex-shrink: 0; }
-            .chat-sidebar { height: 240px; }
-        }
+        @media (max-width: 992px) { .master-container { grid-template-columns: 1fr; grid-template-rows: 140px 1fr 240px; } .video-grid { flex-direction: row; height: 140px; width: 100%; } .v-slot { width: 160px; height: 120px; flex-shrink: 0; } .chat-sidebar { height: 240px; } }
     </style>
 </head>
 <body>
@@ -161,21 +58,19 @@
                 <p class="font-cinzel text-muted small">VIP STRATEJİ ODASI LİMİTİ: 5 KİŞİ</p>
             </div>
         </div>
-        <video id="shared-screen" autoplay playsinline style="display:none;"></video>
     </div>
 
     <div class="chat-sidebar">
         <div class="p-2 border-bottom border-secondary bg-dark text-center small font-cinzel text-warning">VIP PANEL</div>
         <div class="chat-messages" id="meeting-chat"></div>
-        
         <div class="p-2 bg-black border-top border-secondary">
             <div class="input-group mb-2">
-                <input type="text" id="m-input" class="form-control form-control-lg bg-dark text-white border-0" placeholder="Mesaj yazın..." style="font-size: 0.9rem;">
-                <button onclick="sendMsg()" class="btn btn-warning px-3"><i class="fas fa-paper-plane"></i> GÖNDER</button>
+                <input type="text" id="m-input" class="form-control bg-dark text-white border-0" placeholder="Mesaj yazın...">
+                <button onclick="sendMsg()" class="btn btn-warning"><i class="fas fa-paper-plane"></i></button>
             </div>
             <div class="input-group">
-                <input type="text" id="invite-nick" class="form-control form-control-sm bg-black text-white border-secondary" placeholder="Kullanıcı adı...">
-                <button onclick="inviteUser()" class="btn btn-sm btn-success px-3">DAVET ET</button>
+                <input type="text" id="invite-nick" class="form-control form-control-sm bg-black text-white border-secondary" placeholder="Davet nick...">
+                <button onclick="inviteUser()" class="btn btn-sm btn-success">DAVET</button>
             </div>
         </div>
     </div>
@@ -184,8 +79,8 @@
 <div id="context-menu">
     <div id="menu-user-title" class="p-2 bg-dark text-center text-warning small fw-bold border-bottom border-warning"></div>
     <div class="menu-item" onclick="handleMenuAction('gift')"><i class="fas fa-gift me-2"></i>Hediye Gönder</div>
-    <div class="menu-item text-danger" id="host-mute-opt" onclick="handleMenuAction('mute')"><i class="fas fa-microphone-slash me-2"></i>Sustur (Host)</div>
-    <div class="menu-item text-danger" id="host-kick-opt" onclick="handleMenuAction('kick')"><i class="fas fa-user-times me-2"></i>Odadan At (Host)</div>
+    <div class="menu-item text-danger" id="host-mute-opt" onclick="handleMenuAction('mute')"><i class="fas fa-microphone-slash me-2"></i>Sustur</div>
+    <div class="menu-item text-danger" id="host-kick-opt" onclick="handleMenuAction('kick')"><i class="fas fa-user-times me-2"></i>Odadan At</div>
 </div>
 
 <script src="/socket.io/socket.io.js"></script>
@@ -209,72 +104,48 @@
     async function startMedia() {
         try {
             myStream = await navigator.mediaDevices.getUserMedia({ video: true, audio: true });
-            const localVideo = document.getElementById('localVideo');
-            localVideo.srcObject = myStream;
-            localVideo.play().catch(e => console.log("Autoplay hatası:", e));
-        } catch (e) {
-            Swal.fire("Medya Hatası", "Kamera/Mikrofon izni verilmedi.", "error");
-        }
+            document.getElementById('localVideo').srcObject = myStream;
+        } catch (e) { Swal.fire("Hata", "Medya izni eksik.", "error"); }
     }
 
     myPeer.on('open', id => {
-        // Socket.io'ya odayı da bildirerek katıl
         socket.emit('join-meeting', { roomId: currentRoom, peerId: id, nickname: myNick });
     });
 
     socket.on('user-connected', data => {
         if (data.peerId === myPeer.id) return;
         const call = myPeer.call(data.peerId, myStream, { metadata: { nickname: myNick } });
-        call.on('stream', userStream => {
-            addRemoteVideo(data.peerId, userStream, data.nickname);
-        });
+        call.on('stream', userStream => addRemoteVideo(data.peerId, userStream, data.nickname));
         peers[data.peerId] = call;
     });
 
     myPeer.on('call', call => {
         call.answer(myStream);
-        call.on('stream', userStream => {
-            addRemoteVideo(call.peer, userStream, call.metadata.nickname || "Katılımcı");
-        });
+        call.on('stream', userStream => addRemoteVideo(call.peer, userStream, call.metadata.nickname || "Katılımcı"));
         peers[call.peer] = call;
     });
 
     function addRemoteVideo(peerId, stream, nick) {
         if (document.getElementById(peerId)) return;
-        const wrapper = document.getElementById('video-wrapper');
         const slot = document.createElement('div');
-        slot.className = "v-slot";
-        slot.id = peerId;
+        slot.className = "v-slot"; slot.id = peerId;
         slot.onclick = (e) => showMenu(e, nick, peerId);
-        
         const video = document.createElement('video');
-        video.srcObject = stream;
-        video.autoplay = true;
-        video.playsInline = true;
-        
+        video.srcObject = stream; video.autoplay = true; video.playsInline = true;
         const tag = document.createElement('div');
-        tag.className = "name-tag";
-        tag.innerText = nick;
-
+        tag.className = "name-tag"; tag.innerText = nick;
         slot.append(video, tag);
-        wrapper.append(slot);
+        document.getElementById('video-wrapper').append(slot);
     }
 
-    // CHAT SİSTEMİ (KRİTİK DÜZELTME)
+    // CHAT
     function sendMsg() {
         const input = document.getElementById('m-input');
-        const text = input.value.trim();
-        if (text) {
-            // Sunucuya mesajı oda bilgisiyle gönder
-            socket.emit('meeting-message', { room: currentRoom, text: text });
+        if (input.value.trim()) {
+            socket.emit('meeting-message', { room: currentRoom, text: input.value });
             input.value = "";
         }
     }
-
-    // Enter tuşu desteği
-    document.getElementById('m-input').addEventListener('keypress', (e) => {
-        if (e.key === 'Enter') sendMsg();
-    });
 
     socket.on('new-meeting-message', data => {
         const chat = document.getElementById('meeting-chat');
@@ -285,24 +156,33 @@
         chat.scrollTop = chat.scrollHeight;
     });
 
-    // DAVET SİSTEMİ
+    // KICK / ERROR SİSTEMİ
+    socket.on('command-kick', () => {
+        Swal.fire("Oda Dağıldı", "Oturum sona erdi.", "info").then(() => window.location.href = "/chat");
+    });
+
+    socket.on('error', (msg) => { Swal.fire("Bilgi", msg, "warning"); });
+
     function inviteUser() {
         const nick = document.getElementById('invite-nick').value;
         if (nick) {
-            socket.emit('send-meeting-invite', { target: nick, from: myNick, room: currentRoom });
-            Swal.fire({
-                toast: true,
-                position: 'top-end',
-                icon: 'success',
-                title: nick + " davet edildi.",
-                showConfirmButton: false,
-                timer: 2000
-            });
+            socket.emit('send-meeting-invite', { target: nick, room: currentRoom });
             document.getElementById('invite-nick').value = "";
         }
     }
 
-    // MENÜ VE DİĞER FONKSİYONLAR
+    function toggleMic() {
+        const t = myStream.getAudioTracks()[0]; t.enabled = !t.enabled;
+        document.getElementById('mic-btn').classList.toggle('btn-danger', !t.enabled);
+    }
+
+    function toggleVid() {
+        const t = myStream.getVideoTracks()[0]; t.enabled = !t.enabled;
+        document.getElementById('vid-btn').classList.toggle('btn-danger', !t.enabled);
+    }
+
+    function exitRoom() { window.location.href = "/chat"; }
+
     function showMenu(e, nick, peerId) {
         e.stopPropagation();
         selectedUser = { nick, peerId };
@@ -310,40 +190,19 @@
         document.getElementById('menu-user-title').innerText = nick;
         document.getElementById('host-mute-opt').style.display = isRoomOwner ? 'block' : 'none';
         document.getElementById('host-kick-opt').style.display = isRoomOwner ? 'block' : 'none';
-        menu.style.display = 'block';
-        menu.style.left = e.clientX + 'px';
-        menu.style.top = e.clientY + 'px';
+        menu.style.display = 'block'; menu.style.left = e.clientX + 'px'; menu.style.top = e.clientY + 'px';
     }
 
     async function handleMenuAction(action) {
         if (!selectedUser) return;
-        if (action === 'mute') {
-            socket.emit('host-action', { action: 'mute', targetPeerId: selectedUser.peerId, room: currentRoom });
-        } else if (action === 'kick') {
-            socket.emit('host-action', { action: 'kick', targetPeerId: selectedUser.peerId, room: currentRoom });
+        if (action === 'kick' && isRoomOwner) {
+            socket.emit('host-action', { action: 'kick', targetNick: selectedUser.nick, room: currentRoom });
         }
         document.getElementById('context-menu').style.display = 'none';
-    }
-
-    function toggleMic() {
-        const audioTrack = myStream.getAudioTracks()[0];
-        audioTrack.enabled = !audioTrack.enabled;
-        document.getElementById('mic-btn').classList.toggle('btn-danger', !audioTrack.enabled);
-    }
-
-    function toggleVid() {
-        const videoTrack = myStream.getVideoTracks()[0];
-        videoTrack.enabled = !videoTrack.enabled;
-        document.getElementById('vid-btn').classList.toggle('btn-danger', !videoTrack.enabled);
-    }
-
-    function exitRoom() {
-        window.location.href = "/chat";
     }
 
     startMedia();
     window.onclick = () => document.getElementById('context-menu').style.display = 'none';
 </script>
-
 </body>
 </html>
