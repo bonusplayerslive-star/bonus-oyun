@@ -175,16 +175,14 @@ function startSearch(bet, prize) {
 }
     // Büyük harf duyarlılığı için yardımcı fonksiyon
     function formatAnimalName(name) {
-        if (!name) return 'Lion';
-        const map = {
-            'peregrinefalcon': 'Peregrinefalcon',
-            'falcon': 'Falcon',
-            'kurd': 'Kurd',
-            'kurt': 'Kurd',
-            'lion': 'Lion'
-        };
-        return map[name.toLowerCase()] || name;
-    }
+    if (!name) return 'Lion';
+    const n = name.toLowerCase();
+    // Klasör isimlerin tam olarak neyse soldakileri ona eşitle
+    if (n.includes('falcon') || n.includes('peregrine')) return 'Peregrinefalcon'; 
+    if (n.includes('kurd') || n.includes('kurt')) return 'Kurd';
+    if (n.includes('lion')) return 'Lion';
+    return 'Lion'; // Varsayılan
+}
 
     function startSearch(bet, prize) {
         const currentBpl = parseInt("<%= user.bpl %>");
@@ -291,4 +289,5 @@ function startSearch(bet, prize) {
 
     const currentRoom = "arena";
 </script>
+
 
