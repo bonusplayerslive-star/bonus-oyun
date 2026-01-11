@@ -132,6 +132,23 @@
         });
     });
 
+// chat.ejs içindeki arena-invite-received kısmı
+socket.on('arena-invite-received', (data) => {
+    Swal.fire({
+        title: '⚔️ ARENA MEYDAN OKUMASI!',
+        text: `${data.from} seni düelloya davet ediyor!`,
+        confirmButtonText: 'KABUL ET',
+        // ...
+    }).then((result) => {
+        if (result.isConfirmed) {
+            // DİKKAT: Sıraya girmek yerine doğrudan arena sayfasına davet eden kişinin ismiyle git
+            window.location.href = `/arena?from=${data.from}`;
+        }
+    });
+});
+
+
+
     socket.on('meeting-invite-received', (data) => {
         Swal.fire({
             title: '🏛️ KONSEY ÇAĞRISI',
@@ -196,5 +213,6 @@
 </script>
 </body>
 </html>
+
 
 
