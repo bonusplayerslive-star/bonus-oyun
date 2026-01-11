@@ -307,8 +307,8 @@ socket.on('meeting-invite-request', (data) => {
         socket.emit('error', 'Kullanıcı şu an online değil.');
     }
 });
-   // --- TOPLANTI DAVET SİSTEMİ (DÜZELTİLMİŞ) ---
-    socket.on('send-meeting-invite', (data) => {
+// app.js - Davet ve Otomatik Oda Katılım Mantığı (TEMİZLENMİŞ)
+    socket.on('host-action', (data) => {
         const targetSId = onlineUsers.get(data.target);
         if (targetSId) {
             // Davet edeni kendi odasına sokar
@@ -320,6 +320,13 @@ socket.on('meeting-invite-request', (data) => {
                 room: socket.nickname, 
                 role: 'guest'
             });
+
+            // Davet edeni host olarak toplantı sayfasına yönlendirir
+            socket.emit('force-join-meeting', { room: socket.nickname, role: 'host' });
+        } else {
+            socket.emit('error', 'Kullanıcı şu an online değil.');
+        }
+    });
 
             // Davet edeni host olarak yönlendirir
             socket.emit('force-join-meeting', { room: socket.nickname, role: 'host' });
@@ -442,6 +449,7 @@ socket.on('meeting-invite-request', (data) => {
 
 const PORT = process.env.PORT || 3000;
 server.listen(PORT, () => console.log(`🚀 SİSTEM AKTİF: Port ${PORT}`));
+
 
 
 
