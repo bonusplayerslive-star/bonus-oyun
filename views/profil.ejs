@@ -34,13 +34,11 @@
         }
         .stat-card:hover { border-color: var(--neon-green); transform: translateY(-5px); }
         
-        /* Resimlerin düzgün görünmesi için yol düzeltmesi */
         .inventory-img { 
             width: 100%; aspect-ratio: 1/1; object-fit: cover; 
             border-radius: 10px; border: 2px solid var(--neon-green); margin-bottom: 10px;
         }
 
-        /* Seçili hayvanı vurgulamak için efekt */
         .selected-animal-card { border: 2px solid var(--gold) !important; box-shadow: 0 0 15px var(--gold); }
         
         .bpl-badge { color: var(--neon-green); font-family: 'Orbitron'; font-weight: bold; font-size: 1.3rem; }
@@ -49,10 +47,16 @@
         .progress { background: #1a1a1a; border-radius: 10px; border: 1px solid #333; height: 8px; }
         .stat-label { font-size: 0.7rem; color: #aaa; font-family: 'Orbitron'; text-transform: uppercase; }
 
+        /* Market butonu envanter doluysa kırmızı görünecek */
         .btn-market-special {
             background: var(--neon-green); color: black; border: none;
             box-shadow: 0 0 15px var(--neon-green); animation: pulse 2s infinite;
         }
+        .btn-market-full {
+            background: #ff4444; color: white; border: none;
+            box-shadow: 0 0 15px #ff4444; cursor: not-allowed; opacity: 0.7;
+        }
+
         @keyframes pulse {
             0% { box-shadow: 0 0 5px var(--neon-green); }
             50% { box-shadow: 0 0 20px var(--neon-green); }
@@ -89,7 +93,15 @@
             <div class="col-md-3 mb-4">
                 <div class="glass-panel text-center">
                     <h6 class="text-muted border-bottom border-secondary pb-2 mb-3 font-orbitron">SİSTEM MENÜSÜ</h6>
-                    <a href="/market" class="btn btn-market-special nav-btn mb-4"><i class="fas fa-shopping-cart me-2"></i>BPL MARKET</a>
+                    
+                    <% if (user.inventory && user.inventory.length >= 3) { %>
+                        <button onclick="Swal.fire('Envanter Dolu', 'Maksimum 3 hayvan sınırına ulaştınız!', 'warning')" class="btn btn-market-full nav-btn mb-4">
+                            <i class="fas fa-shopping-cart me-2"></i>ENVANTER DOLU (3/3)
+                        </button>
+                    <% } else { %>
+                        <a href="/market" class="btn btn-market-special nav-btn mb-4"><i class="fas fa-shopping-cart me-2"></i>BPL MARKET</a>
+                    <% } %>
+
                     <a href="/development" class="btn btn-outline-warning nav-btn"><i class="fas fa-tools me-2"></i>GELİŞTİRME</a>
                     <a href="/arena" class="btn btn-outline-danger nav-btn"><i class="fas fa-crosshairs me-2"></i>ARENA (BATTLE)</a>
                     <a href="/chat" class="btn btn-outline-info nav-btn"><i class="fas fa-comments me-2"></i>GLOBAL CHAT</a>
@@ -106,7 +118,7 @@
                 <div class="glass-panel">
                     <div class="d-flex justify-content-between align-items-center mb-4">
                         <h4 class="font-orbitron mb-0 text-uppercase"><i class="fas fa-boxes me-2 text-success"></i>ENVANTER</h4>
-                        <span class="badge rounded-pill bg-dark border border-secondary p-2">Varlık: <%= (user.inventory ? user.inventory.length : 0) %></span>
+                        <span class="badge rounded-pill bg-dark border border-secondary p-2">Varlık: <%= (user.inventory ? user.inventory.length : 0) %> / 3</span>
                     </div>
 
                     <div class="row">
@@ -174,13 +186,16 @@
 
     <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
     <script>
+        // BPL Değerini JS tarafında da tutalım (Meeting kontrolü için)
+        const myBpl = <%= user.bpl || 0 %>;
+        const charCount = <%= (user.inventory ? user.inventory.length : 0) %>;
+
         async function selectForArena(name) {
             try {
-                // app.js'deki API yoluyla eşitlendi: /api/select-animal
                 const res = await fetch('/api/select-animal', {
                     method: 'POST',
                     headers: {'Content-Type': 'application/json'},
-                    body: JSON.stringify({ animalName: name }) // İsim gönderiyoruz
+                    body: JSON.stringify({ animalName: name })
                 });
                 
                 const data = await res.json();
@@ -194,41 +209,33 @@
                         color: '#fff',
                         confirmButtonColor: '#39FF14'
                     }).then(() => {
-                        location.reload(); // Sayfayı yenile ki "Seçili" görünsün
+                        location.reload();
                     });
                 } else {
                     Swal.fire('Hata', data.error || 'Seçim yapılamadı.', 'error');
                 }
             } catch (err) {
-                console.error("Hata:", err);
                 Swal.fire('Hata', 'Sunucu bağlantısı koptu.', 'error');
             }
         }
 
-// profil.ejs içindeki seçim ve limit kontrolü
-function startArenaAction() {
-    const selected = document.querySelector('.selected-character'); // Seçili karakter class'ı
-    const characterCount = document.querySelectorAll('.inventory-item').length;
+        // Arena Giriş Kontrolü
+        function checkArenaAccess() {
+            if (charCount === 0) {
+                Swal.fire("Karakter Yok", "Arenaya girmek için en az 1 hayvanın olmalı!", "warning");
+                return false;
+            }
+            window.location.href = "/arena";
+        }
 
-    if (characterCount > 3) {
-        return Swal.fire("Hata", "Envanterinizde en fazla 3 hayvan bulunabilir!", "error");
-    }
-    if (!selected) {
-        return Swal.fire("Seçim Gerekli", "Arenaya girmeden önce bir hayvan seçmelisiniz!", "warning");
-    }
-    window.location.href = "/arena";
-}
-
-// Meeting Giriş Ücreti Kontrolü (Profil sayfasındaki buton)
-async function joinMeetingRoom() {
-    if (myBpl < 50) {
-        return Swal.fire("Bakiye Yetersiz", "Odaya giriş/açma ücreti 50 BPL'dir.", "error");
-    }
-    // Backend'e bakiye düşme isteği gönder ve yönlendir
-    window.location.href = "/meeting?room=global&role=guest";
-}
-
-</script>
+        // Meeting Giriş Kontrolü
+        function checkMeetingAccess() {
+            if (myBpl < 50) {
+                Swal.fire("Bakiye Yetersiz", "Toplantı için en az 50 BPL gereklidir.", "error");
+                return false;
+            }
+            window.location.href = "/meeting?role=guest";
+        }
+    </script>
 </body>
 </html>
-
