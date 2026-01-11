@@ -286,8 +286,15 @@ socket.on('meeting-invite-received', (data) => {
         }
     });
 });
+
+socket.on('force-arena-match', (data) => {
+    // Sizi doğrudan Arena sayfasına ve odaya bağlar
+    window.location.href = `/arena?match=${data.room}`;
+});
+
 </script>
 </body>
 </html>
+
 
 
