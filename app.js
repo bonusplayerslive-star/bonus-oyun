@@ -77,6 +77,31 @@ app.get('/', (req, res) => {
     res.render('index', { title: 'BPL Ultimate' });
 });
 
+// app.js - VIP Meeting Ücretlendirme Mantığı
+app.get('/meeting', authRequired, async (req, res) => {
+    const role = req.query.role; // host veya guest
+    const user = await User.findById(req.session.userId);
+
+    if (role === 'host') {
+        const MEETING_COST = 50;
+
+        if (user.bpl >= MEETING_COST) {
+            user.bpl -= MEETING_COST;
+            await user.save();
+            // Kullanıcıya bakiye güncellemesini socket üzerinden anlık gönder
+            io.to(req.session.socketId).emit('update-bpl', user.bpl);
+            res.render('meeting', { role: 'host', bpl: user.bpl });
+        } else {
+            // Bakiyesi yetersizse profiline yönlendir ve hata mesajı ver
+            return res.redirect('/profil?error=insufficient_bpl');
+        }
+    } else {
+        // Katılımcı (guest) ise ücret kesmeden direkt içeri al
+        res.render('meeting', { role: 'guest', bpl: user.bpl });
+    }
+});
+
+
 app.post('/register', async (req, res) => {
     const { nickname, email, password } = req.body;
     try {
@@ -118,7 +143,12 @@ app.get('/arena', authRequired, (req, res) => res.render('arena'));
 app.get('/development', authRequired, (req, res) => res.render('development'));
 app.get('/meeting', authRequired, (req, res) => res.render('meeting'));
 app.get('/chat', authRequired, (req, res) => res.render('chat'));
-app.get('/wallet', authRequired, (req, res) => res.render('wallet', { bpl: res.locals.user.bpl || 0 }));
+// Satır 121 düzeltmesi:
+app.get('/wallet', authRequired, (req, res) => {
+    // Eğer res.locals.user tanımsızsa 0 döner, çökme engellenir
+    const currentBpl = (res.locals.user && res.locals.user.bpl) ? res.locals.user.bpl : 0;
+    res.render('wallet', { bpl: currentBpl });
+});
 
 app.get('/logout', (req, res) => {
     req.session.destroy();
@@ -263,6 +293,19 @@ io.on('connection', async (socket) => {
         if (data.room && data.text) io.to(data.room).emit('new-meeting-message', { sender: socket.nickname, text: data.text });
     });
 
+    
+// app.js içindeki socket.on bloklarına ekle
+socket.on('meeting-invite-request', (data) => {
+    const targetSid = onlineUsers.get(data.to); // Kullanıcı adına göre socket ID bul
+    if (targetSid) {
+        io.to(targetSid).emit('meeting-invite-received', { 
+            from: socket.nickname,
+            roomId: data.roomId 
+        });
+    } else {
+        socket.emit('error', 'Kullanıcı şu an online değil.');
+    }
+});
     socket.on('send-meeting-invite', (data) => {
         const targetSId = onlineUsers.get(data.target);
         if (targetSId) {
@@ -380,4 +423,5 @@ io.on('connection', async (socket) => {
 
 const PORT = process.env.PORT || 3000;
 server.listen(PORT, () => console.log(`🚀 SİSTEM AKTİF: Port ${PORT}`));
+
 
