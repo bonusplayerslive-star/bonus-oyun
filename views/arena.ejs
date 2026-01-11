@@ -155,8 +155,24 @@
 <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
 
 <script>
-    const socket = io();
+ 
+// arena.ejs - Script bloğunun en başı
+const socket = io();
+const urlParams = new URLSearchParams(window.location.search);
+const inviteFrom = urlParams.get('from'); // Eğer davetle gelindiyse URL'de kimden geldiği yazar
 
+// Eğer sayfaya bir davet kabul ederek geldiyse otomatik eşleşme başlat
+if (inviteFrom) {
+    document.getElementById('bet-screen').style.display = 'none';
+    document.getElementById('wait-screen').style.display = 'block';
+    socket.emit('arena-invite-accept', { from: inviteFrom });
+}
+
+// Mevcut startSearch fonksiyonun (Rastgele rakipler için kalabilir)
+function startSearch(bet, prize) {
+    // ... bakiye kontrolü kodların ...
+    socket.emit('arena-join-queue', { bet: bet, prize: prize });
+}
     // Büyük harf duyarlılığı için yardımcı fonksiyon
     function formatAnimalName(name) {
         if (!name) return 'Lion';
@@ -275,3 +291,4 @@
 
     const currentRoom = "arena";
 </script>
+
