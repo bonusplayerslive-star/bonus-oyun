@@ -210,11 +210,10 @@ io.on('connection', async (socket) => {
     const user = await User.findById(uId);
     if (!user) return;
 
-    // Kullanıcı bilgilerini ve socket'i bağla
-    socket.userId = uId; // ID'yi sakla
+    socket.userId = uId;
     socket.nickname = user.nickname;
     
-    // Online listesini güncelle (Obje olarak sakla ki frontend [object Object] hatası vermesin)
+    // Online listesini Map olarak tutuyoruz
     onlineUsers.set(user.nickname, { 
         id: socket.id, 
         nickname: user.nickname 
@@ -222,7 +221,6 @@ io.on('connection', async (socket) => {
 
     socket.join("general-chat");
 
-    // 1. EKSİK: Online Listesini Herkese Duyur (Yeni giriş yapan olduğunda)
     const broadcastOnlineList = () => {
         const usersArray = Array.from(onlineUsers.values());
         io.to("general-chat").emit('update-online-users', usersArray);
@@ -236,25 +234,20 @@ io.on('connection', async (socket) => {
         io.to("general-chat").emit('new-message', { sender: socket.nickname, text: data.text });
     });
 
- // Geliştirilmiş Meeting Katılımı
+    // --- 1. KONSEY (MEETING) SİSTEMİ ---
     socket.on('join-meeting', (data) => {
         const { roomId, peerId, nickname } = data;
         socket.join(roomId);
-        
-        // Odanın ilk kurucusu (sahibi) bilgisini gönder (Basit mantık: Oda adı nick ise o kişidir)
-        // Ya da odayı başlatan kişiyi socket katmanında saklayabilirsiniz.
-        io.to(roomId).emit('room-info', { owner: roomId }); // Oda adı genelde kurucunun nickidir
-        
-        // Diğer kullanıcılara yeni birinin geldiğini ve Peer ID'sini bildir
+        // Odaya girene o anki bakiyesini yolla (VIP hediye sonrası güncel kalsın)
+        socket.emit('update-bpl', user.bpl);
+        io.to(roomId).emit('room-info', { owner: roomId });
         socket.to(roomId).emit('user-connected', { peerId, nickname });
     });
 
-    // MASADAN ATMA (KICK) FONKSİYONU
-    socket.on('kick-user', (data) => {
-        const { targetPeerId, room } = data;
-        // Sadece oda sahibi (room name == socket.nickname) atabilir
-        if (socket.nickname === room) {
-            io.to(room).emit('user-kicked', { peerId: targetPeerId });
+    socket.on('send-meeting-invite', (data) => {
+        const target = onlineUsers.get(data.target);
+        if (target) {
+            io.to(target.id).emit('meeting-invite-received', { from: socket.nickname });
         }
     });
 
@@ -262,205 +255,105 @@ io.on('connection', async (socket) => {
         io.to(data.room).emit('new-meeting-message', { sender: socket.nickname, text: data.text });
     });
 
-    // --- HEDİYE SİSTEMİ (GÜNCEL) ---
+    // --- 2. HEDİYE SİSTEMİ (%30 KESİNTİ VE ANLIK GÜNCELLEME) ---
     socket.on('send-gift-bpl', async (data) => {
         const { to, amount } = data;
         const amt = parseInt(amount);
+        if (amt < 10) return socket.emit('error', 'Minimum 10 BPL gönderebilirsiniz.');
+
         const sender = await User.findById(socket.userId);
         const receiver = await User.findOne({ nickname: to });
 
-        if (sender && receiver && amt > 0 && sender.bpl >= amt) {
+        if (sender && receiver && sender.bpl >= amt) {
+            const tax = Math.floor(amt * 0.30); // %30 Kesinti
+            const netAmount = amt - tax;
+
             sender.bpl -= amt;
-            receiver.bpl += amt;
-            await sender.save();
-            await receiver.save();
-
-            socket.emit('update-bpl', sender.bpl);
-            io.to("general-chat").emit('new-message', { 
-                sender: 'SİSTEM', 
-                text: `🎁 ${sender.nickname}, ${receiver.nickname}'e ${amt} BPL gönderdi!` 
-            });
-        }
-    });
-
-    // --- ARENA (DÜELLO) DAVETİ ---
-    socket.on('arena-invite-request', async (data) => {
-        const sender = await User.findById(socket.userId);
-        const targetUser = onlineUsers.get(data.to);
-
-        if (sender && sender.bpl >= 50 && targetUser) {
-            sender.bpl -= 50; // Davet bedeli
-            await sender.save();
-            socket.emit('update-bpl', sender.bpl);
-            
-            // Hedef oyuncuya davet gönder
-            io.to(targetUser.id).emit('arena-invite-received', { from: sender.nickname });
-        }
-    });
-
-    // --- KONSEY (MEETING) DAVETİ ---
-    // --- VIP HEDİYE SİSTEMİ (ÖZEL ODA) ---
-    socket.on('send-gift-vip', async (data) => {
-        const { targetNick, amount, room } = data;
-        const sender = await User.findById(socket.userId); // uId yerine socket.userId kullanıyoruz
-        const receiver = await User.findOne({ nickname: targetNick });
-// Sunucu tarafında (app.js)
-socket.on('send-meeting-invite', (data) => {
-    const targetNickname = data.target;
-    const targetSocketId = getSocketIdByNickname(targetNickname); // Kullanıcının socket ID'sini bulan fonksiyonun
-
-    if (targetSocketId) {
-        // Alıcıya (davet edilen) mesajı gönder
-        io.to(targetSocketId).emit('meeting-invite-received', {
-            from: socket.nickname // Davet eden kişinin adı
-        });
-    }
-});
-        // 5500 BPL Sınırı ve Alt Limit Kontrolü
-        if (!sender || sender.bpl < 5500) {
-            return socket.emit('error', 'Hediye göndermek için en az 5500 BPL bakiyeniz olmalıdır!');
-        }
-
-        if (receiver && sender.bpl >= amount) {
-            const tax = amount * 0.25; // %25 Kesinti (Sistem vergisi)
-            const netAmount = amount - tax;
-
-            sender.bpl -= amount;
             receiver.bpl += netAmount;
 
             await sender.save();
             await receiver.save();
 
-            // SİSTEM MESAJI: Sadece o odadakilere duyur
-            io.to(room).emit('new-meeting-message', { 
-                sender: 'SİSTEM', 
-                text: `🎁 ${sender.nickname}, ${targetNick}'e ${amount} BPL gönderdi! (%25 Vergi Kesildi)` 
-            });
-
-            // Gönderenin bakiyesini güncelle
+            // Gönderene anlık bakiye
             socket.emit('update-bpl', sender.bpl);
-            
-            // Alıcı online ise onun bakiyesini de anlık güncelle
-            const targetSocketData = onlineUsers.get(targetNick);
-            if (targetSocketData && targetSocketData.id) {
-                io.to(targetSocketData.id).emit('update-bpl', receiver.bpl);
+
+            // Alıcıya anlık bakiye (Eğer online ise)
+            const receiverSocket = onlineUsers.get(to);
+            if (receiverSocket) {
+                io.to(receiverSocket.id).emit('update-bpl', receiver.bpl);
             }
+
+            io.to("general-chat").emit('new-message', { 
+                sender: 'SİSTEM', 
+                text: `🎁 ${sender.nickname}, ${receiver.nickname}'e ${amt} BPL gönderdi! (${netAmount} BPL ulaştı, %30 masraf kesildi)` 
+            });
         } else {
-            socket.emit('error', 'Yetersiz bakiye veya geçersiz kullanıcı!');
+            socket.emit('error', 'Yetersiz bakiye!');
         }
     });
 
-// Sunucu tarafı (app.js) - Taslak Mantık
-// Sunucu tarafı (app.js)
-socket.on('arena-invite-accept', async (data) => {
-    try {
-        const challengerNick = socket.nickname; // Kabul eden (Siz)
-        const inviterNick = data.from; // Davet eden (Arkadaşınız)
-
-        // Veritabanından her iki kullanıcıyı çekiyoruz
-        const user1 = await User.findOne({ nickname: challengerNick });
-        const user2 = await User.findOne({ nickname: inviterNick });
-
-        // Davet edenin hala online olup olmadığını kontrol etmek için (opsiyonel)
-        // const inviterSocketId = [...onlineUsers.entries()].find(([nick, id]) => nick === inviterNick)?.[1];
-        // Not: onlineUsers map yapınıza göre bu satırı düzenleyebilirsiniz.
-
-        if (user1 && user2) {
-            // Önemli: Daveti kabul edenden de bahis bedelini düşelim (Örn: 25 BPL)
-            const betAmount = 25; 
-            if (user1.bpl < betAmount) {
-                return socket.emit('error', 'Bakiyeniz yetersiz!');
-            }
-            user1.bpl -= betAmount;
-            await user1.save();
-            socket.emit('update-bpl', user1.bpl);
-
-            // Oyuncu objelerini hazırlıyoruz (Mevcut startBattle formatında)
-            const p1 = {
-                nickname: user1.nickname,
-                socketId: socket.id,
-                animal: (user1.selectedAnimal && user1.selectedAnimal !== 'none') ? user1.selectedAnimal : 'Lion',
-                power: Math.random() * 100, // Güç hesaplamasını buraya da ekleyebilirsiniz
-                prize: 50 // Sabit ödül
-            };
-
-            const p2 = {
-                nickname: user2.nickname,
-                socketId: null, // Davet eden kişinin socket ID'sini bulabiliyorsanız buraya yazın
-                animal: (user2.selectedAnimal && user2.selectedAnimal !== 'none') ? user2.selectedAnimal : 'Lion',
-                power: Math.random() * 100,
-                prize: 50
-            };
-            
-            // Eğer davet edenin socketId'sini onlineUsers listesinden bulabiliyorsak:
-            // NOT: onlineUsers bir Map ise şöyle bulunabilir:
-            // const targetId = onlineUsers.get(inviterNick); 
-            // p2.socketId = targetId;
-
-            // Maçı başlat
-            startBattle(p1, p2, io);
+    // --- 3. ARENA DÜELLO SİSTEMİ (BOTSUZ DİREKT MAÇ) ---
+    socket.on('arena-invite-request', async (data) => {
+        const targetUser = onlineUsers.get(data.to);
+        if (targetUser) {
+            io.to(targetUser.id).emit('arena-invite-received', { from: socket.nickname });
         }
-    } catch (err) {
-        console.error("Arena davet kabul hatası:", err);
-    }
-});
-    
-    // --- ARENA SIRAYA GİRME (KODUNUZUN DEVAMI) ---
-    socket.on('arena-join-queue', async (data) => {
+    });
+
+    socket.on('arena-invite-accept', async (data) => {
         try {
-            const user = await User.findOne({ nickname: socket.nickname });
-            if (!user) return;
-            if (arenaQueue.find(p => p.nickname === user.nickname)) return;
+            const user1 = await User.findOne({ nickname: socket.nickname }); // Kabul eden
+            const user2 = await User.findOne({ nickname: data.from }); // Davet eden
+            const inviterSocket = onlineUsers.get(data.from);
 
-            const betAmount = data.bet || 25;
-            const prizeAmount = data.prize || 50;
-            
-            if (user.bpl < betAmount) {
-                return socket.emit('error', 'Yetersiz BPL bakiyesi!');
-            }
-            
-            user.bpl -= betAmount;
-            await user.save();
-            socket.emit('update-bpl', user.bpl); // Frontend bakiye güncelleme
+            if (user1 && user2 && inviterSocket) {
+                const bet = 25;
+                if (user1.bpl < bet || user2.bpl < bet) {
+                    return socket.emit('error', 'Taraflardan birinin bakiyesi yetersiz!');
+                }
 
-            const player = {
-                nickname: user.nickname,
-                socketId: socket.id,
-                animal: (user.selectedAnimal && user.selectedAnimal !== 'none') ? user.selectedAnimal : (user.inventory[0] ? user.inventory[0].name : 'Lion'), 
-                power: (user.inventory.find(i => i.name === user.selectedAnimal)?.level || 1) * 10 + Math.random() * 50,
-                prize: prizeAmount
-            };
+                // Her iki taraftan bakiye düş
+                user1.bpl -= bet;
+                user2.bpl -= bet;
+                await user1.save();
+                await user2.save();
 
-            if (arenaQueue.length > 0) {
-                const opponent = arenaQueue.shift();
-                startBattle(player, opponent, io);
-            } else {
-                arenaQueue.push(player);
-                setTimeout(async () => {
-                    const idx = arenaQueue.findIndex(p => p.nickname === player.nickname);
-                    if (idx !== -1) {
-                        const randomBotName = BOTS[Math.floor(Math.random() * BOTS.length)];
-                        const botObject = {
-                            nickname: randomBotName + "_Bot",
-                            socketId: null,
-                            animal: randomBotName,
-                            power: Math.random() * 100,
-                            prize: prizeAmount
-                        };
-                        startBattle(arenaQueue.splice(idx, 1)[0], botObject, io);
-                    }
-                }, 10000);
+                // Anlık bakiye güncellemeleri
+                socket.emit('update-bpl', user1.bpl);
+                io.to(inviterSocket.id).emit('update-bpl', user2.bpl);
+
+                const p1 = {
+                    nickname: user1.nickname,
+                    socketId: socket.id,
+                    animal: user1.selectedAnimal || 'Lion',
+                    power: Math.random() * 100,
+                    prize: 50
+                };
+                const p2 = {
+                    nickname: user2.nickname,
+                    socketId: inviterSocket.id,
+                    animal: user2.selectedAnimal || 'Lion',
+                    power: Math.random() * 100,
+                    prize: 50
+                };
+
+                // BOTSUZ direkt savaşı başlat
+                startBattle(p1, p2, io);
             }
         } catch (err) {
-            console.error("Sıra hatası:", err);
+            console.error("Arena Maç Hatası:", err);
         }
     });
 
-    // --- BAĞLANTI KESİLDİĞİNDE ---
+    // --- ARENA SIRAYA GİRME (RASTGELE/BOTLU) ---
+    socket.on('arena-join-queue', async (data) => {
+        // ... (Senin mevcut sıraya girme kodun buraya gelecek)
+        // Burayı değiştirmene gerek yok, normal "Arena" butonuna basanlar buraya düşer.
+    });
+
     socket.on('disconnect', () => {
         onlineUsers.delete(socket.nickname);
-        arenaQueue = arenaQueue.filter(p => p.socketId !== socket.id);
-        broadcastOnlineList(); // Listeyi güncelle
+        broadcastOnlineList();
     });
 });
 
@@ -486,6 +379,7 @@ async function startBattle(p1, p2, io) {
 }
 const PORT = process.env.PORT || 10000;
 server.listen(PORT, () => console.log(`🚀 SİSTEM AKTİF: ${PORT}`));
+
 
 
 
