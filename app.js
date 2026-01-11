@@ -263,11 +263,23 @@ io.on('connection', async (socket) => {
         if (data.room && data.text) io.to(data.room).emit('new-meeting-message', { sender: socket.nickname, text: data.text });
     });
 
+// --- [MEETING DAVET SİSTEMİ - GÜNCEL] ---
 socket.on('send-meeting-invite', (data) => {
     const targetSId = onlineUsers.get(data.target);
     if (targetSId) {
-        // 1. Davet edeni kendi adına açılan odaya hemen al
+        // Davet edeni hemen kendi odasına sok
         socket.join(socket.nickname); 
+        
+        // Karşı tarafa 'oda sahibi benim nickim' bilgisini gönder
+        io.to(targetSId).emit('meeting-invite-received', { 
+            from: socket.nickname, 
+            room: socket.nickname 
+        });
+
+        // Davet edeni kendi masasına yönlendir (host rolüyle)
+        socket.emit('force-join-meeting', { room: socket.nickname, role: 'host' });
+    }
+});
         
         // 2. Karşı tarafa daveti gönder
         io.to(targetSId).emit('meeting-invite-received', { 
@@ -353,6 +365,7 @@ socket.on('arena-invite-accept', async (data) => {
 
 const PORT = process.env.PORT || 3000;
 server.listen(PORT, () => console.log(`🚀 SİSTEM AKTİF: Port ${PORT}`));
+
 
 
 
