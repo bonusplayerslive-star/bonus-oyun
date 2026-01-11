@@ -4,7 +4,7 @@
 const express = require('express');
 const mongoose = require('mongoose');
 const session = require('express-session');
-const MongoStore = require('connect-mongo'); // .default kalktı, yeni sürümlerde bu şekilde kullanılır
+const MongoStore = require('connect-mongo').default; // .default kalktı, yeni sürümlerde bu şekilde kullanılır
 const http = require('http');
 const socketIo = require('socket.io');
 const path = require('path');
@@ -345,3 +345,4 @@ io.on('connection', async (socket) => {
 
 const PORT = process.env.PORT || 3000;
 server.listen(PORT, () => console.log(`🚀 SİSTEM AKTİF: Port ${PORT}`));
+
