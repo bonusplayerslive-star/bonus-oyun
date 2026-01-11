@@ -314,7 +314,31 @@
         track.enabled = !track.enabled;
         document.getElementById('vid-btn').classList.toggle('btn-danger', !track.enabled);
     }
+// Davet Et butonunun çalışması için gereken o eksik parça:
+function inviteUser() {
+    const targetNick = document.getElementById('invite-nick').value.trim();
+    if (!targetNick) {
+        return Swal.fire("Hata", "Davet edilecek kişinin kullanıcı adını yazmalısın!", "warning");
+    }
 
+    // Backend'e (app.js) davet isteği gönderiyoruz
+    socket.emit('meeting-invite-request', { 
+        to: targetNick, 
+        roomId: roomID 
+    });
+
+    Swal.fire({
+        title: "Davet Gönderildi",
+        text: `${targetNick} kullanıcısına operasyon daveti iletildi.`,
+        icon: "success",
+        timer: 2000,
+        showConfirmButton: false,
+        background: '#0a1520',
+        color: '#fff'
+    });
+    
+    document.getElementById('invite-nick').value = ""; // Kutuyu temizle
+}
     function exitRoom() { window.location.href = "/chat"; }
     window.onclick = () => document.getElementById('user-menu').style.display = 'none';
     
@@ -322,4 +346,5 @@
 </script>
 </body>
 </html>
+
 
