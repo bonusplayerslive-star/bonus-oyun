@@ -365,20 +365,53 @@ socket.on('send-gift-bpl', async (data) => {
         await fromUser.save();
         await toUser.save();
 
-        socket.emit('update-bpl', fromUser.bpl);
-        if (toSocketId) {
-            io.to(toSocketId).emit('update-bpl', toUser.bpl);
-            io.to(toSocketId).emit('new-message', { sender: "SİSTEM", text: `🎁 ${socket.nickname} sana ${amount} BPL gönderdi!` });
-        }
-        io.to("general-chat").emit('new-message', { sender: "SİSTEM", text: `📢 ${socket.nickname}, ${data.to} kullanıcısına ${amount} BPL hediye etti!` });
-    } catch (err) { console.error("Hediye Hatası:", err); }
-});
-            // Global duyuru
+        // --- [HEDİYE SİSTEMİ - CHAT - TEMİZLENMİŞ VERSİYON] ---
+    socket.on('send-gift-bpl', async (data) => {
+        try {
+            const amount = parseInt(data.amount);
+            
+            // 100 - 2000 Limit Kontrolü
+            if (isNaN(amount) || amount < 100 || amount > 2000) {
+                return socket.emit('error', 'Hediye miktarı 100 ile 2000 BPL arasında olmalıdır!');
+            }
+
+            const fromUser = await User.findById(socket.userId);
+            const toUser = await User.findOne({ nickname: data.to });
+            const toSocketId = onlineUsers.get(data.to);
+
+            if (!toUser) return socket.emit('error', 'Hedef kullanıcı bulunamadı.');
+            if (fromUser.bpl - amount < 25) return socket.emit('error', 'Limit: Bakiyeniz 25 BPL altına düşemez!');
+
+            // BPL Transferi
+            fromUser.bpl -= amount;
+            toUser.bpl += amount;
+            await fromUser.save();
+            await toUser.save();
+
+            // Gönderene ve alana bildirim
+            socket.emit('update-bpl', fromUser.bpl);
+            if (toSocketId) {
+                io.to(toSocketId).emit('update-bpl', toUser.bpl);
+                io.to(toSocketId).emit('new-message', { sender: "SİSTEM", text: `🎁 ${socket.nickname} sana ${amount} BPL gönderdi!` });
+            }
+            
+            // Global Duyuru
             io.to("general-chat").emit('new-message', { sender: "SİSTEM", text: `📢 ${socket.nickname}, ${data.to} kullanıcısına ${amount} BPL hediye etti!` });
 
-        } catch (err) { console.error("Hediye Hatası:", err); }
-    });
+        } catch (err) { 
+            console.error("Hediye Hatası:", err); 
+        }
+    }); // Bloğu tek seferde ve doğru şekilde kapattık.
 
+    // --- [ARENA DAVET SİSTEMİ - CHAT] ---
+    socket.on('arena-invite-request', (data) => {
+        const targetSId = onlineUsers.get(data.to);
+        if (targetSId) {
+            io.to(targetSId).emit('arena-invite-received', { from: socket.nickname });
+        } else {
+            socket.emit('error', 'Kullanıcı şu an online değil.');
+        }
+    });
     // --- [ARENA DAVET SİSTEMİ - CHAT] ---
     socket.on('arena-invite-request', (data) => {
         const targetSId = onlineUsers.get(data.to);
@@ -397,6 +430,7 @@ socket.on('send-gift-bpl', async (data) => {
 
 const PORT = process.env.PORT || 3000;
 server.listen(PORT, () => console.log(`🚀 SİSTEM AKTİF: Port ${PORT}`));
+
 
 
 
