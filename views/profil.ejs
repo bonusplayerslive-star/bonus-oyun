@@ -204,6 +204,31 @@
                 Swal.fire('Hata', 'Sunucu bağlantısı koptu.', 'error');
             }
         }
-    </script>
+
+// profil.ejs içindeki seçim ve limit kontrolü
+function startArenaAction() {
+    const selected = document.querySelector('.selected-character'); // Seçili karakter class'ı
+    const characterCount = document.querySelectorAll('.inventory-item').length;
+
+    if (characterCount > 3) {
+        return Swal.fire("Hata", "Envanterinizde en fazla 3 hayvan bulunabilir!", "error");
+    }
+    if (!selected) {
+        return Swal.fire("Seçim Gerekli", "Arenaya girmeden önce bir hayvan seçmelisiniz!", "warning");
+    }
+    window.location.href = "/arena";
+}
+
+// Meeting Giriş Ücreti Kontrolü (Profil sayfasındaki buton)
+async function joinMeetingRoom() {
+    if (myBpl < 50) {
+        return Swal.fire("Bakiye Yetersiz", "Odaya giriş/açma ücreti 50 BPL'dir.", "error");
+    }
+    // Backend'e bakiye düşme isteği gönder ve yönlendir
+    window.location.href = "/meeting?room=global&role=guest";
+}
+
+</script>
 </body>
 </html>
+
