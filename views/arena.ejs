@@ -1,153 +1,159 @@
 <%- include('header') %>
 
 <style>
-    /* Arena Atmosferi */
-    body {
-        background: radial-gradient(circle, #1a1a2e 0%, #0f0f1a 100%) !important;
-        color: #fff;
-        overflow-x: hidden;
+    /* Arena Tam Ekran Atmosferi */
+    body, html {
+        margin: 0;
+        padding: 0;
+        width: 100%;
+        height: 100%;
+        background: #000 !important;
+        overflow: hidden; /* Savaş sırasında kaydırmayı engeller */
     }
 
     .arena-main-container {
-        min-height: 80vh;
+        min-height: 100vh;
         display: flex;
         flex-direction: column;
         justify-content: center;
         align-items: center;
-        padding: 20px;
+        position: relative;
     }
 
-    /* Başlık Efekti */
-    .arena-title {
-        font-family: 'Orbitron', sans-serif;
-        text-transform: uppercase;
-        letter-spacing: 5px;
-        text-shadow: 0 0 15px #ffc107;
-        font-weight: 900;
-        margin-bottom: 40px;
+    /* Bahis Ekranı */
+    #bet-screen {
+        z-index: 10;
+        background: radial-gradient(circle, #1a1a2e 0%, #0f0f1a 100%);
+        width: 100%;
+        height: 100vh;
+        display: flex;
+        flex-direction: column;
+        justify-content: center;
+        align-items: center;
     }
 
-    /* Bahis Kartları */
     .bet-card {
-        transition: all 0.3s cubic-bezier(0.175, 0.885, 0.32, 1.275);
-        border: 2px solid rgba(255, 255, 255, 0.1);
+        transition: transform 0.3s ease;
+        border: 2px solid rgba(255, 215, 0, 0.3);
         background: rgba(255, 255, 255, 0.05);
         backdrop-filter: blur(10px);
         cursor: pointer;
         border-radius: 15px;
         padding: 20px;
-        text-align: center;
         margin: 10px;
+        min-width: 180px;
     }
 
     .bet-card:hover {
-        transform: translateY(-10px);
-        box-shadow: 0 0 30px var(--glow-color);
-        border-color: var(--glow-color);
+        transform: scale(1.05);
+        border-color: #ffc107;
+        box-shadow: 0 0 20px rgba(255, 193, 7, 0.4);
     }
 
-    /* Renk Kodları */
-    .bet-green { --glow-color: #00ff88; color: #00ff88; }
-    .bet-blue { --glow-color: #00d4ff; color: #00d4ff; }
-    .bet-gold { --glow-color: #ffcc00; color: #ffcc00; }
-    .bet-red { --glow-color: #ff4444; color: #ff4444; }
-
-    /* Video Alanı */
+    /* --- TAM EKRAN VİDEO ALANI --- */
     #battle-area {
-        position: relative;
-        max-width: 850px;
-        width: 100%;
-        border-radius: 20px;
-        overflow: hidden;
-        box-shadow: 0 0 50px rgba(0, 0, 0, 0.8);
-        border: 4px solid #ffc107;
+        position: fixed;
+        top: 0;
+        left: 0;
+        width: 100vw;
+        height: 100vh;
         background: #000;
-        display: none; 
+        display: none;
+        z-index: 9999;
     }
 
-    .video-overlay-glow {
+    #battle-video {
+        width: 100%;
+        height: 100%;
+        object-fit: cover; /* Videoyu ekranı tamamen kaplayacak şekilde uzatır/keser */
+    }
+
+    /* Video Üstü Bilgi Katmanı */
+    .video-overlay {
         position: absolute;
-        top: 0; left: 0; right: 0; bottom: 0;
-        box-shadow: inset 0 0 50px rgba(255, 193, 7, 0.4);
+        top: 30px;
+        width: 100%;
+        text-align: center;
+        z-index: 10001;
         pointer-events: none;
-        z-index: 5;
     }
 
-    /* Sayaç Efekti */
-    .countdown-number {
-        font-size: 120px;
+    #battle-status {
+        font-family: 'Orbitron', sans-serif;
+        font-size: 2.5rem;
         font-weight: 900;
-        background: linear-gradient(to bottom, #fff, #ffc107);
-        -webkit-background-clip: text;
-        -webkit-text-fill-color: transparent;
-        filter: drop-shadow(0 0 20px rgba(255,193,7,0.6));
+        color: #ffc107;
+        text-shadow: 0 0 15px #000, 0 0 30px #000;
+        text-transform: uppercase;
+        letter-spacing: 3px;
     }
 
-    @keyframes shake {
-        0% { transform: translate(1px, 1px) rotate(0deg); }
-        20% { transform: translate(-3px, 0px) rotate(-1deg); }
-        40% { transform: translate(3px, 2px) rotate(1deg); }
-        60% { transform: translate(-1px, -1px) rotate(1deg); }
-        100% { transform: translate(1px, -2px) rotate(-1deg); }
+    .opponent-badge {
+        background: rgba(220, 53, 69, 0.8);
+        padding: 10px 20px;
+        border-radius: 50px;
+        font-weight: bold;
+        margin-top: 10px;
+        display: inline-block;
+        border: 2px solid #fff;
+    }
+
+    /* Bekleme Ekranı */
+    #wait-screen {
+        display: none;
+        text-align: center;
+        z-index: 20;
+    }
+
+    .countdown-number {
+        font-size: 150px;
+        font-weight: 900;
+        color: #ffc107;
+        text-shadow: 0 0 30px rgba(255, 193, 7, 0.5);
     }
 </style>
 
 <div class="arena-main-container">
-    <div id="bet-screen" class="w-100 text-center">
+    <div id="bet-screen">
         <% if (user.selectedAnimal === 'none' || !user.selectedAnimal) { %>
-            <div class="alert alert-warning d-inline-block p-4" style="border-radius: 15px; background: rgba(255,193,7,0.1); border: 1px solid #ffc107;">
-                <h4 class="text-warning">Karakter Seçilmedi!</h4>
-                <p>Arenaya girmeden önce bir dövüşçü seçmelisin.</p>
-                <a href="/profil" class="btn btn-warning fw-bold px-4">PROFİLE GİT</a>
+            <div class="text-center p-5 border border-warning rounded">
+                <h2 class="text-warning">DÖVÜŞÇÜ SEÇİLMEDİ!</h2>
+                <p>Arenaya girmek için önce profilinden bir karakter seçmelisin.</p>
+                <a href="/profil" class="btn btn-warning fw-bold">PROFİLE GİT</a>
             </div>
         <% } else { %>
-            <h1 class="arena-title text-warning">ARENA BAHİSİ</h1>
-            <div class="row justify-content-center px-3">
-                <div class="col-6 col-md-2" onclick="startSearch(25, 50)">
-                    <div class="bet-card bet-green">
-                        <h5 class="fw-bold">BAŞLANGIÇ</h5>
-                        <hr style="border-color: inherit;">
-                        <h3 class="fw-bold">25 ➔ 50</h3>
-                        <small>BPL TOKEN</small>
-                    </div>
+            <h1 class="mb-5 text-warning fw-bold" style="letter-spacing: 5px;">ARENA DÜELLOSU</h1>
+            <div class="d-flex flex-wrap justify-content-center">
+                <div class="bet-card" onclick="startSearch(25, 50)">
+                    <h4 class="text-success">BAŞLANGIÇ</h4>
+                    <hr>
+                    <h3>25 ➔ 50</h3>
+                    <small>BPL TOKEN</small>
                 </div>
-                <div class="col-6 col-md-2" onclick="startSearch(35, 100)">
-                    <div class="bet-card bet-blue">
-                        <h5 class="fw-bold">AMATÖR</h5>
-                        <hr style="border-color: inherit;">
-                        <h3 class="fw-bold">35 ➔ 100</h3>
-                        <small>BPL TOKEN</small>
-                    </div>
-                </div>
-                <div class="col-6 col-md-2" onclick="startSearch(75, 200)">
-                    <div class="bet-card bet-gold">
-                        <h5 class="fw-bold">PROFESYONEL</h5>
-                        <hr style="border-color: inherit;">
-                        <h3 class="fw-bold">75 ➔ 200</h3>
-                        <small>BPL TOKEN</small>
-                    </div>
-                </div>
-                <div class="col-6 col-md-2" onclick="startSearch(120, 450)">
-                    <div class="bet-card bet-red">
-                        <h5 class="fw-bold">EFSANE</h5>
-                        <hr style="border-color: inherit;">
-                        <h3 class="fw-bold">120 ➔ 450</h3>
-                        <small>BPL TOKEN</small>
-                    </div>
+                <div class="bet-card" onclick="startSearch(75, 200)">
+                    <h4 class="text-info">PROFESYONEL</h4>
+                    <hr>
+                    <h3>75 ➔ 200</h3>
+                    <small>BPL TOKEN</small>
                 </div>
             </div>
         <% } %>
     </div>
 
-    <div id="wait-screen" class="text-center" style="display: none;">
+    <div id="wait-screen">
         <div class="countdown-number" id="timer">10</div>
-        <h2 class="text-white mt-3 fw-bold">RAKİP ARANIYOR...</h2>
-        <div class="spinner-border text-warning mt-3" style="width: 3rem; height: 3rem;" role="status"></div>
+        <h2 class="text-white">RAKİP ARANIYOR...</h2>
+        <div class="spinner-grow text-warning mt-3"></div>
     </div>
 
     <div id="battle-area">
-        <div class="video-overlay-glow"></div>
-        <div id="battle-content"></div>
+        <div class="video-overlay">
+            <div id="battle-status">HAZIRLAN...</div>
+            <div id="opp-info" class="opponent-badge">RAKİP: ARANIYOR</div>
+        </div>
+        <video id="battle-video" playsinline>
+            <source id="video-src" src="" type="video/mp4">
+        </video>
     </div>
 </div>
 
@@ -155,139 +161,77 @@
 <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
 
 <script>
- 
-// arena.ejs - Script bloğunun en başı
-const socket = io();
-const urlParams = new URLSearchParams(window.location.search);
-const inviteFrom = urlParams.get('from'); // Eğer davetle gelindiyse URL'de kimden geldiği yazar
+    const socket = io();
+    const video = document.getElementById('battle-video');
+    const videoSrc = document.getElementById('video-src');
+    const battleArea = document.getElementById('battle-area');
+    const statusText = document.getElementById('battle-status');
+    const oppInfo = document.getElementById('opp-info');
 
-// Eğer sayfaya bir davet kabul ederek geldiyse otomatik eşleşme başlat
-if (inviteFrom) {
-    document.getElementById('bet-screen').style.display = 'none';
-    document.getElementById('wait-screen').style.display = 'block';
-    socket.emit('arena-invite-accept', { from: inviteFrom });
-}
+    // URL'den Davet Kontrolü (Oda sahibinin nicki ile direkt eşleşme)
+    const urlParams = new URLSearchParams(window.location.search);
+    const inviteFrom = urlParams.get('from');
 
-// Mevcut startSearch fonksiyonun (Rastgele rakipler için kalabilir)
-function startSearch(bet, prize) {
-    // ... bakiye kontrolü kodların ...
-    socket.emit('arena-join-queue', { bet: bet, prize: prize });
-}
-    // Büyük harf duyarlılığı için yardımcı fonksiyon
-    function formatAnimalName(name) {
-    if (!name) return 'Lion';
-    const n = name.toLowerCase();
-    // Klasör isimlerin tam olarak neyse soldakileri ona eşitle
-    if (n.includes('falcon') || n.includes('peregrine')) return 'Peregrinefalcon'; 
-    if (n.includes('kurd') || n.includes('kurt')) return 'Kurd';
-    if (n.includes('lion')) return 'Lion';
-    return 'Lion'; // Varsayılan
-}
+    if (inviteFrom) {
+        document.getElementById('bet-screen').style.display = 'none';
+        document.getElementById('wait-screen').style.display = 'block';
+        socket.emit('arena-invite-accept', { from: inviteFrom });
+    }
 
     function startSearch(bet, prize) {
-        const currentBpl = parseInt("<%= user.bpl %>");
-        if (currentBpl < bet) {
-            Swal.fire({
-                icon: 'error',
-                title: 'Yetersiz Bakiye',
-                text: 'En az ' + bet + ' BPL gerekiyor!',
-                background: '#1a1a2e',
-                color: '#fff'
-            });
-            return;
+        const myBpl = parseInt("<%= user.bpl %>");
+        if (myBpl < bet) {
+            return Swal.fire('Hata', 'Yetersiz BPL!', 'error');
         }
-
         document.getElementById('bet-screen').style.display = 'none';
         document.getElementById('wait-screen').style.display = 'block';
         
-        socket.emit('arena-join-queue', { bet: bet, prize: prize });
+        // Önce online oyuncu aranır, backend'de 10sn sonra bot devreye girer
+        socket.emit('arena-join-queue', { bet, prize });
 
         let count = 10;
-        const countdown = setInterval(() => {
+        const timer = setInterval(() => {
             count--;
-            const timerEl = document.getElementById('timer');
-            if (timerEl) timerEl.innerText = count;
-            if(count <= 0) clearInterval(countdown);
+            document.getElementById('timer').innerText = count;
+            if(count <= 0) clearInterval(timer);
         }, 1000);
     }
 
+    // SAVAŞ BAŞLADIĞINDA (MAÇ BULUNDU)
     socket.on('arena-match-found', (data) => {
-        console.log("Maç Başladı:", data);
-        document.body.style.animation = "shake 0.5s ease-in-out";
-        
         document.getElementById('wait-screen').style.display = 'none';
-        document.getElementById('battle-area').style.display = 'block';
-
-        const opponentNick = (typeof data.opponent === 'object') ? (data.opponent.nickname || "Rakip") : data.opponent;
+        battleArea.style.display = 'block';
         
-        // Hamle yapacak olanın (rakibin) ve kazananın isimlerini formatla
-        const winnerAnimal = formatAnimalName(typeof data.winnerAnimal === 'object' ? data.winnerAnimal.name : data.winnerAnimal);
-        const opponentAnimal = formatAnimalName(typeof data.opponentAnimal === 'object' ? data.opponentAnimal.name : data.opponentAnimal);
-
-        const battleContent = document.getElementById('battle-content');
-
-        // İlk HTML (Hamle Videosu ile başlar)
-        battleContent.innerHTML = `
-            <div style="position: relative; z-index: 10; padding: 20px;">
-                <h2 id="battle-title" style="color: #ffc107; font-weight: 900; text-shadow: 0 0 15px rgba(255,193,7,0.5);">⚔️ SAVAŞ HAMLESİ ⚔️</h2>
-                <div class="d-flex justify-content-between mb-2">
-                    <span class="badge bg-danger p-2" style="font-size:1rem;">RAKİP: ${opponentNick}</span>
-                    <span class="badge bg-success p-2" style="font-size:1rem;">ÖDÜL: ${data.prize} BPL</span>
-                </div>
-                <video id="battle-video" autoplay playsinline style="width:100%; border-radius:10px; border: 2px solid gold; background:#000;">
-                    <source id="video-src" src="/caracter/move/${opponentAnimal}/${opponentAnimal}1.mp4" type="video/mp4">
-                    Tarayıcınız video desteği sunmuyor.
-                </video>
-                <div id="result-overlay" style="display:none; margin-top:15px; border-top: 2px solid #ffc107; padding-top:15px;">
-                    <h1 class="text-warning fw-bold">🏆 KAZANAN 🏆</h1>
-                    <h2 class="text-white" style="text-shadow: 0 0 10px #00ff00;">${data.winnerNick}</h2>
-                </div>
-            </div>
-        `;
-
-        const video = document.getElementById('battle-video');
-        const videoSrc = document.getElementById('video-src');
-        const battleTitle = document.getElementById('battle-title');
+        // Bilgileri güncelle
+        oppInfo.innerText = `RAKİP: ${data.opponent}`;
         
-        let isSecondVideo = false;
-
-        // Video bittiğinde çalışacak mantık
-        video.onended = () => {
-            if (!isSecondVideo) {
-                // Hamle videosu bitti, Zafer videosuna geç
-                isSecondVideo = true;
-                battleTitle.innerHTML = "🎉 ZAFER ANI 🎉";
-                battleTitle.style.color = "#00ff88";
-                
-                // Kaynağı değiştir (hayvanadı.mp4)
-                videoSrc.src = `/caracter/move/${winnerAnimal}/${winnerAnimal}.mp4`;
-                video.load();
-                video.play();
-                
-                // Kazanan yazısını göster
-                document.getElementById('result-overlay').style.display = 'block';
-            } else {
-                // Zafer videosu da bitti, sayfayı yenile
+        // 1. HAMLE VİDEOSU: Rakibin hamlesi (hayvanadı1.mp4)
+        const moveUrl = `/caracter/move/${data.opponentAnimal}/${data.opponentAnimal}1.mp4`;
+        statusText.innerText = "SAVAŞ HAMLESİ!";
+        
+        playSequence(moveUrl, () => {
+            // 2. ZAFER VİDEOSU: Kazananın sevinci (hayvanadı.mp4)
+            const winUrl = `/caracter/move/${data.winnerAnimal}/${data.winnerAnimal}.mp4`;
+            statusText.innerText = `KAZANAN: ${data.winnerNick}`;
+            statusText.style.color = "#00ff88";
+            
+            playSequence(winUrl, () => {
                 setTimeout(() => {
-                    window.location.reload();
-                }, 4000);
-            }
-        };
-
-        // Video yüklenemezse (Fallback)
-        video.onerror = function() {
-            console.error("Video bulunamadı, Lion deneniyor...");
-            if (!isSecondVideo) {
-                 videoSrc.src = "/caracter/move/Lion/Lion1.mp4";
-            } else {
-                 videoSrc.src = "/caracter/move/Lion/Lion.mp4";
-            }
-            video.load();
-            video.play();
-        };
+                    window.location.href = '/profil'; // Savaş bitti profil sayfasına dön
+                }, 3000);
+            });
+        });
     });
 
-    const currentRoom = "arena";
+    function playSequence(url, callback) {
+        videoSrc.src = url;
+        video.load();
+        video.play().catch(e => {
+            console.log("Video oynatma hatası:", e);
+            callback(); // Hata olursa sonrakine geç
+        });
+        video.onended = callback;
+    }
+
+    // Bot %55 kazanma mantığı ve Online Oyuncu önceliği Backend (app.js) tarafında yönetiliyor.
 </script>
-
-
