@@ -327,6 +327,125 @@ socket.on('host-action', (data) => {
         } catch (e) { console.log(e); }
     });
 
+    // --- SOCKET.IO KONTROL MERKEZİ ---
+io.on('connection', async (socket) => {
+    const uId = socket.request.session?.userId;
+    if (!uId) return;
+
+    const user = await User.findById(uId);
+    if (!user) return;
+
+    socket.userId = uId;
+    socket.nickname = user.nickname;
+    onlineUsers.set(user.nickname, socket.id);
+
+    socket.join("general-chat");
+
+    const broadcastOnlineList = () => {
+        const usersArray = Array.from(onlineUsers.keys()).map(nick => ({ nickname: nick }));
+        io.to("general-chat").emit('update-online-users', usersArray);
+    };
+    broadcastOnlineList();
+
+    socket.emit('load-history', chatHistory);
+
+    // --- CHAT SİSTEMİ ---
+    socket.on('chat-message', (data) => {
+        addToHistory(socket.nickname, data.text);
+        io.to("general-chat").emit('new-message', { sender: socket.nickname, text: data.text });
+    });
+
+    // --- MEETING (KONSEY) SİSTEMİ ---
+    
+    // 1. Davet Gönderme (Chat'ten birine tıklandığında)
+    socket.on('send-meeting-invite', (data) => {
+        const targetSocketId = onlineUsers.get(data.target);
+        if (targetSocketId) {
+            io.to(targetSocketId).emit('meeting-invite-received', { from: socket.nickname });
+        }
+    });
+
+    // 2. Oda Kurma (BPL Kesintisi ile)
+    socket.on('create-meeting-room', async (data) => {
+        const user = await User.findById(socket.userId);
+        if (!user || user.bpl < 50) {
+            return socket.emit('error', 'Oda kurmak için 50 BPL gerekir!');
+        }
+        
+        user.bpl -= 50;
+        await user.save();
+        socket.emit('update-bpl', user.bpl);
+        
+        socket.join(data.room);
+        console.log(`🏛️ Konsey Kuruldu: ${data.room} (Sahibi: ${user.nickname})`);
+    });
+
+    // 3. Odaya Katılma (5 Kişi Limiti)
+    socket.on('join-meeting', (data) => {
+        const room = io.sockets.adapter.rooms.get(data.roomId);
+        const userCount = room ? room.size : 0;
+
+        if (userCount >= 5) {
+            return socket.emit('error', 'Bu konsey masası dolu! (Maks 5 kişi)');
+        }
+
+        socket.join(data.roomId);
+        // Diğerlerine kamerasını açması için sinyal gönder
+        socket.to(data.roomId).emit('user-connected', {
+            peerId: data.peerId,
+            nickname: data.nickname
+        });
+    });
+
+    // 4. Host Yetkileri (Mute & Kick)
+    socket.on('host-action', (data) => {
+        // Güvenlik: Oda sahibi sadece kendi odasında işlem yapabilir
+        if (socket.nickname === data.room) {
+            if (data.action === 'mute') {
+                io.to(data.targetPeerId).emit('command-mute');
+            } else if (data.action === 'kick') {
+                io.to(data.targetPeerId).emit('command-kick');
+            }
+        }
+    });
+
+    // --- ARENA VE HEDİYE SİSTEMİ ---
+
+    // Arena Davet İsteği (Yeni)
+    socket.on('arena-invite-request', (data) => {
+        const targetSocketId = onlineUsers.get(data.to);
+        if (targetSocketId) {
+            io.to(targetSocketId).emit('arena-invite-received', { from: socket.nickname });
+        }
+    });
+
+    // Hediye Sistemi
+    socket.on('send-gift-bpl', async (data) => {
+        const { to, amount } = data;
+        const amt = parseInt(amount);
+        if (amt < 10) return socket.emit('error', 'Minimum 10 BPL.');
+        const sender = await User.findById(socket.userId);
+        const receiver = await User.findOne({ nickname: to });
+
+        if (sender && receiver && (sender.bpl - amt) >= 25) { // 25 BPL limit kontrolü
+            const netAmount = Math.floor(amt * 0.70);
+            sender.bpl -= amt;
+            receiver.bpl += netAmount;
+            await sender.save(); await receiver.save();
+            
+            socket.emit('update-bpl', sender.bpl);
+            const rSId = onlineUsers.get(to);
+            if (rSId) io.to(rSId).emit('update-bpl', receiver.bpl);
+            
+            io.to("general-chat").emit('new-message', { 
+                sender: 'SİSTEM', 
+                text: `🎁 ${sender.nickname}, ${receiver.nickname}'e ${amt} BPL gönderdi!` 
+            });
+        } else {
+            socket.emit('error', 'Yetersiz bakiye veya limit engeli!');
+        }
+    });
+
     socket.on('disconnect', () => {
         onlineUsers.delete(socket.nickname);
         arenaQueue = arenaQueue.filter(p => p.socketId !== socket.id);
@@ -334,7 +453,18 @@ socket.on('host-action', (data) => {
     });
 });
 
+
+
+
+
+
+
+
+    
+});
+
 // --- SERVER BAŞLATMA ---
 const PORT = process.env.PORT || 10000;
 server.listen(PORT, () => console.log(`🚀 SİSTEM AKTİF: ${PORT}`));
+
 
