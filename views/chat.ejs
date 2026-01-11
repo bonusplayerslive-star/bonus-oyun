@@ -285,21 +285,49 @@ socket.on('meeting-invite-received', (data) => {
     });
 });
 
-// Davet alan kişi için (Kabul ettiğinde çalışır)
-socket.on('meeting-invite-received', (data) => {
-    Swal.fire({
-        title: 'TOPLANTI DAVETİ',
-        text: `${data.from} seni konsey odasına çağırıyor!`,
-        icon: 'info',
-        showCancelButton: true,
-        confirmButtonText: 'KATIL',
-        cancelButtonText: 'REDDET'
-    }).then((result) => {
-        if (result.isConfirmed) {
-            window.location.href = `/meeting?room=${data.room}&role=guest`;
-        }
+// --- ARENA DAVETİ ALINDIĞINDA ---
+    socket.on('arena-invite-received', (data) => {
+        Swal.fire({
+            title: '⚔️ ARENA ÇAĞRISI!',
+            text: `${data.from} seni düelloya davet ediyor! (25 BPL)`,
+            icon: 'warning',
+            showCancelButton: true,
+            confirmButtonText: 'KABUL ET',
+            cancelButtonText: 'REDDET',
+            background: '#0a0b0c',
+            color: '#fff',
+            confirmButtonColor: '#ff2400'
+        }).then((result) => {
+            if (result.isConfirmed) {
+                // Kabul edildiğinde sunucuya bildir
+                socket.emit('arena-invite-accept', { from: data.from });
+            }
+        });
     });
-});
+
+    // --- MEETING DAVETİ ALINDIĞINDA (TEK VE TEMİZ BLOK) ---
+    socket.on('meeting-invite-received', (data) => {
+        Swal.fire({
+            title: '🏛️ KONSEY DAVETİ',
+            text: `${data.from} seni strateji masasına bekliyor!`,
+            icon: 'info',
+            showCancelButton: true,
+            confirmButtonText: 'KATIL',
+            cancelButtonText: 'REDDET',
+            background: '#0a0b0c',
+            color: '#ffc107'
+        }).then((result) => {
+            if (result.isConfirmed) {
+                window.location.href = `/meeting?room=${data.room}&role=guest`;
+            }
+        });
+    });
+
+    // --- ARENAYA ZORUNLU YÖNLENDİRME ---
+    socket.on('force-arena-match', (data) => {
+        // Maç başladığında iki tarafı da arena sayfasına fırlatır
+        window.location.href = `/arena`; 
+    });
 
 socket.on('force-arena-match', (data) => {
     // Sizi doğrudan Arena sayfasına ve odaya bağlar
@@ -309,6 +337,7 @@ socket.on('force-arena-match', (data) => {
 </script>
 </body>
 </html>
+
 
 
 
