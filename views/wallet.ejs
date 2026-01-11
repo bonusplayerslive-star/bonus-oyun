@@ -9,18 +9,22 @@
     <style>
         :root { --neon-green: #39FF14; --neon-red: #ff003c; --dark-bg: #0a0a0a; }
         body { background: var(--dark-bg); color: #fff; font-family: 'Courier New', monospace; padding-top: 20px; }
+        
+        /* Orijinal Neon Tasarımın */
         .neon-border { border: 1px solid var(--neon-green); box-shadow: 0 0 15px rgba(57, 255, 20, 0.2); background: rgba(0,0,0,0.9); border-radius: 15px; }
         .text-neon { color: var(--neon-green); text-shadow: 0 0 8px var(--neon-green); }
         .btn-neon { border: 1px solid var(--neon-green); color: var(--neon-green); background: transparent; transition: 0.3s; font-weight: bold; text-transform: uppercase; }
         .btn-neon:hover { background: var(--neon-green); color: #000; box-shadow: 0 0 25px var(--neon-green); }
+        
         .bep20-alert { background: rgba(255, 0, 60, 0.1); border: 2px dashed var(--neon-red); color: #fff; padding: 15px; border-radius: 10px; animation: pulse-red 2s infinite; }
         @keyframes pulse-red { 0% { box-shadow: 0 0 5px var(--neon-red); } 50% { box-shadow: 0 0 20px var(--neon-red); } 100% { box-shadow: 0 0 5px var(--neon-red); } }
+        
+        /* Asset Kart Tasarımı */
         .asset-card { background: linear-gradient(145deg, #0f0f0f, #1a1a1a); border: 1px solid rgba(255,255,255,0.1); border-radius: 12px; overflow: hidden; transition: 0.4s; position: relative; }
         .asset-card:hover { border-color: var(--neon-green); transform: translateY(-10px); }
         .asset-img { height: 160px; width: 100%; object-fit: cover; filter: grayscale(40%); transition: 0.5s; }
         .asset-card:hover .asset-img { filter: grayscale(0%); }
-        .status-badge { font-size: 0.7rem; padding: 3px 10px; border-radius: 20px; background: rgba(57, 255, 20, 0.1); color: var(--neon-green); border: 1px solid var(--neon-green); }
-        .withdraw-note { font-size: 0.8rem; color: #ffa500; background: rgba(255,165,0,0.05); border-left: 3px solid #ffa500; padding: 10px; }
+        
         input.form-control { background: #111 !important; border: 1px solid #333 !important; color: #fff !important; }
     </style>
 </head>
@@ -48,7 +52,7 @@
                 <h4 class="text-info mb-4 border-bottom border-info pb-2">Finansal Altyapı</h4>
                 <div class="mb-4">
                     <label class="form-label">Geri Ödeme Adresin (BEP20)</label>
-                    <input type="text" id="usdtAddress" class="form-control" value="<%= user.usdt_address || '' %>" placeholder="0x...">
+                    <input type="text" id="usdtAddress" class="form-control" value="<%= user.bnb_address || '' %>" placeholder="0x...">
                     <button onclick="saveAddress()" class="btn btn-neon mt-3 w-100">KAYDET</button>
                 </div>
                 <div class="mt-auto pt-3">
@@ -64,10 +68,7 @@
                     <label class="form-label">Çekilecek Miktar</label>
                     <input type="number" id="withdrawAmount" class="form-control" placeholder="Min: 7500">
                 </div>
-                <div id="calcBox" class="p-3 mb-4 bg-danger bg-opacity-10 border border-danger rounded" style="display:none;">
-                    <div class="d-flex justify-content-between"><span>Net:</span><span id="netAmount">0</span></div>
-                </div>
-                <button onclick="alert('Tasfiye talebi iletildi!')" class="btn btn-danger w-100 py-3 fw-bold">TALEBİ İLET</button>
+                <button onclick="Swal.fire('Bilgi', 'Tasfiye sistemi şu an bakımda.', 'info')" class="btn btn-danger w-100 py-3 fw-bold">TALEBİ İLET</button>
             </div>
         </div>
     </div>
@@ -89,15 +90,15 @@
                         "AYI": "bear", "BEAR": "bear", "TIMSAH": "crocodile", "CROCODILE": "crocodile",
                         "KARTAL": "eagle", "EAGLE": "eagle", "KURT": "wolf", "WOLF": "wolf",
                         "ASLAN": "lion", "LION": "lion", "GORIL": "gorilla", "GORILLA": "gorilla",
-                        "GERGEDAN": "rhino", "RHINO": "rhino", "GÖKDOĞAN": "peregrinefalcon"
+                        "GERGEDAN": "rhino", "RHINO": "rhino", "GÖKDOĞAN": "peregrinefalcon", "FALCON": "peregrinefalcon"
                     };
                 %>
-                <% user.inventory.forEach((item, index) => { 
+                <% user.inventory.forEach((item) => { 
                     let itemName = item.name || item;
                     let upperName = itemName.toUpperCase();
                     let engName = animalTranslate[upperName] || "logo";
-                    let originalPrice = ['ASLAN','LION','GERGEDAN','RHINO','GORIL','GORILLA','KAPLAN','TIGER'].includes(upperName) ? 5000 : 1000;
-                    let sellPrice = originalPrice * 0.70;
+                    let isPremium = ['ASLAN','LION','GERGEDAN','RHINO','GORIL','GORILLA','KAPLAN','TIGER'].includes(upperName);
+                    let sellPrice = isPremium ? 3500 : 700;
                 %>
                     <div class="col-6 col-lg-3 mb-4">
                         <div class="asset-card h-100 text-center pb-3">
@@ -105,8 +106,9 @@
                             <div class="p-3">
                                 <h6 class="text-white text-uppercase"><%= itemName %></h6>
                                 <p class="text-warning fw-bold"><%= sellPrice %> BPL</p>
+                                
                                 <% if(user.inventory.length > 1) { %>
-                                    <button onclick="sellCharacter('<%= index %>', '<%= itemName %>', <%= originalPrice %>)" class="btn btn-sm btn-outline-danger w-100">SAT</button>
+                                    <button onclick="sellAnimal('<%= itemName %>', <%= sellPrice %>)" class="btn btn-sm btn-outline-danger w-100">SAT</button>
                                 <% } else { %>
                                     <span class="badge bg-secondary w-100">ANA VARLIK</span>
                                 <% } %>
@@ -119,60 +121,50 @@
     </div>
 </div>
 
+<script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
 <script>
-    const userId = '<%= user.id %>';
-    function saveAddress() {
-        const usdt = document.getElementById('usdtAddress').value;
-        fetch('/save-wallet-address', {
-            method: 'POST',
-            headers: {'Content-Type': 'application/x-www-form-urlencoded'},
-            body: `userId=${userId}&usdtAddress=${usdt}`
-        }).then(r => r.json()).then(d => alert(d.msg));
-    }
-    function sellCharacter(index, name, price) {
-        if(!confirm(name + " satılsın mı?")) return;
-        fetch('/sell-character', {
-            method: 'POST',
-            headers: {'Content-Type': 'application/x-www-form-urlencoded'},
-            body: `userId=${userId}&animalIndex=${index}&fiyat=${price}`
-        }).then(r => r.json()).then(d => location.reload());
-    }
-async function sellAnimal(name) {
-    const result = await Swal.fire({
-        title: 'EMİN MİSİN?',
-        text: `${name} isimli karakterini 700 BPL karşılığında satmak istiyor musun?`,
-        icon: 'warning',
-        showCancelButton: true,
-        confirmButtonColor: '#d33',
-        cancelButtonColor: '#3085d6',
-        confirmButtonText: 'Evet, Sat!',
-        cancelButtonText: 'Vazgeç',
-        background: '#050505',
-        color: '#fff'
-    });
+    async function sellAnimal(name, sellPrice) {
+        const result = await Swal.fire({
+            title: 'EMİN MİSİN?',
+            text: `${name} karakterini ${sellPrice} BPL karşılığında satmak istiyor musun?`,
+            icon: 'warning',
+            showCancelButton: true,
+            confirmButtonColor: '#d33',
+            confirmButtonText: 'Evet, Sat!',
+            cancelButtonText: 'Vazgeç',
+            background: '#050505',
+            color: '#fff'
+        });
 
-    if (result.isConfirmed) {
-        try {
-            const res = await fetch('/api/sell-item', {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ itemName: name })
-            });
-
-            const data = await res.json();
-
-            if (data.success) {
-                Swal.fire('SATILDI!', `Karakter başarıyla satıldı. Yeni bakiyen: ${data.newBpl} BPL`, 'success')
-                .then(() => location.reload());
-            } else {
-                Swal.fire('Hata', data.error, 'error');
+        if (result.isConfirmed) {
+            try {
+                const res = await fetch('/api/sell-item', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ itemName: name })
+                });
+                const data = await res.json();
+                if (data.success) {
+                    Swal.fire('SATILDI!', 'BPL hesabına eklendi.', 'success').then(() => location.reload());
+                } else {
+                    Swal.fire('Hata', data.error, 'error');
+                }
+            } catch (err) {
+                Swal.fire('Hata', 'Sunucu hatası!', 'error');
             }
-        } catch (err) {
-            Swal.fire('Hata', 'İşlem başarısız.', 'error');
         }
     }
-}
+
+    function saveAddress() {
+        const usdt = document.getElementById('usdtAddress').value;
+        fetch('/api/save-wallet-address', { // Route'una göre kontrol et
+            method: 'POST',
+            headers: {'Content-Type': 'application/json'},
+            body: JSON.stringify({ usdtAddress: usdt })
+        }).then(r => r.json()).then(d => {
+            Swal.fire('Başarılı', 'Adres kaydedildi.', 'success');
+        });
+    }
 </script>
 </body>
 </html>
-
