@@ -349,6 +349,27 @@ socket.on('send-meeting-invite', (data) => {
             socket.emit('error', 'Yetersiz bakiye veya geçersiz kullanıcı!');
         }
     });
+
+// Sunucu tarafı (app.js) - Taslak Mantık
+socket.on('arena-invite-accept', (data) => {
+    const challenger = socket; // Kabul eden
+    const inviter = getSocketByNickname(data.from); // Davet eden
+
+    if (inviter) {
+        const roomId = `arena_${inviter.nickname}_${challenger.nickname}`;
+        inviter.join(roomId);
+        challenger.join(roomId);
+
+        // İkisine birden "Maç Başladı" bilgisini gönder
+        io.to(roomId).emit('arena-match-found', {
+            opponent: inviter.nickname,
+            prize: 50, // Sabit veya dinamik ödül
+            winnerNick: Math.random() > 0.5 ? inviter.nickname : challenger.nickname,
+            // ... diğer veriler
+        });
+    }
+});
+    
     // --- ARENA SIRAYA GİRME (KODUNUZUN DEVAMI) ---
     socket.on('arena-join-queue', async (data) => {
         try {
@@ -430,6 +451,7 @@ async function startBattle(p1, p2, io) {
 }
 const PORT = process.env.PORT || 10000;
 server.listen(PORT, () => console.log(`🚀 SİSTEM AKTİF: ${PORT}`));
+
 
 
 
