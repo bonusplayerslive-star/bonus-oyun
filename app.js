@@ -192,6 +192,43 @@ async function startBattle(p1, p2, io) {
     if (p1.socketId) io.to(p1.socketId).emit('arena-match-found', matchData(p1, p2));
     if (p2.socketId) io.to(p2.socketId).emit('arena-match-found', matchData(p2, p1));
 }
+
+
+// --- GELİŞTİRME MERKEZİ API ---
+app.post('/api/upgrade-stat', async (req, res) => {
+    try {
+        const { animalName, statType } = req.body;
+        const user = await User.findById(req.session.userId);
+        if (!user) return res.json({ success: false, error: 'Oturum kapalı.' });
+
+        // Hayvanı envanterde bul
+        const animal = user.inventory.find(a => a.name === animalName);
+        if (!animal) return res.json({ success: false, error: 'Birim bulunamadı.' });
+
+        const cost = (statType === 'def') ? 10 : 15;
+        if (user.bpl - cost < 25) return res.json({ success: false, error: 'BPL 25 altına düşemez!' });
+
+        // Geliştirme işlemleri
+        user.bpl -= cost;
+        if (statType === 'hp') {
+            animal.hp += 10;
+            animal.maxHp = (animal.maxHp || 500) + 10;
+        } else if (statType === 'atk') {
+            animal.atk += 5;
+        } else if (statType === 'def') {
+            animal.def += 5;
+        }
+
+        await user.save();
+        res.json({ success: true, newBalance: user.bpl });
+    } catch (err) {
+        res.json({ success: false, error: 'Sunucu hatası.' });
+    }
+});
+
+
+
+
 // =============================================================
 // --- 6. SOCKET.IO (TEK, TEMİZ VE HATASIZ BAĞLANTI BLOĞU) ---
 // =============================================================
@@ -367,6 +404,7 @@ socket.on('disconnect', () => {
 // --- SERVER BAŞLATMA ---
 const PORT = process.env.PORT || 10000;
 server.listen(PORT, () => console.log(`🚀 SİSTEM AKTİF: ${PORT}`));
+
 
 
 
