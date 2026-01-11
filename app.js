@@ -298,7 +298,7 @@ let arenaQueue = [];
 
 // --- ARENA MOTORU ---
 async function startBattle(p1, p2, io) {
-    let winner, loser;
+    let winner;
     
     // 1. KURAL: BOT %55 İHTİMALLE KAZANIR
     const isP1Bot = !p1.socketId;
@@ -312,15 +312,13 @@ async function startBattle(p1, p2, io) {
             winner = botWon ? p1 : p2;
         }
     } else {
-        // Gerçek oyuncular arası güç savaşı
         winner = p1.power >= p2.power ? p1 : p2;
     }
-    
-    loser = (winner === p1) ? p2 : p1;
 
     // Kazanan oyuncu ise ödülü ver
     if (winner.socketId) {
         try {
+            const User = require('./models/User'); // Modelin yolundan emin olun
             const winUser = await User.findOne({ nickname: winner.nickname });
             if (winUser) {
                 winUser.bpl += p1.prize;
@@ -330,38 +328,30 @@ async function startBattle(p1, p2, io) {
         } catch (err) { console.error("Ödül Hatası:", err); }
     }
 
-    // 2. KURAL: VİDEO YÖNETİMİ (hayvanadi1.mp4 hamle, hayvanadi.mp4 zafer)
-    const matchDataForP1 = {
-        opponent: p2.nickname,
-        opponentAnimal: p2.animal, 
+    // 2. KURAL: VİDEO VERİLERİ
+    const matchData = (p, opp) => ({
+        opponent: opp.nickname,
+        opponentAnimal: opp.animal, 
         winnerNick: winner.nickname,
         winnerAnimal: winner.animal, 
-        prize: p1.prize
-    };
+        prize: p.prize
+    });
 
-    const matchDataForP2 = {
-        opponent: p1.nickname,
-        opponentAnimal: p1.animal,
-        winnerNick: winner.nickname,
-        winnerAnimal: winner.animal,
-        prize: p1.prize
-    };
-
-    if (p1.socketId) io.to(p1.socketId).emit('arena-match-found', matchDataForP1);
-    if (p2.socketId) io.to(p2.socketId).emit('arena-match-found', matchDataForP2);
+    if (p1.socketId) io.to(p1.socketId).emit('arena-match-found', matchData(p1, p2));
+    if (p2.socketId) io.to(p2.socketId).emit('arena-match-found', matchData(p2, p1));
 }
 
 // --- IO CONNECTION ---
 io.on('connection', (socket) => {
 
-    // A. DAVET KABULÜ (Direkt Arena)
+    // A. DAVET KABULÜ
     socket.on('arena-invite-accept', async (data) => {
         try {
             const user1 = await User.findOne({ nickname: socket.nickname });
             const user2 = await User.findOne({ nickname: data.from });
-            const inviterSocket = onlineUsers.get(data.from);
+            const inviterSocketId = onlineUsers.get(data.from); // onlineUsers Map olmalı
 
-            if (user1 && user2 && inviterSocket) {
+            if (user1 && user2 && inviterSocketId) {
                 const bet = 25;
                 if (user1.bpl < bet || user2.bpl < bet) return socket.emit('error', 'Bakiye yetersiz!');
 
@@ -369,18 +359,18 @@ io.on('connection', (socket) => {
                 await user1.save(); await user2.save();
 
                 socket.emit('update-bpl', user1.bpl);
-                io.to(inviterSocket.id).emit('update-bpl', user2.bpl);
+                io.to(inviterSocketId).emit('update-bpl', user2.bpl);
 
                 startBattle(
                     { nickname: user1.nickname, socketId: socket.id, animal: user1.selectedAnimal || 'Lion', power: Math.random()*100, prize: 50 },
-                    { nickname: user2.nickname, socketId: inviterSocket.id, animal: user2.selectedAnimal || 'Lion', power: Math.random()*100, prize: 50 },
+                    { nickname: user2.nickname, socketId: inviterSocketId, animal: user2.selectedAnimal || 'Lion', power: Math.random()*100, prize: 50 },
                     io
                 );
             }
         } catch (e) { console.log("Arena Davet Hatası:", e); }
     });
 
-    // B. SIRAYA GİRME (Önce İnsan, 10sn Sonra Bot)
+    // B. SIRAYA GİRME
     socket.on('arena-join-queue', async (data) => {
         try {
             const user = await User.findOne({ nickname: socket.nickname });
@@ -404,7 +394,6 @@ io.on('connection', (socket) => {
             } else {
                 arenaQueue.push(player);
                 setTimeout(async () => {
-                    // idx hatası burada düzeltildi
                     const idx = arenaQueue.findIndex(p => p.socketId === socket.id);
                     if (idx !== -1) {
                         const waitingPlayer = arenaQueue.splice(idx, 1)[0];
@@ -425,19 +414,8 @@ io.on('connection', (socket) => {
     socket.on('disconnect', () => {
         arenaQueue = arenaQueue.filter(p => p.socketId !== socket.id);
     });
-});
+}); // <--- io.on kapanışı
+
+// --- SERVER BAŞLATMA ---
 const PORT = process.env.PORT || 10000;
 server.listen(PORT, () => console.log(`🚀 SİSTEM AKTİF: ${PORT}`));
-
-
-
-
-
-
-
-
-
-
-
-
-
