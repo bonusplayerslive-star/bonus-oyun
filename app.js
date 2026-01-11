@@ -256,16 +256,17 @@ io.on('connection', async (socket) => {
         }
     });
 
-    socket.on('send-meeting-invite', (data) => {
+socket.on('send-meeting-invite', (data) => {
         const targetSId = onlineUsers.get(data.target);
         if (targetSId) {
+            // Davet gönderenin nickini 'room' olarak gönderiyoruz ki 
+            // karşı taraf kabul edince senin odana gelsin.
             io.to(targetSId).emit('meeting-invite-received', { 
                 from: socket.nickname,
-                room: data.room || socket.nickname 
+                room: socket.nickname 
             });
         }
     });
-
     socket.on('host-action', (data) => {
         if (socket.nickname === data.room) {
             const targetSId = onlineUsers.get(data.targetNick); 
@@ -351,16 +352,22 @@ io.on('connection', async (socket) => {
         }
     });
 
-    // --- [5] ÇIKIŞ ---
-    socket.on('disconnect', () => {
+socket.on('disconnect', () => {
+        // Eğer çıkan kişi bir oda sahibiyse (oda adı kendi nicki ise)
+        const myRoomName = socket.nickname;
+        
+        // Odadaki herkese 'Oda sahibi ayrıldı' mesajı gönder ve onları ana sayfaya at
+        io.to(myRoomName).emit('error', 'Oda sahibi ayrıldığı için konsey dağıtıldı.');
+        io.to(myRoomName).emit('command-kick'); // Frontend'de bu sinyali ana sayfaya yönlendiririz
+
         onlineUsers.delete(socket.nickname);
         arenaQueue = arenaQueue.filter(p => p.socketId !== socket.id);
         broadcastOnlineList();
     });
-});
 // --- SERVER BAŞLATMA ---
 const PORT = process.env.PORT || 10000;
 server.listen(PORT, () => console.log(`🚀 SİSTEM AKTİF: ${PORT}`));
+
 
 
 
