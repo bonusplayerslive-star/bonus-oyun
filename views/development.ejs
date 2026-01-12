@@ -13,39 +13,40 @@
         font-family: 'Orbitron';
         letter-spacing: 2px;
         color: #39FF14;
-        text-shadow: 0 0 10px rgba(57, 255, 20, 0.5);
+        text-shadow: 0 0 10px rgba(57, 255, 20, 0.4);
     }
 
     .upgrade-card {
         background: rgba(15, 15, 15, 0.95);
-        border: 1px solid rgba(57, 255, 20, 0.2);
+        border: 1px solid rgba(57, 255, 20, 0.15);
         border-radius: 15px;
+        transition: all 0.3s ease;
+        margin-bottom: 20px;
+        position: relative;
+        backdrop-filter: blur(10px);
         padding: 15px;
         height: 100%;
-        position: relative;
-        transition: transform 0.2s;
-        backdrop-filter: blur(10px);
     }
-
-    /* Mobil için kart boyutları ayarı */
-    @media (max-width: 768px) {
-        .upgrade-card { margin-bottom: 15px; }
+    
+    .upgrade-card:hover {
+        border-color: #39FF14;
+        box-shadow: 0 0 20px rgba(57, 255, 20, 0.15);
     }
 
     .stat-label {
         font-size: 0.7rem;
         color: #aaa;
-        font-family: 'Orbitron';
-        margin-bottom: 2px;
+        font-family: 'Orbitron', sans-serif;
+        margin-bottom: 3px;
         display: flex;
         justify-content: space-between;
     }
 
     .progress {
-        height: 8px;
+        height: 6px;
         background-color: #111;
-        border-radius: 4px;
         margin-bottom: 8px;
+        border-radius: 3px;
         border: 1px solid #222;
     }
 
@@ -58,12 +59,20 @@
     }
 
     .btn-upgrade {
-        font-family: 'Orbitron';
-        font-size: 0.7rem;
+        font-family: 'Orbitron', sans-serif;
+        font-size: 0.65rem;
         font-weight: 700;
         padding: 8px;
-        margin-bottom: 12px;
+        border-radius: 6px;
         text-transform: uppercase;
+    }
+
+    .wallet-banner {
+        background: rgba(17, 17, 17, 0.9);
+        border: 1px solid #ffd700;
+        padding: 10px 20px;
+        border-radius: 50px;
+        display: inline-block;
     }
 
     .level-badge {
@@ -73,34 +82,26 @@
         background: #39FF14;
         color: #000;
         font-family: 'Orbitron';
-        padding: 2px 8px;
-        border-radius: 4px;
         font-size: 0.65rem;
         font-weight: bold;
-        z-index: 2;
+        padding: 2px 8px;
+        border-radius: 4px;
+        z-index: 5;
     }
 
-    .potion-section {
-        border-top: 1px solid rgba(255, 255, 255, 0.1);
+    .potion-box {
+        border-top: 1px solid rgba(255,255,255,0.1);
         padding-top: 10px;
         margin-top: 5px;
-    }
-
-    .wallet-banner {
-        background: rgba(20, 20, 20, 0.8);
-        border: 1px solid #ffd700;
-        padding: 10px 25px;
-        border-radius: 50px;
-        display: inline-block;
     }
 </style>
 
 <div class="container mt-4 mb-5">
     <div class="text-center mb-4">
-        <h1 class="dev-title text-uppercase mb-3">GELİŞTİRME MERKEZİ</h1>
+        <h1 class="dev-title text-uppercase mb-2">GELİŞTİRME MERKEZİ</h1>
         <div class="wallet-banner">
-            <span class="text-warning fw-bold h4">
-                <i class="fas fa-coins me-2"></i><%= user.bpl %> <small>BPL</small>
+            <span class="text-warning fw-bold h4" id="balanceDisplay">
+                <i class="fas fa-coins me-1"></i><%= user.bpl %> <small>BPL</small>
             </span>
         </div>
     </div>
@@ -108,38 +109,39 @@
     <div class="row g-3">
         <% if (user.inventory && user.inventory.length > 0) { %>
             <% user.inventory.forEach(animal => { 
-                let maxStat = (animal.level || 1) * 200; 
-                let maxHP = (animal.level || 1) * 100 + 10; // Örn: LVL 1 için 110, LVL 2 için 210
+                let maxStat = (animal.level || 1) * 200;
+                let maxHP = (animal.level || 1) * 500; // Örnek HP sınırı
             %>
-                <div class="col-12 col-md-6 col-lg-4 col-xl-3"> <div class="upgrade-card">
+                <div class="col-12 col-md-6 col-lg-4 col-xl-3">
+                    <div class="upgrade-card">
                         <div class="level-badge">LVL <%= animal.level || 1 %></div>
                         
                         <div class="d-flex align-items-center mb-3">
-                            <img src="/caracter/profile/<%= animal.name %>.jpg" 
-                                 onerror="this.src='/caracter/page/Logo.jpeg';" 
-                                 class="char-img me-3">
+                           <img src="/caracter/profile/<%= animal.name %>.jpg" 
+                                onerror="this.src='/caracter/page/Logo.jpeg';"
+                                class="char-img me-3" alt="<%= animal.name %>">
                             <div>
                                 <h6 class="text-white text-uppercase mb-0" style="font-family: 'Orbitron';"><%= animal.name %></h6>
-                                <small class="text-success small" style="font-size: 0.6rem;">DURUM: SAVAŞA HAZIR</small>
+                                <small class="text-success" style="font-size: 0.6rem;">SAVAŞA HAZIR</small>
                             </div>
                         </div>
 
-                        <div class="stat-box">
+                        <div class="stat-box mb-2">
                             <div class="stat-label">
-                                <span><i class="fas fa-heart text-danger"></i> YAŞAM</span>
+                                <span><i class="fas fa-heart text-danger me-1"></i> HP</span>
                                 <span><%= animal.hp || 100 %> / <%= maxHP %></span>
                             </div>
                             <div class="progress">
                                 <div class="progress-bar bg-danger" style="width: <%= ((animal.hp || 100) / maxHP) * 100 %>%"></div>
                             </div>
                             <button class="btn btn-outline-danger w-100 btn-upgrade" onclick="upgradeStat('<%= animal.name %>', 'hp')">
-                                HP +10 <span class="float-end">15 BPL</span>
+                                HP +25 <span class="float-end">20 BPL</span>
                             </button>
                         </div>
 
-                        <div class="stat-box">
+                        <div class="stat-box mb-2">
                             <div class="stat-label">
-                                <span><i class="fas fa-fist-raised text-warning"></i> SALDIRI</span>
+                                <span><i class="fas fa-fist-raised text-warning me-1"></i> ATK</span>
                                 <span><%= animal.atk %> / <%= maxStat %></span>
                             </div>
                             <div class="progress">
@@ -150,9 +152,9 @@
                             </button>
                         </div>
 
-                        <div class="stat-box">
+                        <div class="stat-box mb-2">
                             <div class="stat-label">
-                                <span><i class="fas fa-shield-alt text-info"></i> SAVUNMA</span>
+                                <span><i class="fas fa-shield-alt text-info me-1"></i> DEF</span>
                                 <span><%= animal.def %> / <%= maxStat %></span>
                             </div>
                             <div class="progress">
@@ -163,52 +165,61 @@
                             </button>
                         </div>
 
-                        <div class="potion-section">
-                            <button class="btn btn-info w-100 fw-bold text-dark btn-upgrade mb-1" onclick="buyStamina('<%= animal.name %>')">
-                                <i class="fas fa-bolt"></i> ENERJİ İKSİRİ <span class="float-end">5 BPL</span>
+                        <div class="potion-box">
+                            <button class="btn btn-info w-100 btn-upgrade text-dark fw-bold" onclick="buyStamina('<%= animal.name %>')">
+                                <i class="fas fa-bolt me-1"></i> ENERJİ İKSİRİ <span class="float-end">5 BPL</span>
                             </button>
-                            <div class="text-center">
-                                <small class="text-info" style="font-size: 0.55rem; letter-spacing: 0.5px;">2 Saatlik Yorgunluğu Siler (+%20 Şans)</small>
+                            <div class="text-center mt-1">
+                                <small class="text-info" style="font-size: 0.55rem;">Yorgunluğu Siler & +%20 Şans Verir</small>
                             </div>
                         </div>
                     </div>
                 </div>
             <% }) %>
+        <% } else { %>
+            <div class="col-12 text-center py-5">
+                <div class="p-4 border border-secondary rounded-4 bg-dark">
+                    <h5 class="text-white">ENVANTER BOŞ</h5>
+                    <a href="/market" class="btn btn-success btn-sm px-4 mt-2">MARKETE GİT</a>
+                </div>
+            </div>
         <% } %>
     </div>
 </div>
 
 <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
 <script>
+    let currentBalance = parseInt("<%= user.bpl %>");
+
     function upgradeStat(animalName, statType) {
         fetch('/api/upgrade-stat', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ animalName, statType })
+            body: JSON.stringify({ animalName, statType }) 
         })
         .then(res => res.json())
         .then(data => {
-            if(data.success) {
+            if (data.success) {
                 location.reload();
             } else {
-                Swal.fire({ icon: 'error', title: 'HATA', text: data.error, background: '#111', color: '#fff' });
+                Swal.fire('Hata', data.error, 'error');
             }
         });
     }
 
     function buyStamina(animalName) {
-        fetch('/api/buy-stamina', {
-            method: 'POST',
+        fetch('/api/buy-stamina', { 
+            method: 'POST', 
             headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ animalName })
+            body: JSON.stringify({ animalName }) 
         })
         .then(res => res.json())
         .then(data => {
             if(data.success) {
-                Swal.fire({ icon: 'success', title: 'ENERJİ DOLDU', text: 'Karakter savaşa hazır!', timer: 1500, showConfirmButton: false });
-                setTimeout(() => location.reload(), 1500);
+                Swal.fire({ title: 'Enerji Doldu!', icon: 'success', timer: 1000, showConfirmButton: false })
+                .then(() => location.reload());
             } else {
-                Swal.fire({ icon: 'error', title: 'HATA', text: data.error });
+                Swal.fire('Hata', data.error, 'error');
             }
         });
     }
