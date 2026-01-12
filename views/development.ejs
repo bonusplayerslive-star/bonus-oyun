@@ -9,217 +9,195 @@
         color: #fff;
     }
 
-    /* MOBİL UYUMLU BAŞLIK */
     .dev-title {
-        font-family: 'Orbitron'; 
+        font-family: 'Orbitron';
         letter-spacing: 2px;
-        font-size: 1.5rem;
+        color: #39FF14;
+        text-shadow: 0 0 10px rgba(57, 255, 20, 0.5);
     }
-    @media (min-width: 768px) { .dev-title { font-size: 2.5rem; } }
 
     .upgrade-card {
         background: rgba(15, 15, 15, 0.95);
-        border: 1px solid rgba(57, 255, 20, 0.15);
+        border: 1px solid rgba(57, 255, 20, 0.2);
         border-radius: 15px;
-        transition: all 0.3s ease;
-        margin-bottom: 20px;
+        padding: 15px;
+        height: 100%;
         position: relative;
+        transition: transform 0.2s;
         backdrop-filter: blur(10px);
     }
-    
-    .upgrade-card:hover {
-        border-color: #39FF14;
-        box-shadow: 0 0 20px rgba(57, 255, 20, 0.15);
+
+    /* Mobil için kart boyutları ayarı */
+    @media (max-width: 768px) {
+        .upgrade-card { margin-bottom: 15px; }
     }
 
     .stat-label {
-        font-size: 0.75rem;
+        font-size: 0.7rem;
         color: #aaa;
-        font-family: 'Orbitron', sans-serif;
-        margin-bottom: 3px;
+        font-family: 'Orbitron';
+        margin-bottom: 2px;
+        display: flex;
+        justify-content: space-between;
     }
 
     .progress {
-        height: 6px;
+        height: 8px;
         background-color: #111;
-        margin-bottom: 10px;
-        border-radius: 3px;
+        border-radius: 4px;
+        margin-bottom: 8px;
+        border: 1px solid #222;
     }
 
-    /* MOBİL RESİM BOYUTU */
     .char-img {
-        width: 100px;
-        height: 100px;
+        width: 80px;
+        height: 80px;
         object-fit: cover;
         border: 2px solid #39FF14;
-        border-radius: 15px;
-        background: #111;
+        border-radius: 12px;
     }
 
     .btn-upgrade {
-        font-family: 'Orbitron', sans-serif;
+        font-family: 'Orbitron';
         font-size: 0.7rem;
         font-weight: 700;
-        padding: 10px;
-        border-radius: 8px;
-    }
-
-    .wallet-banner {
-        background: rgba(17, 17, 17, 0.9);
-        border: 1px solid #ffd700;
-        padding: 10px 20px;
-        border-radius: 12px;
-        display: inline-block;
+        padding: 8px;
+        margin-bottom: 12px;
+        text-transform: uppercase;
     }
 
     .level-badge {
         position: absolute;
-        top: 15px;
-        right: 15px;
+        top: 10px;
+        right: 10px;
         background: #39FF14;
         color: #000;
         font-family: 'Orbitron';
-        font-size: 0.7rem;
+        padding: 2px 8px;
+        border-radius: 4px;
+        font-size: 0.65rem;
         font-weight: bold;
-        padding: 3px 10px;
-        border-radius: 5px;
+        z-index: 2;
+    }
+
+    .potion-section {
+        border-top: 1px solid rgba(255, 255, 255, 0.1);
+        padding-top: 10px;
+        margin-top: 5px;
+    }
+
+    .wallet-banner {
+        background: rgba(20, 20, 20, 0.8);
+        border: 1px solid #ffd700;
+        padding: 10px 25px;
+        border-radius: 50px;
+        display: inline-block;
     }
 </style>
 
 <div class="container mt-4 mb-5">
     <div class="text-center mb-4">
-        <h1 class="neon-text fw-bold dev-title text-uppercase mb-2" style="color: #39FF14;">GELİŞTİRME MERKEZİ</h1>
-        
-        <div class="wallet-banner mt-2">
-            <span class="text-white-50 small d-block">MEVCUT KAYNAK</span>
-            <span class="text-warning fw-bold h4" id="balanceDisplay">
-                <i class="fas fa-coins me-1"></i><%= user.bpl %> <small>BPL</small>
+        <h1 class="dev-title text-uppercase mb-3">GELİŞTİRME MERKEZİ</h1>
+        <div class="wallet-banner">
+            <span class="text-warning fw-bold h4">
+                <i class="fas fa-coins me-2"></i><%= user.bpl %> <small>BPL</small>
             </span>
         </div>
     </div>
 
     <div class="row g-3">
         <% if (user.inventory && user.inventory.length > 0) { %>
-            <% user.inventory.forEach(animal => { %>
-                <div class="col-12 col-md-6 col-lg-4">
-                    <div class="upgrade-card p-3">
+            <% user.inventory.forEach(animal => { 
+                let maxStat = (animal.level || 1) * 200; 
+                let maxHP = (animal.level || 1) * 100 + 10; // Örn: LVL 1 için 110, LVL 2 için 210
+            %>
+                <div class="col-12 col-md-6 col-lg-4 col-xl-3"> <div class="upgrade-card">
                         <div class="level-badge">LVL <%= animal.level || 1 %></div>
                         
                         <div class="d-flex align-items-center mb-3">
-                           <img src="/caracter/profile/<%= animal.name %>.jpg" 
-     onerror="this.src='/caracter/profile/<%= animal.name.toLowerCase() %>.jpg';
-this.onerror=function(){this.src='/caracter/page/Logo.jpeg'};"
-     class="char-img me-3" alt="<%= animal.name %>">
+                            <img src="/caracter/profile/<%= animal.name %>.jpg" 
+                                 onerror="this.src='/caracter/page/Logo.jpeg';" 
+                                 class="char-img me-3">
                             <div>
-                                <h5 class="text-white text-uppercase mb-0" style="font-family: 'Orbitron';"><%= animal.name %></h5>
-                                <small class="text-success">SAVAŞA HAZIR</small>
+                                <h6 class="text-white text-uppercase mb-0" style="font-family: 'Orbitron';"><%= animal.name %></h6>
+                                <small class="text-success small" style="font-size: 0.6rem;">DURUM: SAVAŞA HAZIR</small>
                             </div>
                         </div>
 
-                        <div class="stat-box mb-3">
-                            <div class="d-flex justify-content-between stat-label">
-                                <span><i class="fas fa-fist-raised text-warning me-1"></i> SALDIRI</span>
-                                <span class="text-white"><%= animal.atk %> / <%= (animal.level || 1) * 200 %></span>
+                        <div class="stat-box">
+                            <div class="stat-label">
+                                <span><i class="fas fa-heart text-danger"></i> YAŞAM</span>
+                                <span><%= animal.hp || 100 %> / <%= maxHP %></span>
                             </div>
                             <div class="progress">
-                                <div class="progress-bar bg-warning" 
-                                     style="width: <%= (animal.atk / ((animal.level || 1) * 200)) * 100 %>%">
-                                </div>
+                                <div class="progress-bar bg-danger" style="width: <%= ((animal.hp || 100) / maxHP) * 100 %>%"></div>
                             </div>
-                            <button class="btn btn-outline-warning w-100 btn-upgrade" 
-                                    onclick="upgradeStat('<%= animal.name %>', 'atk')"
-                                    <%= animal.atk >= ((animal.level || 1) * 200) ? 'disabled' : '' %>>
-                                <i class="fas fa-plus-circle me-1"></i> ATK +5 <span class="float-end">15 BPL</span>
+                            <button class="btn btn-outline-danger w-100 btn-upgrade" onclick="upgradeStat('<%= animal.name %>', 'hp')">
+                                HP +10 <span class="float-end">15 BPL</span>
                             </button>
                         </div>
 
-                        <div class="stat-box mb-3">
-                            <div class="d-flex justify-content-between stat-label">
-                                <span><i class="fas fa-shield-alt text-info me-1"></i> SAVUNMA</span>
-                                <span class="text-white"><%= animal.def %> / <%= (animal.level || 1) * 200 %></span>
+                        <div class="stat-box">
+                            <div class="stat-label">
+                                <span><i class="fas fa-fist-raised text-warning"></i> SALDIRI</span>
+                                <span><%= animal.atk %> / <%= maxStat %></span>
                             </div>
                             <div class="progress">
-                                <div class="progress-bar bg-info" style="width: <%= (animal.def / ((animal.level || 1) * 200)) * 100 %>%"></div>
+                                <div class="progress-bar bg-warning" style="width: <%= (animal.atk / maxStat) * 100 %>%"></div>
                             </div>
-                            <button class="btn btn-outline-info w-100 btn-upgrade" onclick="upgradeStat('<%= animal.name %>', 'def')">
-                                <i class="fas fa-plus-circle me-1"></i> DEF +5 <span class="float-end">10 BPL</span>
+                            <button class="btn btn-outline-warning w-100 btn-upgrade" onclick="upgradeStat('<%= animal.name %>', 'atk')" <%= animal.atk >= maxStat ? 'disabled' : '' %>>
+                                ATK +5 <span class="float-end">15 BPL</span>
                             </button>
                         </div>
 
-                        <div class="stat-box mt-3 pt-2 border-top border-secondary">
-                            <button class="btn btn-info w-100 btn-upgrade text-dark fw-bold" onclick="buyStamina('<%= animal.name %>')">
-                                <i class="fas fa-bolt me-1"></i> ENERJİ İKSİRİ <span class="float-end">5 BPL</span>
+                        <div class="stat-box">
+                            <div class="stat-label">
+                                <span><i class="fas fa-shield-alt text-info"></i> SAVUNMA</span>
+                                <span><%= animal.def %> / <%= maxStat %></span>
+                            </div>
+                            <div class="progress">
+                                <div class="progress-bar bg-info" style="width: <%= (animal.def / maxStat) * 100 %>%"></div>
+                            </div>
+                            <button class="btn btn-outline-info w-100 btn-upgrade" onclick="upgradeStat('<%= animal.name %>', 'def')" <%= animal.def >= maxStat ? 'disabled' : '' %>>
+                                DEF +5 <span class="float-end">10 BPL</span>
                             </button>
-                            <p class="text-center text-info mb-0 mt-1" style="font-size: 0.65rem;">
-                                2 Saatlik Yorgunluğu Siler (+%20 Şans)
-                            </p>
                         </div>
 
+                        <div class="potion-section">
+                            <button class="btn btn-info w-100 fw-bold text-dark btn-upgrade mb-1" onclick="buyStamina('<%= animal.name %>')">
+                                <i class="fas fa-bolt"></i> ENERJİ İKSİRİ <span class="float-end">5 BPL</span>
+                            </button>
+                            <div class="text-center">
+                                <small class="text-info" style="font-size: 0.55rem; letter-spacing: 0.5px;">2 Saatlik Yorgunluğu Siler (+%20 Şans)</small>
+                            </div>
+                        </div>
                     </div>
                 </div>
             <% }) %>
-        <% } else { %>
-            <div class="col-12 text-center py-5">
-                <div class="p-4 border border-secondary rounded-4 bg-dark">
-                    <i class="fas fa-box-open fa-3x text-muted mb-3"></i>
-                    <h5 class="text-white">ENVANTER BOŞ</h5>
-                    <p class="text-muted small">Geliştirecek bir birimin yok.</p>
-                    <a href="/market" class="btn btn-success btn-sm px-4">MARKETE GİT</a>
-                </div>
-            </div>
         <% } %>
     </div>
 </div>
 
 <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
 <script>
-    let currentBalance = parseInt("<%= user.bpl %>");
-    const SAFETY_LIMIT = 25;
-
     function upgradeStat(animalName, statType) {
-        const cost = (statType === 'def') ? 10 : 15;
-        if (currentBalance - cost < SAFETY_LIMIT) {
-            Swal.fire({
-                title: 'KAYNAK YETERSİZ',
-                text: `Bakiyeniz 25 BPL altına düşemez.`,
-                icon: 'error',
-                background: '#111', color: '#fff'
-            });
-            return;
-        }
-
-        Swal.fire({
-            title: 'ONAY',
-            text: `${statType.toUpperCase()} geliştirmesi yapılsın mı?`,
-            icon: 'question',
-            showCancelButton: true,
-            background: '#111', color: '#fff'
-        }).then((result) => {
-            if (result.isConfirmed) {
-                fetch('/api/upgrade-stat', {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ animalName, statType }) 
-                })
-                .then(res => res.json())
-                .then(data => {
-                    if (data.success) {
-                        location.reload();
-                    } else {
-                        Swal.fire('Hata', data.error, 'error');
-                    }
-                });
+        fetch('/api/upgrade-stat', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ animalName, statType })
+        })
+        .then(res => res.json())
+        .then(data => {
+            if(data.success) {
+                location.reload();
+            } else {
+                Swal.fire({ icon: 'error', title: 'HATA', text: data.error, background: '#111', color: '#fff' });
             }
         });
     }
 
     function buyStamina(animalName) {
-        if (currentBalance < 5) {
-            Swal.fire('Hata', 'Yetersiz BPL!', 'error');
-            return;
-        }
-
-        fetch('/api/buy-stamina', { 
+        fetch('/api/buy-stamina', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({ animalName })
@@ -227,9 +205,10 @@ this.onerror=function(){this.src='/caracter/page/Logo.jpeg'};"
         .then(res => res.json())
         .then(data => {
             if(data.success) {
-                Swal.fire('Enerji Doldu!', 'Yorgunluk silindi!', 'success').then(() => location.reload());
+                Swal.fire({ icon: 'success', title: 'ENERJİ DOLDU', text: 'Karakter savaşa hazır!', timer: 1500, showConfirmButton: false });
+                setTimeout(() => location.reload(), 1500);
             } else {
-                Swal.fire('Hata', data.error, 'error');
+                Swal.fire({ icon: 'error', title: 'HATA', text: data.error });
             }
         });
     }
