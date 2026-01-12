@@ -262,10 +262,29 @@ app.post('/api/upgrade-stat', authRequired, async (req, res) => {
         res.json({ success: false, error: 'Sunucu hatası' }); 
     }
 });
-// app.js - /api/buy-stamina rotası için örnek mantık
-const dopingDuration = 2 * 60 * 60 * 1000; // 2 saat (ms cinsinden)
-animal.staminaDopingUntil = new Date(Date.now() + dopingDuration);
-animal.stamina = 100; // Enerjiyi de fuller
+app.post('/api/buy-stamina', async (req, res) => {
+    try {
+        const { animalName } = req.body;
+        const user = await User.findById(req.session.userId);
+        const animal = user.inventory.find(a => a.name === animalName);
+
+        if (user.bpl < 5) return res.json({ success: false, error: 'Yetersiz BPL!' });
+
+        // İksir işlemlerini burada yapıyoruz
+        const dopingDuration = 2 * 60 * 60 * 1000; // 2 saat
+        animal.staminaDopingUntil = new Date(Date.now() + dopingDuration);
+        animal.stamina = 100;
+        
+        user.bpl -= 5;
+        
+        user.markModified('inventory');
+        await user.save();
+
+        res.json({ success: true });
+    } catch (err) {
+        res.json({ success: false, error: 'İksir alınamadı.' });
+    }
+});
 // --- ARENA SAVAŞ MOTORU ---
 async function startBattle(p1, p2, io) {
     let winner;
@@ -424,6 +443,7 @@ function calculateWinChance(user) {
 
 const PORT = process.env.PORT || 3000;
 server.listen(PORT, () => console.log(`🚀 SİSTEM AKTİF: Port ${PORT}`));
+
 
 
 
