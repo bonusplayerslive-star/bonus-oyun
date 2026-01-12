@@ -21,8 +21,7 @@ const UserSchema = new mongoose.Schema({
         atk: { type: Number, default: 20 },    
         def: { type: Number, default: 10 },    
         
-        // --- YENİ EKLEME: ENERJİ İKSİRİ TAKİBİ ---
-        // Bu alan iksirin 2 saatlik süresini veritabanında tutar
+        // --- SADECE BU SATIRI EKLEDİK ---
         staminaDopingUntil: { type: Date, default: null },
         
         // İstatistik takibi (Hayvan bazlı)
