@@ -220,16 +220,47 @@ app.post('/api/upgrade-stat', authRequired, async (req, res) => {
         const { animalName, statType } = req.body;
         const user = await User.findById(req.session.userId);
         const animal = user.inventory.find(a => a.name === animalName);
-        if (!animal) return res.json({ success: false });
+
+        if (!animal) return res.json({ success: false, error: 'Karakter bulunamadı!' });
+
         const cost = (statType === 'def') ? 10 : 15;
-        if (user.bpl - cost < 25) return res.json({ success: false, error: 'Yetersiz BPL!' });
-        user.bpl -= cost;
-        if (statType === 'hp') { animal.hp += 10; animal.maxHp += 10; }
+        if (user.bpl - cost < 25) return res.json({ success: false, error: 'Yetersiz BPL! (Limit 25)' });
+
+        // Stat Artırma
+        if (statType === 'hp') { 
+            animal.hp += 10; 
+            animal.maxHp = (animal.maxHp || 100) + 10; 
+        } 
         else if (statType === 'atk') { animal.atk += 5; }
         else if (statType === 'def') { animal.def += 5; }
+
+        // --- LEVEL ATLAMA MANTIĞI ---
+        // Her 250 birimlik toplam stat artışında seviye atlar
+        // Formül: (HP artışı/10) + ATK + DEF üzerinden bir hesaplama yapılabilir 
+        // Veya sadece statların kendi değerlerine bakılır:
+        if (animal.atk >= 200 && animal.def >= 200 && animal.level === 1) {
+            animal.level = 2;
+            // Seviye 2 olduğu için ekstra bonus verilebilir
+            animal.hp += 50;
+            animal.maxHp += 50;
+        } else if (animal.atk >= 400 && animal.def >= 400 && animal.level === 2) {
+            animal.level = 3;
+        }
+
+        user.bpl -= cost;
+        user.markModified('inventory'); // Mongoose'un array değişikliğini fark etmesi için
         await user.save();
-        res.json({ success: true, newBalance: user.bpl });
-    } catch (err) { res.json({ success: false }); }
+
+        res.json({ 
+            success: true, 
+            newBalance: user.bpl, 
+            newLevel: animal.level,
+            stats: { hp: animal.hp, atk: animal.atk, def: animal.def }
+        });
+    } catch (err) { 
+        console.error(err);
+        res.json({ success: false, error: 'Sunucu hatası' }); 
+    }
 });
 
 // --- ARENA SAVAŞ MOTORU ---
@@ -325,6 +356,26 @@ io.on('connection', async (socket) => {
         }
     });
 
+// Savaş başlangıcında kontrol edilecek fonksiyon taslağı
+function calculateWinChance(user) {
+    let chanceModifier = 0;
+    const twoHoursInMs = 2 * 60 * 60 * 1000;
+    const now = new Date();
+
+    // Eğer son savaştan üzerinden 2 saat geçmemişse
+    if (user.lastBattleTime && (now - user.lastBattleTime < twoHoursInMs)) {
+        // Ve 5 BPL ödeyerek "Doping" almamışsa
+        if (!user.hasStaminaDoping) {
+            chanceModifier = -35; // %35 kazanma şansı düşer (Yorgunluk cezası)
+            console.log(`${user.nickname} yorgun savaşıyor!`);
+        }
+    }
+    return chanceModifier;
+}
+
+
+
+    
     socket.on('arena-join-queue', async (data) => {
         const u = await User.findById(socket.userId);
         if (!u || u.bpl < data.bet) return socket.emit('error', 'Yetersiz bakiye!');
@@ -370,5 +421,6 @@ io.on('connection', async (socket) => {
 
 const PORT = process.env.PORT || 3000;
 server.listen(PORT, () => console.log(`🚀 SİSTEM AKTİF: Port ${PORT}`));
+
 
 
