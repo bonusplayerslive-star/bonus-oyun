@@ -86,6 +86,30 @@
     }
 </style>
 
+<div class="text-center mb-3">
+    <button class="btn btn-sm btn-info" onclick="buyStamina()">
+        <i class="fas fa-bolt"></i> ENERJİ İKSİRİ (5 BPL) 
+        <br><small>2 Saatlik Yorgunluğu Siler (+%20 Şans)</small>
+    </button>
+</div>
+
+<script>
+function buyStamina() {
+    fetch('/api/buy-stamina', { method: 'POST' })
+    .then(res => res.json())
+    .then(data => {
+        if(data.success) {
+            Swal.fire('Enerji Doldu!', 'Yorgunluk silindi, savaşa hazırsın!', 'success');
+            location.reload();
+        } else {
+            Swal.fire('Hata', data.error, 'error');
+        }
+    });
+}
+</script>
+
+
+
 <div class="container mt-4 mb-5">
     <div class="text-center mb-4">
         <h1 class="neon-text fw-bold dev-title text-uppercase mb-2" style="color: #39FF14;">GELİŞTİRME MERKEZİ</h1>
@@ -117,18 +141,23 @@ this.onerror=function(){this.src='/caracter/page/Logo.jpeg'};"
                             </div>
                         </div>
 
-                        <div class="stat-box mb-3">
-                            <div class="d-flex justify-content-between stat-label">
-                                <span><i class="fas fa-heart text-danger me-1"></i> HP</span>
-                                <span class="text-white"><%= animal.hp %> / <%= animal.maxHp || 500 %></span>
-                            </div>
-                            <div class="progress">
-                                <div class="progress-bar bg-danger" style="width: <%= (animal.hp / (animal.maxHp || 500)) * 100 %>%"></div>
-                            </div>
-                            <button class="btn btn-outline-danger w-100 btn-upgrade" onclick="upgradeStat('<%= animal.name %>', 'hp')">
-                                <i class="fas fa-plus-circle me-1"></i> HP +10 <span class="float-end">15 BPL</span>
-                            </button>
-                        </div>
+                   <div class="stat-box mb-3">
+    <div class="d-flex justify-content-between stat-label">
+        <span><i class="fas fa-fist-raised text-warning me-1"></i> SALDIRI</span>
+        <span class="text-white"><%= animal.atk %> / <%= (animal.level || 1) * 200 %></span>
+    </div>
+    <div class="progress">
+        <div class="progress-bar bg-warning" 
+             style="width: <%= (animal.atk / ((animal.level || 1) * 200)) * 100 %>%">
+        </div>
+    </div>
+    <button class="btn btn-outline-warning w-100 btn-upgrade" 
+            onclick="upgradeStat('<%= animal.name %>', 'atk')"
+            <%= animal.atk >= (animal.level * 200) ? 'disabled' : '' %>>
+        <i class="fas fa-plus-circle me-1"></i> ATK +5 
+        <span class="float-end">15 BPL</span>
+    </button>
+</div>
 
                         <div class="stat-box mb-3">
                             <div class="d-flex justify-content-between stat-label">
@@ -231,6 +260,7 @@ this.onerror=function(){this.src='/caracter/page/Logo.jpeg'};"
 </script>
 
 <%- include('footer') %>
+
 
 
 
