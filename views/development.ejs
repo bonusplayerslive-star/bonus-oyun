@@ -86,30 +86,6 @@
     }
 </style>
 
-<div class="text-center mb-3">
-    <button class="btn btn-sm btn-info" onclick="buyStamina()">
-        <i class="fas fa-bolt"></i> ENERJİ İKSİRİ (5 BPL) 
-        <br><small>2 Saatlik Yorgunluğu Siler (+%20 Şans)</small>
-    </button>
-</div>
-
-<script>
-function buyStamina() {
-    fetch('/api/buy-stamina', { method: 'POST' })
-    .then(res => res.json())
-    .then(data => {
-        if(data.success) {
-            Swal.fire('Enerji Doldu!', 'Yorgunluk silindi, savaşa hazırsın!', 'success');
-            location.reload();
-        } else {
-            Swal.fire('Hata', data.error, 'error');
-        }
-    });
-}
-</script>
-
-
-
 <div class="container mt-4 mb-5">
     <div class="text-center mb-4">
         <h1 class="neon-text fw-bold dev-title text-uppercase mb-2" style="color: #39FF14;">GELİŞTİRME MERKEZİ</h1>
@@ -133,57 +109,52 @@ function buyStamina() {
                            <img src="/caracter/profile/<%= animal.name %>.jpg" 
      onerror="this.src='/caracter/profile/<%= animal.name.toLowerCase() %>.jpg';
 this.onerror=function(){this.src='/caracter/page/Logo.jpeg'};"
-     class="char-img me-3">
-                                 alt="<%= animal.name %>">
+     class="char-img me-3" alt="<%= animal.name %>">
                             <div>
                                 <h5 class="text-white text-uppercase mb-0" style="font-family: 'Orbitron';"><%= animal.name %></h5>
                                 <small class="text-success">SAVAŞA HAZIR</small>
                             </div>
                         </div>
 
-                   <div class="stat-box mb-3">
-    <div class="d-flex justify-content-between stat-label">
-        <span><i class="fas fa-fist-raised text-warning me-1"></i> SALDIRI</span>
-        <span class="text-white"><%= animal.atk %> / <%= (animal.level || 1) * 200 %></span>
-    </div>
-    <div class="progress">
-        <div class="progress-bar bg-warning" 
-             style="width: <%= (animal.atk / ((animal.level || 1) * 200)) * 100 %>%">
-        </div>
-    </div>
-    <button class="btn btn-outline-warning w-100 btn-upgrade" 
-            onclick="upgradeStat('<%= animal.name %>', 'atk')"
-            <%= animal.atk >= (animal.level * 200) ? 'disabled' : '' %>>
-        <i class="fas fa-plus-circle me-1"></i> ATK +5 
-        <span class="float-end">15 BPL</span>
-    </button>
-</div>
-
                         <div class="stat-box mb-3">
                             <div class="d-flex justify-content-between stat-label">
                                 <span><i class="fas fa-fist-raised text-warning me-1"></i> SALDIRI</span>
-                                <span class="text-white"><%= animal.atk %> / 200</span>
+                                <span class="text-white"><%= animal.atk %> / <%= (animal.level || 1) * 200 %></span>
                             </div>
                             <div class="progress">
-                                <div class="progress-bar bg-warning" style="width: <%= (animal.atk / 200) * 100 %>%"></div>
+                                <div class="progress-bar bg-warning" 
+                                     style="width: <%= (animal.atk / ((animal.level || 1) * 200)) * 100 %>%">
+                                </div>
                             </div>
-                            <button class="btn btn-outline-warning w-100 btn-upgrade" onclick="upgradeStat('<%= animal.name %>', 'atk')">
+                            <button class="btn btn-outline-warning w-100 btn-upgrade" 
+                                    onclick="upgradeStat('<%= animal.name %>', 'atk')"
+                                    <%= animal.atk >= ((animal.level || 1) * 200) ? 'disabled' : '' %>>
                                 <i class="fas fa-plus-circle me-1"></i> ATK +5 <span class="float-end">15 BPL</span>
                             </button>
                         </div>
 
-                        <div class="stat-box">
+                        <div class="stat-box mb-3">
                             <div class="d-flex justify-content-between stat-label">
                                 <span><i class="fas fa-shield-alt text-info me-1"></i> SAVUNMA</span>
-                                <span class="text-white"><%= animal.def %> / 200</span>
+                                <span class="text-white"><%= animal.def %> / <%= (animal.level || 1) * 200 %></span>
                             </div>
                             <div class="progress">
-                                <div class="progress-bar bg-info" style="width: <%= (animal.def / 200) * 100 %>%"></div>
+                                <div class="progress-bar bg-info" style="width: <%= (animal.def / ((animal.level || 1) * 200)) * 100 %>%"></div>
                             </div>
                             <button class="btn btn-outline-info w-100 btn-upgrade" onclick="upgradeStat('<%= animal.name %>', 'def')">
                                 <i class="fas fa-plus-circle me-1"></i> DEF +5 <span class="float-end">10 BPL</span>
                             </button>
                         </div>
+
+                        <div class="stat-box mt-3 pt-2 border-top border-secondary">
+                            <button class="btn btn-info w-100 btn-upgrade text-dark fw-bold" onclick="buyStamina('<%= animal.name %>')">
+                                <i class="fas fa-bolt me-1"></i> ENERJİ İKSİRİ <span class="float-end">5 BPL</span>
+                            </button>
+                            <p class="text-center text-info mb-0 mt-1" style="font-size: 0.65rem;">
+                                2 Saatlik Yorgunluğu Siler (+%20 Şans)
+                            </p>
+                        </div>
+
                     </div>
                 </div>
             <% }) %>
@@ -203,64 +174,65 @@ this.onerror=function(){this.src='/caracter/page/Logo.jpeg'};"
 <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
 <script>
     let currentBalance = parseInt("<%= user.bpl %>");
-    const SAFETY_LIMIT = 25; // Backend ile aynı limit
+    const SAFETY_LIMIT = 25;
 
     function upgradeStat(animalName, statType) {
         const cost = (statType === 'def') ? 10 : 15;
-
         if (currentBalance - cost < SAFETY_LIMIT) {
             Swal.fire({
                 title: 'KAYNAK YETERSİZ',
-                text: `Bakiyeniz 25 BPL altına düşemez. Mevcut: ${currentBalance} BPL`,
+                text: `Bakiyeniz 25 BPL altına düşemez.`,
                 icon: 'error',
-                background: '#111',
-                color: '#fff'
+                background: '#111', color: '#fff'
             });
             return;
         }
 
         Swal.fire({
-            title: 'GELİŞTİRME ONAYI',
-            text: `${animalName} için ${statType.toUpperCase()} takviyesi (Maliyet: ${cost} BPL)`,
+            title: 'ONAY',
+            text: `${statType.toUpperCase()} geliştirmesi yapılsın mı?`,
             icon: 'question',
             showCancelButton: true,
-            confirmButtonText: 'ONAYLA',
-            background: '#111',
-            color: '#fff'
+            background: '#111', color: '#fff'
         }).then((result) => {
             if (result.isConfirmed) {
                 fetch('/api/upgrade-stat', {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
-                    // Backend'in beklediği değişken isimleri: animalName ve statType
                     body: JSON.stringify({ animalName, statType }) 
                 })
                 .then(res => res.json())
                 .then(data => {
                     if (data.success) {
-                        currentBalance = data.newBalance; 
-                        document.getElementById('balanceDisplay').innerHTML = `<i class="fas fa-coins me-1"></i>${data.newBalance} <small>BPL</small>`;
-                        
-                        Swal.fire({
-                            title: 'BAŞARILI!',
-                            text: 'Birim özellikleri güncellendi.',
-                            icon: 'success',
-                            background: '#111',
-                            color: '#fff',
-                            timer: 1000
-                        }).then(() => location.reload());
+                        location.reload();
                     } else {
-                        Swal.fire('HATA', data.error || 'İşlem başarısız.', 'error');
+                        Swal.fire('Hata', data.error, 'error');
                     }
-                })
-                .catch(err => Swal.fire('HATA', 'Sunucuya bağlanılamadı.', 'error'));
+                });
+            }
+        });
+    }
+
+    function buyStamina(animalName) {
+        if (currentBalance < 5) {
+            Swal.fire('Hata', 'Yetersiz BPL!', 'error');
+            return;
+        }
+
+        fetch('/api/buy-stamina', { 
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ animalName })
+        })
+        .then(res => res.json())
+        .then(data => {
+            if(data.success) {
+                Swal.fire('Enerji Doldu!', 'Yorgunluk silindi!', 'success').then(() => location.reload());
+            } else {
+                Swal.fire('Hata', data.error, 'error');
             }
         });
     }
 </script>
 
 <%- include('footer') %>
-
-
-
-
