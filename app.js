@@ -526,38 +526,58 @@ app.post('/api/buy-stamina', async (req, res) => {
         res.json({ success: false, error: 'İksir alınamadı.' });
     }
 });
-async function startBattle(p1, p2, io) {
+
+function calculateWinChance(user, target) {
+    if (!user || !target) return 0;
+    let modifier = 0;
+    const now = new Date();
+    const twoHours = 2 * 60 * 60 * 1000;
+
+    // Yorgunluk Kontrolü
+    if (user.lastBattleTime && (now - user.lastBattleTime < twoHours)) {
+        if (!user.hasStaminaDoping) modifier -= 35; 
+    }
+
+    // KRİTİK STAT KURALI (%3 ATK farkına %2 HP Bonusu)
+    const userAtk = user.atk || 0;
+    const targetDef = target.def || 0;
+    const userHp = user.hp || 0;
+
+    if (userAtk > (targetDef * 1.03)) {
+        modifier += (userHp * 0.02); 
+    }
+    if (userAtk > targetDef) modifier += 5;
+    if (userHp > (target.hp || 0)) modifier += 5;
+
+    return modifier;
+}
+
+async function startBattle(p1, p2, io, roomId = null) {
     try {
-        // 1. ADIM: Kazanma şansını hesapla (Statlar üzerinden)
-        const p1Modifier = calculateWinChance(p1.dbData, p2.dbData);
-        const p2Modifier = calculateWinChance(p2.dbData, p1.dbData);
+        const p1Mod = calculateWinChance(p1.dbData, p2.dbData);
+        const p2Mod = calculateWinChance(p2.dbData, p1.dbData);
+        let p1WinChance = 50 + p1Mod - p2Mod;
 
-        let p1WinChance = 50 + p1Modifier - p2Modifier;
-
-        // Bot varsa dengeyi bot lehine %5 kaydır (Senin özel kuralın)
-        const isP1Bot = !p1.socketId;
-        const isP2Bot = !p2.socketId;
-        if (isP1Bot || isP2Bot) {
-            p1WinChance = isP1Bot ? p1WinChance + 5 : p1WinChance - 5;
+        // Bot dengesi (%5)
+        if (!p1.socketId || !p2.socketId) {
+            p1WinChance = !p1.socketId ? p1WinChance + 5 : p1WinChance - 5;
         }
 
-        // 2. ADIM: Kazananı Belirle
         const roll = Math.random() * 100;
         const winner = roll <= p1WinChance ? p1 : p2;
 
-        // 3. ADIM: Ödül ve DB Güncelleme (Sadece gerçek oyuncuysa)
-        if (winner.socketId && winner.dbData && winner.dbData._id) {
+        // Veritabanı Güncelleme
+        if (winner.socketId && winner.dbData?._id) {
             const winUser = await User.findById(winner.dbData._id);
             if (winUser) {
                 winUser.bpl += winner.prize;
                 winUser.lastBattleTime = new Date();
-                winUser.hasStaminaDoping = false; // Savaşıp dopingi harcadı
+                winUser.hasStaminaDoping = false;
                 await winUser.save();
                 io.to(winner.socketId).emit('update-bpl', winUser.bpl);
             }
         }
 
-        // 4. ADIM: Frontend'e Sinyal Gönder (Bu kısım 0 saniye takılmasını çözer)
         const matchData = (p, opp) => ({
             opponent: opp.nickname,
             opponentAnimal: opp.animal,
@@ -566,12 +586,14 @@ async function startBattle(p1, p2, io) {
             prize: p.prize
         });
 
-        if (p1.socketId) io.to(p1.socketId).emit('arena-match-found', matchData(p1, p2));
-        if (p2.socketId) io.to(p2.socketId).emit('arena-match-found', matchData(p2, p1));
-
-    } catch (err) {
-        console.error("CRITICAL BATTLE ERROR:", err);
-    }
+        // Oda bazlı veya bireysel sinyal gönderimi
+        if (roomId) {
+            io.to(roomId).emit('arena-match-found', matchData(p1, p2)); // Özel oda için tek yayın
+        } else {
+            if (p1.socketId) io.to(p1.socketId).emit('arena-match-found', matchData(p1, p2));
+            if (p2.socketId) io.to(p2.socketId).emit('arena-match-found', matchData(p2, p1));
+        }
+    } catch (err) { console.error("Savaş Hatası:", err); }
 }
 // --- 6. SOCKET.IO ---
 io.on('connection', async (socket) => {
@@ -634,99 +656,60 @@ io.on('connection', async (socket) => {
         }
     });
 
-function calculateWinChance(user, target) {
-    if (!user || !target) return 0; // Güvenlik kontrolü
-    
-    let modifier = 0;
-    const now = new Date();
-    const twoHours = 2 * 60 * 60 * 1000;
-
-    // Yorgunluk Kontrolü
-    if (user.lastBattleTime && (now - user.lastBattleTime < twoHours)) {
-        if (!user.hasStaminaDoping) modifier -= 35;
-    }
-
-    // KRİTİK STAT KURALI (%3 ATK farkına %2 HP Bonusu)
-    const userAtk = user.atk || 0;
-    const targetDef = target.def || 0;
-    const userHp = user.hp || 0;
-
-    if (userAtk > (targetDef * 1.03)) {
-        modifier += (userHp * 0.02); 
-    }
-
-    // Temel Bonuslar
-    if (userAtk > targetDef) modifier += 5;
-    if (userHp > (target.hp || 0)) modifier += 5;
-
-    return modifier;
-}
 
 
-    
-  socket.on('arena-join-queue', async (data) => {
-    try {
-        const u = await User.findById(socket.userId);
-        
-        // Güvenlik Kontrolü
-        if (!u || u.bpl < data.bet) {
-            return socket.emit('error', 'Yetersiz bakiye!');
-        }
+socket.on('arena-join-queue', async (data) => {
+        try {
+            const u = await User.findById(socket.userId);
+            if (!u || u.bpl < (data.bet || 0)) return socket.emit('error', 'Yetersiz bakiye!');
 
-        // 1. ADIM: Bahis miktarını hemen düş
-        u.bpl -= data.bet; 
-        await u.save();
-        socket.emit('update-bpl', u.bpl);
+            // Bahis düş ve güncelle
+            u.bpl -= (data.bet || 0);
+            await u.save();
+            socket.emit('update-bpl', u.bpl);
 
-        // 2. ADIM: Oyuncu nesnesini oluştur
-        const player = { 
-            nickname: u.nickname, 
-            socketId: socket.id, 
-            animal: u.selectedAnimal || 'Lion', 
-            dbData: u, 
-            bet: data.bet, 
-            prize: data.prize 
-        };
+            const player = { 
+                nickname: u.nickname, socketId: socket.id, 
+                animal: u.selectedAnimal || 'Lion', dbData: u, 
+                bet: data.bet, prize: data.prize 
+            };
 
-        // 3. ADIM: Eşleşme Kontrolü
-        if (arenaQueue.length > 0) {
-            // Bekleyen biri varsa savaşı başlat
-            const opponent = arenaQueue.shift();
-            startBattle(player, opponent, io);
-        } else {
-            // Kimse yoksa sıraya ekle
-            arenaQueue.push(player);
+            // SENARYO A: ÖZEL ODA (Meeting/Chat Daveti)
+            if (data.roomId) {
+                socket.join(data.roomId);
+                const roomSize = io.sockets.adapter.rooms.get(data.roomId)?.size || 0;
 
-            // 13 Saniye sonra rakip gelmezse BOT ata
-            setTimeout(async () => {
-                const idx = arenaQueue.findIndex(p => p.socketId === socket.id);
-                if (idx !== -1) {
-                    const p = arenaQueue.splice(idx, 1)[0];
-                    const bNames = ["Lion", "Tiger", "Bear", "Wolf"];
-                    const bName = bNames[Math.floor(Math.random() * bNames.length)];
-                    
-                    const botPlayer = { 
-                        nickname: bName + "_Bot", 
-                        socketId: null, 
-                        animal: bName, 
-                        dbData: { 
-                            atk: p.dbData.atk * 0.9, 
-                            def: p.dbData.def * 0.9, 
-                            hp: 100,
-                            lastBattleTime: null 
-                        },
-                        bet: p.bet, 
-                        prize: p.prize 
-                    };
-                    startBattle(p, botPlayer, io);
+                if (roomSize >= 2) {
+                    // Odada iki kişi oldu, savaşı başlat
+                    const clients = Array.from(io.sockets.adapter.rooms.get(data.roomId));
+                    // Not: Bu kısım için özel oda eşleşme mantığı eklenmelidir.
+                    // Şimdilik davetli düellosu için odaya yayın yapıyoruz.
+                    startBattle(player, { nickname: "Rakip", animal: "Tiger", dbData: {} }, io, data.roomId);
                 }
-            }, 13000); 
-        }
-    } catch (err) {
-        console.error("Arena Join Queue Hatası:", err);
-        socket.emit('error', 'Sistemsel bir hata oluştu.');
-    }
-});
+                return; 
+            }
+
+            // SENARYO B: NORMAL SIRA (Bot Destekli)
+            if (arenaQueue.length > 0) {
+                const opponent = arenaQueue.shift();
+                startBattle(player, opponent, io);
+            } else {
+                arenaQueue.push(player);
+                setTimeout(async () => {
+                    const idx = arenaQueue.findIndex(p => p.socketId === socket.id);
+                    if (idx !== -1) {
+                        const p = arenaQueue.splice(idx, 1)[0];
+                        const botPlayer = { 
+                            nickname: "Bot_" + p.animal, socketId: null, animal: p.animal, 
+                            dbData: { atk: p.dbData.atk * 0.9, def: p.dbData.def * 0.9, hp: 100 },
+                            bet: p.bet, prize: p.prize 
+                        };
+                        startBattle(p, botPlayer, io);
+                    }
+                }, 13000);
+            }
+        } catch (err) { console.error(err); }
+    });
     socket.on('send-gift-bpl', async (data) => {
         try {
             const amount = parseInt(data.amount);
@@ -880,4 +863,5 @@ app.post('/api/help-request', async (req, res) => {
 
 const PORT = process.env.PORT || 3000;
 server.listen(PORT, () => console.log(`🚀 SİSTEM AKTİF: Port ${PORT}`));
+
 
