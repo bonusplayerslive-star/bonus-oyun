@@ -673,11 +673,9 @@ function calculateWinChance(user, target) {
             return socket.emit('error', 'Yetersiz bakiye!');
         }
 
-        // 1. ADIM: Bahis miktarını hemen düş (Savaşa giriş ücreti)
+        // 1. ADIM: Bahis miktarını hemen düş
         u.bpl -= data.bet; 
         await u.save();
-        
-        // Frontend'deki BPL miktarını güncelle
         socket.emit('update-bpl', u.bpl);
 
         // 2. ADIM: Oyuncu nesnesini oluştur
@@ -685,33 +683,33 @@ function calculateWinChance(user, target) {
             nickname: u.nickname, 
             socketId: socket.id, 
             animal: u.selectedAnimal || 'Lion', 
-            dbData: u, // Stat kontrolü için tüm kullanıcı verisi
-            bet: data.bet,     // Yatırılan
-            prize: data.prize  // Hedeflenen ödül
+            dbData: u, 
+            bet: data.bet, 
+            prize: data.prize 
         };
 
         // 3. ADIM: Eşleşme Kontrolü
         if (arenaQueue.length > 0) {
-            // Sırada bekleyen gerçek bir oyuncu varsa onunla savaştır
+            // Bekleyen biri varsa savaşı başlat
             const opponent = arenaQueue.shift();
             startBattle(player, opponent, io);
         } else {
             // Kimse yoksa sıraya ekle
             arenaQueue.push(player);
 
-            // 13 Saniye sonra hala kimse gelmemişse BOT ile eşleştir
+            // 13 Saniye sonra rakip gelmezse BOT ata
             setTimeout(async () => {
                 const idx = arenaQueue.findIndex(p => p.socketId === socket.id);
                 if (idx !== -1) {
                     const p = arenaQueue.splice(idx, 1)[0];
-                    const bNames = ["Lion", "Tiger", "Bear", "Wolf"]; // Bot isim listesi
+                    const bNames = ["Lion", "Tiger", "Bear", "Wolf"];
                     const bName = bNames[Math.floor(Math.random() * bNames.length)];
                     
                     const botPlayer = { 
                         nickname: bName + "_Bot", 
                         socketId: null, 
                         animal: bName, 
-                        dbData: { // Bot için dengeleyici statlar
+                        dbData: { 
                             atk: p.dbData.atk * 0.9, 
                             def: p.dbData.def * 0.9, 
                             hp: 100,
@@ -720,10 +718,9 @@ function calculateWinChance(user, target) {
                         bet: p.bet, 
                         prize: p.prize 
                     };
-
                     startBattle(p, botPlayer, io);
                 }
-            }, 13000); // 13 saniyelik bekleme süresi
+            }, 13000); 
         }
     } catch (err) {
         console.error("Arena Join Queue Hatası:", err);
@@ -883,6 +880,7 @@ app.post('/api/help-request', async (req, res) => {
 
 const PORT = process.env.PORT || 3000;
 server.listen(PORT, () => console.log(`🚀 SİSTEM AKTİF: Port ${PORT}`));
+
 
 
 
