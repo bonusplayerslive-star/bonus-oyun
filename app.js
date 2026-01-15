@@ -144,6 +144,19 @@ app.get('/logout', (req, res) => {
     res.redirect('/');
 });
 
+app.get('/payment', async (req, res) => {
+    try {
+        if (!req.session.userId) return res.redirect('/login');
+        const user = await User.findById(req.session.userId);
+        res.render('payment', { user }); // views/payment.ejs dosyasını arayacak
+    } catch (err) {
+        res.status(500).send("Sunucu hatası");
+    }
+});
+
+
+
+
 // --- 5. MARKET API (GÜNCELLENMİŞ: 3 HAYVAN SINIRI) ---
 app.post('/api/buy-item', authRequired, async (req, res) => {
     const { itemName, price } = req.body;
@@ -443,6 +456,7 @@ function calculateWinChance(user) {
 
 const PORT = process.env.PORT || 3000;
 server.listen(PORT, () => console.log(`🚀 SİSTEM AKTİF: Port ${PORT}`));
+
 
 
 
