@@ -279,12 +279,27 @@ app.post('/verify-payment', async (req, res) => {
         res.json({ status: 'error', msg: 'Doğrulama sırasında sistem hatası oluştu.' });
     }
 });
+// app.js - Satır 282 civarı
 app.post('/api/save-wallet-address', async (req, res) => {
-    // ... giriş kontrolleri ...
-    const { bnb_address } = req.body; // EJS'den gönderdiğimiz isimle aynı
-    await User.findByIdAndUpdate(req.session.user._id, { bnb_address: bnb_address });
-    req.session.user.bnb_address = bnb_address; // Session güncelleme önemli!
-    res.json({ success: true });
+    try {
+        // Kullanıcı giriş yapmamışsa hata döndür, çökmesini engelle
+        if (!req.session || !req.session.user) {
+            return res.status(401).json({ success: false, msg: 'Lütfen tekrar giriş yapın.' });
+        }
+
+        const { bnb_address } = req.body;
+        
+        // Veritabanını güncelle
+        await User.findByIdAndUpdate(req.session.user._id, { bnb_address: bnb_address });
+        
+        // Session bilgisini de güncelle ki sayfada hemen görünsün
+        req.session.user.bnb_address = bnb_address;
+        
+        res.json({ success: true });
+    } catch (err) {
+        console.error("Cüzdan Kayıt Hatası:", err);
+        res.status(500).json({ success: false, msg: 'Sunucu hatası oluştu.' });
+    }
 });
 
 // --- BPL ÇEKİM TALEBİ ROTASI ---
@@ -853,6 +868,7 @@ app.post('/api/help-request', async (req, res) => {
 
 const PORT = process.env.PORT || 3000;
 server.listen(PORT, () => console.log(`🚀 SİSTEM AKTİF: Port ${PORT}`));
+
 
 
 
