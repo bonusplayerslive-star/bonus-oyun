@@ -1,14 +1,14 @@
 <%- include('header') %>
 
 <style>
-    /* Arena Tam Ekran Atmosferi */
+    /* --- GENEL MOBİL VE CİHAZ UYUMLU ATMOSFER --- */
     body, html {
         margin: 0;
         padding: 0;
         width: 100%;
         height: 100%;
         background: radial-gradient(circle, #0a0a0a 0%, #000 100%) !important;
-        overflow: hidden;
+        overflow: hidden; /* Dışarı taşmaları engeller */
         color: #fff;
         font-family: 'Orbitron', sans-serif;
     }
@@ -20,114 +20,87 @@
         justify-content: center;
         align-items: center;
         position: relative;
+        padding: 15px;
     }
 
-    /* Bahis Ekranı Cam Efekti */
+    /* --- BAHİS EKRANI (SEÇİM ALANI) --- */
     #bet-screen {
         z-index: 10;
         width: 100%;
-        height: 100vh;
+        max-width: 1100px;
         display: flex;
         flex-direction: column;
         justify-content: center;
         align-items: center;
-        padding: 20px;
-        background: rgba(0, 0, 0, 0.6);
+        text-align: center;
     }
 
-    /* X-Katlayıcı Kart Tasarımı */
+    h1.arena-title {
+        font-size: clamp(1.5rem, 5vw, 3rem); /* Ekran küçüldükçe yazı küçülür */
+        letter-spacing: 5px;
+        margin-bottom: 30px;
+    }
+
+    /* MOBİL UYUMLU KART DİZİLİMİ */
     .bet-grid {
-        display: grid;
-        grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
-        gap: 25px;
+        display: flex;
+        flex-wrap: wrap; /* Mobilde alt alta gelmesini sağlar */
+        justify-content: center;
+        gap: 20px;
         width: 100%;
-        max-width: 1000px;
-        margin-bottom: 50px;
+        margin-bottom: 40px;
     }
 
     .bet-card {
+        flex: 1 1 250px; /* Mobilde esner, 250px altına düşmez */
+        max-width: 320px;
         background: rgba(255, 255, 255, 0.03);
         border: 2px solid rgba(0, 255, 136, 0.1);
         border-radius: 20px;
-        padding: 40px 20px;
-        text-align: center;
-        transition: all 0.4s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+        padding: 30px 20px;
+        transition: all 0.4s ease;
         cursor: pointer;
-        position: relative;
-        overflow: hidden;
         backdrop-filter: blur(10px);
     }
 
-    .bet-card:hover {
-        transform: translateY(-15px);
+    .bet-card:hover, .bet-card.active {
+        transform: translateY(-10px);
         border-color: #00ff88;
-        box-shadow: 0 15px 40px rgba(0, 255, 136, 0.2);
-    }
-
-    .bet-card.active {
-        background: rgba(0, 255, 136, 0.15);
-        border-color: #00ff88;
-        box-shadow: 0 0 50px rgba(0, 255, 136, 0.4);
-        transform: scale(1.05);
+        background: rgba(0, 255, 136, 0.1);
+        box-shadow: 0 0 30px rgba(0, 255, 136, 0.3);
     }
 
     .multiplier {
-        font-size: 3.5rem;
+        font-size: 3rem;
         font-weight: 900;
-        margin-bottom: 15px;
+        margin-bottom: 10px;
         display: block;
-        text-shadow: 0 0 20px rgba(0,255,136,0.6);
     }
 
-    .bet-details h3 { 
-        font-size: 1.1rem; 
-        color: #ccc; 
-        margin: 10px 0;
-        text-transform: uppercase;
-        letter-spacing: 1px;
-    }
-    
-    .bet-details .prize { 
-        color: #00ff88; 
-        font-weight: bold; 
-        font-size: 1.6rem; 
-        display: block;
-        margin-top: 5px;
-    }
+    .bet-details h3 { font-size: 0.9rem; color: #ccc; margin-bottom: 5px; }
+    .bet-details .prize { font-size: 1.4rem; color: #00ff88; font-weight: bold; }
 
-    /* Başla Butonu */
+    /* BAŞLA BUTONU MOBİL AYARI */
     .start-btn {
         background: #00ff88;
         color: #000;
         border: none;
-        padding: 18px 100px;
-        font-size: 1.8rem;
+        padding: 15px 80px;
+        font-size: clamp(1.2rem, 4vw, 1.8rem);
         font-weight: 900;
-        border-radius: 60px;
+        border-radius: 50px;
         cursor: pointer;
-        transition: all 0.3s ease;
-        box-shadow: 0 0 30px rgba(0, 255, 136, 0.4);
-        text-transform: uppercase;
-        letter-spacing: 4px;
+        transition: 0.3s;
         opacity: 0.2;
         pointer-events: none;
-        filter: grayscale(1);
+        text-transform: uppercase;
+        width: 100%;
+        max-width: 400px;
     }
 
-    .start-btn.ready {
-        opacity: 1;
-        pointer-events: auto;
-        filter: grayscale(0);
-        animation: pulse 2s infinite;
-    }
+    .start-btn.ready { opacity: 1; pointer-events: auto; box-shadow: 0 0 30px rgba(0, 255, 136, 0.4); }
 
-    @keyframes pulse {
-        0% { box-shadow: 0 0 20px rgba(0, 255, 136, 0.4); }
-        50% { box-shadow: 0 0 50px rgba(0, 255, 136, 0.7); }
-        100% { box-shadow: 0 0 20px rgba(0, 255, 136, 0.4); }
-    }
-
-    /* --- TAM EKRAN VİDEO ALANI --- */
+    /* --- VİDEO VE SAVAŞ ALANI --- */
     #battle-area {
         position: fixed;
         top: 0;
@@ -142,63 +115,65 @@
     #battle-video {
         width: 100%;
         height: 100%;
-        object-fit: cover;
+        object-fit: cover; /* Mobilde videoyu tam ekran yapar */
     }
 
     .video-overlay {
         position: absolute;
-        top: 40px;
+        top: 10%;
         width: 100%;
         text-align: center;
         z-index: 10001;
         pointer-events: none;
     }
 
+    /* KAZANAN YAZISI - DAHA ZARİF VE ŞEFFAF */
     #battle-status {
-        font-size: 3rem;
+        font-size: clamp(1.5rem, 6vw, 2.5rem);
         font-weight: 900;
-        color: #00ff88;
-        text-shadow: 0 0 20px #000, 0 0 40px rgba(0, 255, 136, 0.5);
+        color: rgba(0, 255, 136, 0.85); /* Hafif şeffaf yeşil */
+        text-shadow: 0 0 15px rgba(0,0,0,0.8);
         text-transform: uppercase;
-        letter-spacing: 5px;
+        letter-spacing: 4px;
+        background: rgba(0,0,0,0.3);
+        padding: 10px 20px;
+        border-radius: 10px;
+        display: inline-block;
     }
 
+    /* RAKİP BADGE */
     .opponent-badge {
-        background: rgba(220, 53, 69, 0.8);
-        padding: 12px 30px;
+        background: rgba(220, 53, 69, 0.7);
+        padding: 10px 25px;
         border-radius: 50px;
         font-weight: bold;
-        margin-top: 20px;
+        margin-top: 15px;
         display: inline-block;
-        border: 2px solid #fff;
-        box-shadow: 0 0 20px rgba(220, 53, 69, 0.5);
+        border: 1px solid rgba(255,255,255,0.2);
+        transition: opacity 1s ease; /* Kaybolma efekti */
     }
 
-    /* Bekleme Ekranı */
-    #wait-screen {
-        display: none;
-        text-align: center;
-        z-index: 20;
-    }
+    /* BEKLEME EKRANI */
+    #wait-screen { display: none; text-align: center; }
+    .countdown-number { font-size: 100px; color: #00ff88; font-weight: 900; }
 
-    .countdown-number {
-        font-size: 180px;
-        font-weight: 900;
-        color: #00ff88;
-        text-shadow: 0 0 40px rgba(0, 255, 136, 0.6);
+    /* Küçük Ekranlar İçin Ekstra Ayar */
+    @media (max-width: 480px) {
+        .bet-grid { gap: 10px; }
+        .bet-card { padding: 20px 10px; }
+        .multiplier { font-size: 2.2rem; }
     }
 </style>
 
 <div class="arena-main-container">
     <div id="bet-screen">
         <% if (user.selectedAnimal === 'none' || !user.selectedAnimal) { %>
-            <div class="text-center p-5 border border-success rounded bg-dark" style="box-shadow: 0 0 30px rgba(0, 255, 136, 0.2);">
-                <h2 class="text-success mb-4">DÖVÜŞÇÜ SEÇİLMEDİ!</h2>
-                <p class="mb-4 text-white-50">Arenaya girmek için önce profilinden bir karakter seçmelisin.</p>
-                <a href="/profil" class="btn btn-outline-success btn-lg fw-bold px-5">PROFİLE GİT</a>
+            <div class="text-center p-4 border border-success rounded bg-dark">
+                <h2 class="text-success mb-3">DÖVÜŞÇÜ SEÇİLMEDİ!</h2>
+                <a href="/profil" class="btn btn-outline-success btn-lg fw-bold">PROFİLE GİT</a>
             </div>
         <% } else { %>
-            <h1 class="mb-5 text-white fw-bold" style="letter-spacing: 8px;">ARENA <span style="color: #00ff88;">DÜELLOSU</span></h1>
+            <h1 class="arena-title text-white fw-bold">ARENA <span style="color: #00ff88;">DÜELLOSU</span></h1>
             
             <div class="bet-grid">
                 <div class="bet-card" onclick="selectBet(this, 25, 50)">
@@ -232,16 +207,15 @@
 
     <div id="wait-screen">
         <div class="countdown-number" id="timer">10</div>
-        <h2 class="text-white mt-4" style="letter-spacing: 3px;">RAKİP ARANIYOR...</h2>
-        <div class="spinner-grow text-success mt-4" style="width: 3rem; height: 3rem;"></div>
+        <h2 class="text-white mt-4" style="font-size: 1.2rem; letter-spacing: 2px;">RAKİP ARANIYOR...</h2>
     </div>
 
     <div id="battle-area">
         <div class="video-overlay">
-            <div id="battle-status">HAZIRLAN...</div>
+            <div id="battle-status">HAZIRLAN...</div><br>
             <div id="opp-info" class="opponent-badge">RAKİP: ARANIYOR</div>
         </div>
-        <video id="battle-video" playsinline>
+        <video id="battle-video" playsinline muted autoplay>
             <source id="video-src" src="" type="video/mp4">
         </video>
     </div>
@@ -254,35 +228,18 @@
     const socket = io();
     let selectedData = null;
 
-    // Seçim Fonksiyonu
     function selectBet(element, bet, prize) {
         document.querySelectorAll('.bet-card').forEach(card => card.classList.remove('active'));
         element.classList.add('active');
         selectedData = { bet, prize };
-        
-        const startBtn = document.getElementById('start-btn');
-        startBtn.classList.add('ready');
+        document.getElementById('start-btn').classList.add('ready');
     }
 
     function confirmStart() {
         if (!selectedData) return;
-        
-        const myBpl = parseInt("<%= user.bpl %>");
-        if (myBpl < selectedData.bet) {
-            return Swal.fire({
-                icon: 'error',
-                title: 'Yetersiz Bakiye',
-                text: 'Bu düelloya girmek için yeterli BPL bakiyeniz yok!',
-                background: '#111',
-                color: '#fff',
-                confirmButtonColor: '#00ff88'
-            });
-        }
-
         document.getElementById('bet-screen').style.display = 'none';
         document.getElementById('wait-screen').style.display = 'block';
         
-        // Backend'e seçilen bahis ve ödül miktarını gönderiyoruz
         socket.emit('arena-join-queue', { 
             bet: selectedData.bet, 
             prize: selectedData.prize 
@@ -296,29 +253,35 @@
         }, 1000);
     }
 
-    // Maç Bulunduğunda Çalışacak Mantık
     socket.on('arena-match-found', (data) => {
         document.getElementById('wait-screen').style.display = 'none';
-        const battleArea = document.getElementById('battle-area');
-        battleArea.style.display = 'block';
+        document.getElementById('battle-area').style.display = 'block';
         
-        document.getElementById('opp-info').innerText = `RAKİP: ${data.opponent}`;
         const statusText = document.getElementById('battle-status');
+        const oppBadge = document.getElementById('opp-info');
+        
+        oppBadge.innerText = `RAKİP: ${data.opponent}`;
+        statusText.innerText = "SAVAŞ BAŞLADI!";
+        statusText.style.color = "#ff4444"; 
+
+        // RAKİP YAZISINI 2 SANİYE SONRA GİZLE
+        setTimeout(() => {
+            oppBadge.style.opacity = "0";
+        }, 2000);
         
         // 1. HAMLE VİDEOSU
         const moveUrl = `/caracter/move/${data.opponentAnimal}/${data.opponentAnimal}1.mp4`;
-        statusText.innerText = "SAVAŞ BAŞLADI!";
-        
         playSequence(moveUrl, () => {
             // 2. ZAFER VİDEOSU
             const winUrl = `/caracter/move/${data.winnerAnimal}/${data.winnerAnimal}.mp4`;
+            
+            // KAZANAN YAZISI AYARI (Daha soft)
             statusText.innerText = `KAZANAN: ${data.winnerNick}`;
-            statusText.style.color = "#00ff88";
+            statusText.style.color = "rgba(0, 255, 136, 0.8)";
+            statusText.style.fontSize = "1.5rem";
             
             playSequence(winUrl, () => {
-                setTimeout(() => {
-                    window.location.href = '/profil';
-                }, 3000);
+                setTimeout(() => { window.location.href = '/profil'; }, 3000);
             });
         });
     });
@@ -329,7 +292,7 @@
         videoSrc.src = url;
         video.load();
         video.play().catch(e => {
-            console.error("Video hatası:", e);
+            console.log("Otomatik oynatma engellendi, etkileşim bekleniyor.");
             callback();
         });
         video.onended = callback;
