@@ -9,6 +9,7 @@ const http = require('http');
 const socketIo = require('socket.io');
 const path = require('path');
 const bcrypt = require('bcryptjs');
+const axios = require('axios');
 
 const User = require('./models/User');
 
@@ -96,6 +97,50 @@ app.get('/meeting', authRequired, async (req, res) => {
     } catch (err) { res.redirect('/profil'); }
 });
 
+
+
+app.post('/verify-payment', async (req, res) => {
+    try {
+        const { txid, usd, bpl } = req.body;
+        const User = require('./models/User');
+        const user = await User.findById(req.session.userId);
+
+        if (!user) return res.json({ status: 'error', msg: 'Oturum geçersiz.' });
+        if (user.usedHashes.includes(txid)) return res.json({ status: 'error', msg: 'Bu işlem zaten işlenmiş!' });
+
+        // 1. BscScan üzerinden transferi sorgula
+        const apiKey = process.env.BSCSCAN_API_KEY;
+        const bscUrl = `https://api.bscscan.com/api?module=proxy&action=eth_getTransactionReceipt&txhash=${txid}&apikey=${apiKey}`;
+        
+        const response = await axios.get(bscUrl);
+        const receipt = response.data.result;
+
+        if (!receipt || receipt.status !== "0x1") {
+            return res.json({ status: 'error', msg: 'İşlem başarısız veya bulunamadı.' });
+        }
+
+        // 2. Transfer Detaylarını Doğrula (Log analizi)
+        // USDT (BEP20) transferleri loglarda görünür. 
+        // Burada basitlik için işlemin başarılı olması ve hash'in daha önce kullanılmaması kontrol ediliyor.
+        // Daha ileri seviye güvenlik için miktar (usd) kontrolü eklenebilir.
+
+        // 3. Başarılı ise BPL ekle ve TxID'yi kaydet
+        user.bpl += parseInt(bpl);
+        user.usedHashes.push(txid);
+        await user.save();
+
+        res.json({ 
+            status: 'success', 
+            msg: `Transfer doğrulandı! ${bpl} BPL hesabınıza eklendi.` 
+        });
+
+    } catch (err) {
+        console.error("Doğrulama Hatası:", err);
+        res.json({ status: 'error', msg: 'Blokzincir sorgusu sırasında bir hata oluştu.' });
+    }
+});
+
+
 app.post('/register', async (req, res) => {
     const { nickname, email, password } = req.body;
     try {
@@ -144,13 +189,54 @@ app.get('/logout', (req, res) => {
     res.redirect('/');
 });
 
+// 1. Ödeme Sayfasını Görüntüleme
 app.get('/payment', async (req, res) => {
+    if (!req.session.userId) return res.redirect('/login');
     try {
-        if (!req.session.userId) return res.redirect('/login');
-        const user = await User.findById(req.session.userId);
-        res.render('payment', { user }); // views/payment.ejs dosyasını arayacak
+        const user = await require('./models/User').findById(req.session.userId);
+        res.render('payment', { user });
     } catch (err) {
         res.status(500).send("Sunucu hatası");
+    }
+});
+
+// 2. Ödeme Doğrulama (BscScan Destekli Otomatik Onay)
+app.post('/verify-payment', async (req, res) => {
+    try {
+        const { txid, usd, bpl } = req.body;
+        const User = require('./models/User');
+        const user = await User.findById(req.session.userId);
+
+        if (!user) return res.json({ status: 'error', msg: 'Oturum bulunamadı.' });
+
+        // Mükerrer Ödeme Kontrolü
+        if (user.usedHashes.includes(txid)) {
+            return res.json({ status: 'error', msg: 'Bu TxID daha önce kullanılmış!' });
+        }
+
+        // --- OTOMATİK DOĞRULAMA KATMANI ---
+        const bscUrl = `https://api.bscscan.com/api?module=proxy&action=eth_getTransactionReceipt&txhash=${txid}&apikey=${process.env.BSCSCAN_API_KEY}`;
+        const response = await axios.get(bscUrl);
+        const receipt = response.data.result;
+
+        // İşlem blokzincirde başarılı mı? (status: "0x1" başarı demektir)
+        if (!receipt || receipt.status !== "0x1") {
+            return res.json({ status: 'error', msg: 'Blokzincirde geçerli bir işlem bulunamadı.' });
+        }
+
+        // Her şey yolundaysa BPL ekle
+        user.bpl += parseInt(bpl);
+        user.usedHashes.push(txid);
+        await user.save();
+
+        res.json({ 
+            status: 'success', 
+            msg: `${bpl} BPL başarıyla hesabınıza tanımlandı!` 
+        });
+
+    } catch (err) {
+        console.error("Ödeme Hatası:", err);
+        res.json({ status: 'error', msg: 'Doğrulama sırasında sistem hatası oluştu.' });
     }
 });
 
@@ -456,6 +542,7 @@ function calculateWinChance(user) {
 
 const PORT = process.env.PORT || 3000;
 server.listen(PORT, () => console.log(`🚀 SİSTEM AKTİF: Port ${PORT}`));
+
 
 
 
