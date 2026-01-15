@@ -280,7 +280,13 @@ app.post('/verify-payment', async (req, res) => {
     }
 });
 
-
+pp.post('/api/save-wallet-address', async (req, res) => {
+    // ... giriş kontrolleri ...
+    const { bnb_address } = req.body; // EJS'den gönderdiğimiz isimle aynı
+    await User.findByIdAndUpdate(req.session.user._id, { bnb_address: bnb_address });
+    req.session.user.bnb_address = bnb_address; // Session güncelleme önemli!
+    res.json({ success: true });
+});
 
 // --- BPL ÇEKİM TALEBİ ROTASI ---
 app.post('/api/withdraw-request', async (req, res) => {
@@ -848,6 +854,7 @@ app.post('/api/help-request', async (req, res) => {
 
 const PORT = process.env.PORT || 3000;
 server.listen(PORT, () => console.log(`🚀 SİSTEM AKTİF: Port ${PORT}`));
+
 
 
 
