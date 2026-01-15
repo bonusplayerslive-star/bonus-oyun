@@ -279,19 +279,15 @@
         <div class="row justify-content-center">
             <div class="col-md-8">
                 <form id="helpForm">
-                    <div class="row">
-                        <div class="col-md-6 mb-3">
-                            <input type="text" id="helpNickname" class="form-control bg-black text-white border-secondary" placeholder="Nickname" required>
-                        </div>
-                        <div class="col-md-6 mb-3">
-                            <input type="email" id="helpEmail" class="form-control bg-black text-white border-secondary" placeholder="E-posta Adresiniz" required>
-                        </div>
+                    <div class="mb-3">
+                        <input type="email" id="helpEmail" class="form-control bg-black text-white border-secondary" placeholder="Kayıtlı E-posta Adresiniz" required>
+                        <div class="form-text text-muted">Şifre sıfırlama talepleri için kayıtlı e-postanızı kullanın.</div>
                     </div>
                     <div class="mb-3">
                         <select id="helpSubject" class="form-select bg-black text-white border-secondary">
                             <option value="Genel Destek">Genel Destek</option>
-                            <option value="Talep İptali">Talep İptali (Acil)</option>
-                            <option value="Hata Bildirimi">Hata Bildirimi</option>
+                            <option value="Sifre Islemleri">Şifremi Unuttum / Değiştirme</option>
+                            <option value="Talep Iptali">Çekim Talebi İptali</option>
                         </select>
                     </div>
                     <div class="mb-3">
@@ -308,7 +304,6 @@
 document.getElementById('helpForm').addEventListener('submit', function(e) {
     e.preventDefault();
     const data = {
-        nickname: document.getElementById('helpNickname').value,
         email: document.getElementById('helpEmail').value,
         subject: document.getElementById('helpSubject').value,
         message: document.getElementById('helpMessage').value
@@ -322,10 +317,8 @@ document.getElementById('helpForm').addEventListener('submit', function(e) {
     .then(res => res.json())
     .then(res => {
         if(res.success) {
-            alert('Mesajınız başarıyla iletildi. Destek ekibi sizinle iletişime geçecek.');
+            Swal.fire('Başarılı', 'Mesajınız iletildi. E-postanızı kontrol edin.', 'success');
             document.getElementById('helpForm').reset();
-        } else {
-            alert('Hata: ' + res.error);
         }
     });
 });
@@ -338,4 +331,5 @@ document.getElementById('helpForm').addEventListener('submit', function(e) {
 </body>
 
 </html>
+
 
