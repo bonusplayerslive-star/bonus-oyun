@@ -526,48 +526,47 @@ app.post('/api/buy-stamina', async (req, res) => {
         res.json({ success: false, error: 'İksir alınamadı.' });
     }
 });
-// --- ARENA SAVAŞ MOTORU (GÜNCEL & TEMİZ) ---
 async function startBattle(p1, p2, io) {
-    let winner;
+    // 1. ADIM: Her iki oyuncu için statlara dayalı kazanma çarpanını hesapla
+    // (p1Data ve p2Data veritabanından gelen tam user nesneleri olmalı)
+    const p1Modifier = calculateWinChance(p1.dbData, p2.dbData);
+    const p2Modifier = calculateWinChance(p2.dbData, p1.dbData);
+
+    // Temel şans dengesi (50-50 üzerine modifierlar eklenir)
+    let p1WinChance = 50 + p1Modifier - p2Modifier;
+
+    // Bot koruması (Senin %55 kuralını koruyoruz ama modifierlara da şans veriyoruz)
     const isP1Bot = !p1.socketId;
     const isP2Bot = !p2.socketId;
-
-    // NOT: Bahisler (bet) arena-join-queue aşamasında peşin kesildiği için 
-    // burada sadece kazananı belirleyip ödülü veriyoruz.
-
-    // 1. ADIM: Kazananı Belirle (Bot varsa %55 bot kazanır)
+    
     if (isP1Bot || isP2Bot) {
-        // Eğer bir taraf botsa, botun kazanma ihtimali %55
-        const botWon = Math.random() < 0.55; 
-        winner = isP2Bot ? (botWon ? p2 : p1) : (botWon ? p1 : p2);
-    } else {
-        // İki gerçek oyuncuysa güç (power) değerine bakılır
-        winner = p1.power >= p2.power ? p1 : p2;
+        // Bot varsa dengeyi bot lehine %5 kaydırıyoruz
+        p1WinChance = isP1Bot ? p1WinChance + 5 : p1WinChance - 5;
     }
 
-    // 2. ADIM: Ödülü Kazananın Hesabına Yatır
-    if (winner.socketId) { // Kazanan bot değilse ödülü ver
+    // 2. ADIM: Kazananı Belirle
+    const roll = Math.random() * 100;
+    const winner = roll <= p1WinChance ? p1 : p2;
+    const loser = (winner === p1) ? p2 : p1;
+
+    // 3. ADIM: Ödül ve Veritabanı Güncelleme
+    if (winner.socketId) {
         try {
-            const winUser = await User.findOne({ nickname: winner.nickname });
-            if (winUser) {
-                // Seçilen çarpanın ödülünü ekle (Örn: 10X ise 1000 BPL)
-                winUser.bpl += winner.prize; 
-                await winUser.save();
-                
-                // Canlı bakiyeyi frontend'e gönder
-                io.to(winner.socketId).emit('update-bpl', winUser.bpl);
-            }
-        } catch (err) { 
-            console.error("Arena Ödül Yatırma Hatası:", err); 
-        }
+            await User.findByIdAndUpdate(winner.dbData._id, { 
+                $inc: { bpl: winner.prize },
+                lastBattleTime: new Date(),
+                hasStaminaDoping: false // Savaşıp dopingi harcadı
+            });
+            io.to(winner.socketId).emit('update-bpl', winner.dbData.bpl + winner.prize);
+        } catch (err) { console.error("Ödül hatası:", err); }
     }
 
-    // 3. ADIM: Savaş Sonucunu Her İki Tarafa Da Gönder
+    // 4. ADIM: Sinyalleri Gönder (Frontend videoları oynatsın)
     const matchData = (p, opp) => ({
         opponent: opp.nickname,
-        opponentAnimal: opp.animal, 
+        opponentAnimal: opp.animal,
         winnerNick: winner.nickname,
-        winnerAnimal: winner.animal, 
+        winnerAnimal: winner.animal,
         prize: p.prize
     });
 
@@ -636,34 +635,86 @@ io.on('connection', async (socket) => {
     });
 
 // Savaş başlangıcında kontrol edilecek fonksiyon taslağı
-function calculateWinChance(user) {
-    let chanceModifier = 0;
-    const twoHoursInMs = 2 * 60 * 60 * 1000;
+function calculateWinChance(user, target) {
+    let modifier = 0;
     const now = new Date();
+    const twoHours = 2 * 60 * 60 * 1000;
 
-    // Eğer son savaştan üzerinden 2 saat geçmemişse
-    if (user.lastBattleTime && (now - user.lastBattleTime < twoHoursInMs)) {
-        // Ve 5 BPL ödeyerek "Doping" almamışsa
+    // --- Yorgunluk Kontrolü ---
+    if (user.lastBattleTime && (now - user.lastBattleTime < twoHours)) {
         if (!user.hasStaminaDoping) {
-            chanceModifier = -35; // %35 kazanma şansı düşer (Yorgunluk cezası)
-            console.log(`${user.nickname} yorgun savaşıyor!`);
+            modifier -= 35; // Yorgunsa çok ağır ceza
         }
     }
-    return chanceModifier;
+
+    // --- KRİTİK STAT KURALI ---
+    // Eğer saldırın rakibin defansından %3 fazlaysa, canının %2'si kadar şans kazanırsın
+    if (user.atk > (target.def * 1.03)) {
+        // Örn: 500 HP varsa +10 şans puanı
+        modifier += (user.hp * 0.02); 
+    }
+
+    // Temel stat üstünlükleri (Küçük bonuslar)
+    if (user.atk > target.def) modifier += 5;
+    if (user.hp > target.hp) modifier += 5;
+
+    return modifier;
 }
 
 
 
     
-   socket.on('arena-join-queue', async (data) => {
+  socket.on('arena-join-queue', async (data) => {
     try {
         const u = await User.findById(socket.userId);
-        
-        // Güvenlik Kontrolü: Kullanıcı yoksa veya bakiyesi yetersizse işlemi durdur
-        if (!u || u.bpl < data.bet) {
-            return socket.emit('error', 'Yetersiz bakiye!');
-        }
+        if (!u || u.bpl < data.bet) return socket.emit('error', 'Yetersiz bakiye!');
 
+        u.bpl -= data.bet;
+        await u.save();
+        socket.emit('update-bpl', u.bpl);
+
+        const player = { 
+            nickname: u.nickname, 
+            socketId: socket.id, 
+            animal: u.selectedAnimal || 'Lion', 
+            dbData: u, // Tüm statlar (atk, def, hp) burada
+            bet: data.bet, 
+            prize: data.prize 
+        };
+
+        if (arenaQueue.length > 0) {
+            const opponent = arenaQueue.shift();
+            startBattle(player, opponent, io);
+        } else {
+            arenaQueue.push(player);
+
+            // İstediğin 13 saniye bekleme süresi
+            setTimeout(async () => {
+                const idx = arenaQueue.findIndex(p => p.socketId === socket.id);
+                if (idx !== -1) {
+                    const p = arenaQueue.splice(idx, 1)[0];
+                    const bName = BOTS[Math.floor(Math.random() * BOTS.length)];
+                    
+                    // Bot statlarını p'nin statlarına yakın ama rastgele oluştur
+                    const botPlayer = { 
+                        nickname: bName + "_Bot", 
+                        socketId: null, 
+                        animal: bName, 
+                        dbData: { // Bot için hayali statlar
+                            atk: p.dbData.atk * 0.9, 
+                            def: p.dbData.def * 0.9, 
+                            hp: 100,
+                            lastBattleTime: null 
+                        },
+                        bet: p.bet, 
+                        prize: p.prize 
+                    };
+                    startBattle(p, botPlayer, io);
+                }
+            }, 13000); // 13 saniye
+        }
+    } catch (e) { console.log(e); }
+});
         // 1. ADIM: Bahis miktarını hemen düş (Savaşa giriş ücreti)
         u.bpl -= data.bet; 
         await u.save();
@@ -868,6 +919,7 @@ app.post('/api/help-request', async (req, res) => {
 
 const PORT = process.env.PORT || 3000;
 server.listen(PORT, () => console.log(`🚀 SİSTEM AKTİF: Port ${PORT}`));
+
 
 
 
