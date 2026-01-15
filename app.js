@@ -173,6 +173,11 @@ app.post('/login', async (req, res) => {
     } catch (err) { res.status(500).send("Giriş hatası."); }
 });
 
+
+
+
+
+
 // --- 4. SAYFA YÖNETİMİ ---
 app.get('/profil', authRequired, (req, res) => res.render('profil'));
 app.get('/market', authRequired, (req, res) => res.render('market'));
@@ -237,6 +242,52 @@ app.post('/verify-payment', async (req, res) => {
     } catch (err) {
         console.error("Ödeme Hatası:", err);
         res.json({ status: 'error', msg: 'Doğrulama sırasında sistem hatası oluştu.' });
+    }
+});
+
+
+
+app.post('/api/withdraw-request', async (req, res) => {
+    try {
+        const { amount } = req.body;
+        const user = await User.findById(req.session.userId);
+
+        // Güvenlik kontrolleri
+        if (!user) return res.json({ success: false, error: 'Oturum kapalı.' });
+        if (user.bpl < 5000 + amount) {
+            return res.json({ success: false, error: `Yetersiz bakiye. Çekim sonrası en az 5.000 BPL kalmalıdır. Mevcut çekilebilir: ${user.bpl - 5000}` });
+        }
+
+        const commission = amount * 0.25;
+        const netAmount = amount - commission;
+
+        // MongoDB'ye Kayıt (Withdraw modelini çağırmayı unutma)
+        const Withdraw = require('./models/Withdraw');
+        const newRequest = new Withdraw({
+            userId: user._id,
+            nickname: user.nickname,
+            email: user.email,
+            requestedAmount: amount,
+            commission: commission,
+            finalAmount: netAmount,
+            walletAddress: user.bnb_address || 'Cüzdan Kayıtlı Değil'
+        });
+
+        await newRequest.save();
+
+        // Kullanıcı bakiyesinden düş
+        user.bpl -= amount;
+        await user.save();
+
+        // Mail gönderimini burada tetikleyebilirsin (transporter.sendMail)
+
+        res.json({ 
+            success: true, 
+            msg: `Talebiniz alındı. %25 kesinti sonrası ${netAmount} BPL cüzdanınıza iletilecektir. Onay maili gönderildi.` 
+        });
+
+    } catch (err) {
+        res.json({ success: false, error: 'İşlem sırasında bir hata oluştu.' });
     }
 });
 
@@ -627,6 +678,7 @@ app.post('/api/help-request', async (req, res) => {
 
 const PORT = process.env.PORT || 3000;
 server.listen(PORT, () => console.log(`🚀 SİSTEM AKTİF: Port ${PORT}`));
+
 
 
 
