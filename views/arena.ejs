@@ -1,9 +1,12 @@
 <%- include('header') %>
 
 <style>
-    /* Arena Atmosferi ve Arka Plan */
+    /* Arena Tam Ekran Atmosferi */
     body, html {
-        margin: 0; padding: 0; width: 100%; height: 100%;
+        margin: 0;
+        padding: 0;
+        width: 100%;
+        height: 100%;
         background: radial-gradient(circle, #0a0a0a 0%, #000 100%) !important;
         overflow: hidden;
         color: #fff;
@@ -29,114 +32,177 @@
         justify-content: center;
         align-items: center;
         padding: 20px;
+        background: rgba(0, 0, 0, 0.6);
     }
 
     /* X-Katlayıcı Kart Tasarımı */
     .bet-grid {
         display: grid;
-        grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
-        gap: 20px;
+        grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+        gap: 25px;
         width: 100%;
-        max-width: 900px;
-        margin-bottom: 40px;
+        max-width: 1000px;
+        margin-bottom: 50px;
     }
 
     .bet-card {
         background: rgba(255, 255, 255, 0.03);
-        border: 1px solid rgba(0, 255, 136, 0.1);
+        border: 2px solid rgba(0, 255, 136, 0.1);
         border-radius: 20px;
-        padding: 30px 20px;
+        padding: 40px 20px;
         text-align: center;
         transition: all 0.4s cubic-bezier(0.175, 0.885, 0.32, 1.275);
         cursor: pointer;
         position: relative;
         overflow: hidden;
-    }
-
-    .bet-card::before {
-        content: '';
-        position: absolute;
-        top: -50%; left: -50%; width: 200%; height: 200%;
-        background: radial-gradient(circle, rgba(0,255,136,0.1) 0%, transparent 70%);
-        opacity: 0; transition: 0.5s;
+        backdrop-filter: blur(10px);
     }
 
     .bet-card:hover {
-        transform: translateY(-10px);
+        transform: translateY(-15px);
         border-color: #00ff88;
-        box-shadow: 0 10px 30px rgba(0, 255, 136, 0.2);
+        box-shadow: 0 15px 40px rgba(0, 255, 136, 0.2);
     }
 
     .bet-card.active {
-        background: rgba(0, 255, 136, 0.1);
+        background: rgba(0, 255, 136, 0.15);
         border-color: #00ff88;
-        box-shadow: 0 0 40px rgba(0, 255, 136, 0.3);
+        box-shadow: 0 0 50px rgba(0, 255, 136, 0.4);
+        transform: scale(1.05);
     }
-
-    .bet-card.active::before { opacity: 1; }
 
     .multiplier {
-        font-size: 2.5rem;
+        font-size: 3.5rem;
         font-weight: 900;
-        margin-bottom: 10px;
+        margin-bottom: 15px;
         display: block;
-        text-shadow: 0 0 10px rgba(0,255,136,0.5);
+        text-shadow: 0 0 20px rgba(0,255,136,0.6);
     }
 
-    .bet-details h3 { font-size: 1.2rem; color: #aaa; margin: 5px 0; }
-    .bet-details .prize { color: #00ff88; font-weight: bold; font-size: 1.5rem; }
+    .bet-details h3 { 
+        font-size: 1.1rem; 
+        color: #ccc; 
+        margin: 10px 0;
+        text-transform: uppercase;
+        letter-spacing: 1px;
+    }
+    
+    .bet-details .prize { 
+        color: #00ff88; 
+        font-weight: bold; 
+        font-size: 1.6rem; 
+        display: block;
+        margin-top: 5px;
+    }
 
     /* Başla Butonu */
     .start-btn {
         background: #00ff88;
         color: #000;
         border: none;
-        padding: 15px 80px;
-        font-size: 1.5rem;
+        padding: 18px 100px;
+        font-size: 1.8rem;
         font-weight: 900;
-        border-radius: 50px;
+        border-radius: 60px;
         cursor: pointer;
-        transition: 0.3s;
-        box-shadow: 0 0 20px rgba(0, 255, 136, 0.4);
+        transition: all 0.3s ease;
+        box-shadow: 0 0 30px rgba(0, 255, 136, 0.4);
         text-transform: uppercase;
-        letter-spacing: 2px;
-        opacity: 0.5;
+        letter-spacing: 4px;
+        opacity: 0.2;
         pointer-events: none;
+        filter: grayscale(1);
     }
 
     .start-btn.ready {
         opacity: 1;
         pointer-events: auto;
+        filter: grayscale(0);
+        animation: pulse 2s infinite;
     }
 
-    .start-btn:hover {
-        transform: scale(1.1);
-        box-shadow: 0 0 40px rgba(0, 255, 136, 0.6);
+    @keyframes pulse {
+        0% { box-shadow: 0 0 20px rgba(0, 255, 136, 0.4); }
+        50% { box-shadow: 0 0 50px rgba(0, 255, 136, 0.7); }
+        100% { box-shadow: 0 0 20px rgba(0, 255, 136, 0.4); }
     }
 
-    /* Video ve Wait Screen (Değişmedi) */
-    #battle-area { position: fixed; top: 0; left: 0; width: 100vw; height: 100vh; background: #000; display: none; z-index: 9999; }
-    #battle-video { width: 100%; height: 100%; object-fit: cover; }
-    #wait-screen { display: none; text-align: center; z-index: 20; }
-    .countdown-number { font-size: 150px; font-weight: 900; color: #00ff88; text-shadow: 0 0 30px rgba(0, 255, 136, 0.5); }
-    .video-overlay { position: absolute; top: 30px; width: 100%; text-align: center; z-index: 10001; pointer-events: none; }
-    #battle-status { font-size: 2.5rem; font-weight: 900; color: #00ff88; text-shadow: 0 0 15px #000; text-transform: uppercase; }
+    /* --- TAM EKRAN VİDEO ALANI --- */
+    #battle-area {
+        position: fixed;
+        top: 0;
+        left: 0;
+        width: 100vw;
+        height: 100vh;
+        background: #000;
+        display: none;
+        z-index: 9999;
+    }
+
+    #battle-video {
+        width: 100%;
+        height: 100%;
+        object-fit: cover;
+    }
+
+    .video-overlay {
+        position: absolute;
+        top: 40px;
+        width: 100%;
+        text-align: center;
+        z-index: 10001;
+        pointer-events: none;
+    }
+
+    #battle-status {
+        font-size: 3rem;
+        font-weight: 900;
+        color: #00ff88;
+        text-shadow: 0 0 20px #000, 0 0 40px rgba(0, 255, 136, 0.5);
+        text-transform: uppercase;
+        letter-spacing: 5px;
+    }
+
+    .opponent-badge {
+        background: rgba(220, 53, 69, 0.8);
+        padding: 12px 30px;
+        border-radius: 50px;
+        font-weight: bold;
+        margin-top: 20px;
+        display: inline-block;
+        border: 2px solid #fff;
+        box-shadow: 0 0 20px rgba(220, 53, 69, 0.5);
+    }
+
+    /* Bekleme Ekranı */
+    #wait-screen {
+        display: none;
+        text-align: center;
+        z-index: 20;
+    }
+
+    .countdown-number {
+        font-size: 180px;
+        font-weight: 900;
+        color: #00ff88;
+        text-shadow: 0 0 40px rgba(0, 255, 136, 0.6);
+    }
 </style>
 
 <div class="arena-main-container">
     <div id="bet-screen">
         <% if (user.selectedAnimal === 'none' || !user.selectedAnimal) { %>
-            <div class="text-center p-5 border border-success rounded bg-dark">
-                <h2 class="text-success">DÖVÜŞÇÜ SEÇİLMEDİ!</h2>
-                <p>Arenaya girmek için önce profilinden bir karakter seçmelisin.</p>
-                <a href="/profil" class="btn btn-outline-success fw-bold">PROFİLE GİT</a>
+            <div class="text-center p-5 border border-success rounded bg-dark" style="box-shadow: 0 0 30px rgba(0, 255, 136, 0.2);">
+                <h2 class="text-success mb-4">DÖVÜŞÇÜ SEÇİLMEDİ!</h2>
+                <p class="mb-4 text-white-50">Arenaya girmek için önce profilinden bir karakter seçmelisin.</p>
+                <a href="/profil" class="btn btn-outline-success btn-lg fw-bold px-5">PROFİLE GİT</a>
             </div>
         <% } else { %>
-            <h1 class="mb-5 text-white fw-bold" style="letter-spacing: 5px;">ARENA <span style="color: #00ff88;">DÜELLOSU</span></h1>
+            <h1 class="mb-5 text-white fw-bold" style="letter-spacing: 8px;">ARENA <span style="color: #00ff88;">DÜELLOSU</span></h1>
             
             <div class="bet-grid">
                 <div class="bet-card" onclick="selectBet(this, 25, 50)">
-                    <span class="multiplier">2X</span>
+                    <span class="multiplier" style="color: #00ff88;">2X</span>
                     <div class="bet-details">
                         <h3>Giriş: 25 BPL</h3>
                         <span class="prize">Ödül: 50 BPL</span>
@@ -166,8 +232,8 @@
 
     <div id="wait-screen">
         <div class="countdown-number" id="timer">10</div>
-        <h2 class="text-white">RAKİP ARANIYOR...</h2>
-        <div class="spinner-grow text-success mt-3"></div>
+        <h2 class="text-white mt-4" style="letter-spacing: 3px;">RAKİP ARANIYOR...</h2>
+        <div class="spinner-grow text-success mt-4" style="width: 3rem; height: 3rem;"></div>
     </div>
 
     <div id="battle-area">
@@ -190,14 +256,12 @@
 
     // Seçim Fonksiyonu
     function selectBet(element, bet, prize) {
-        // Diğer kartlardan 'active' klasını kaldır
         document.querySelectorAll('.bet-card').forEach(card => card.classList.remove('active'));
-        // Seçilene ekle
         element.classList.add('active');
-        // Veriyi sakla
         selectedData = { bet, prize };
-        // Butonu aktif et
-        document.getElementById('start-btn').classList.add('ready');
+        
+        const startBtn = document.getElementById('start-btn');
+        startBtn.classList.add('ready');
     }
 
     function confirmStart() {
@@ -205,13 +269,24 @@
         
         const myBpl = parseInt("<%= user.bpl %>");
         if (myBpl < selectedData.bet) {
-            return Swal.fire('Hata', 'Yetersiz BPL Bakiyesi!', 'error');
+            return Swal.fire({
+                icon: 'error',
+                title: 'Yetersiz Bakiye',
+                text: 'Bu düelloya girmek için yeterli BPL bakiyeniz yok!',
+                background: '#111',
+                color: '#fff',
+                confirmButtonColor: '#00ff88'
+            });
         }
 
-        // Aramayı başlat
         document.getElementById('bet-screen').style.display = 'none';
         document.getElementById('wait-screen').style.display = 'block';
-        socket.emit('arena-join-queue', selectedData);
+        
+        // Backend'e seçilen bahis ve ödül miktarını gönderiyoruz
+        socket.emit('arena-join-queue', { 
+            bet: selectedData.bet, 
+            prize: selectedData.prize 
+        });
 
         let count = 10;
         const timer = setInterval(() => {
@@ -221,20 +296,29 @@
         }, 1000);
     }
 
-    // Socket olayları ve video sequence fonksiyonları senin eski kodunla aynı şekilde devam ediyor...
+    // Maç Bulunduğunda Çalışacak Mantık
     socket.on('arena-match-found', (data) => {
         document.getElementById('wait-screen').style.display = 'none';
-        document.getElementById('battle-area').style.display = 'block';
-        document.getElementById('opp-info').innerText = `RAKİP: ${data.opponent}`;
+        const battleArea = document.getElementById('battle-area');
+        battleArea.style.display = 'block';
         
-        const moveUrl = `/caracter/move/${data.opponentAnimal}/${data.opponentAnimal}1.mp4`;
+        document.getElementById('opp-info').innerText = `RAKİP: ${data.opponent}`;
         const statusText = document.getElementById('battle-status');
         
+        // 1. HAMLE VİDEOSU
+        const moveUrl = `/caracter/move/${data.opponentAnimal}/${data.opponentAnimal}1.mp4`;
+        statusText.innerText = "SAVAŞ BAŞLADI!";
+        
         playSequence(moveUrl, () => {
+            // 2. ZAFER VİDEOSU
             const winUrl = `/caracter/move/${data.winnerAnimal}/${data.winnerAnimal}.mp4`;
             statusText.innerText = `KAZANAN: ${data.winnerNick}`;
+            statusText.style.color = "#00ff88";
+            
             playSequence(winUrl, () => {
-                setTimeout(() => { window.location.href = '/profil'; }, 3000);
+                setTimeout(() => {
+                    window.location.href = '/profil';
+                }, 3000);
             });
         });
     });
@@ -244,7 +328,10 @@
         const videoSrc = document.getElementById('video-src');
         videoSrc.src = url;
         video.load();
-        video.play().catch(e => callback());
+        video.play().catch(e => {
+            console.error("Video hatası:", e);
+            callback();
+        });
         video.onended = callback;
     }
 </script>
