@@ -859,7 +859,7 @@ socket.on('arena-join-queue', async (data) => {
         arenaQueue = arenaQueue.filter(p => p.socketId !== socket.id);
         broadcastOnlineList();
     });
-});
+
 
 const nodemailer = require('nodemailer'); // Mail için
 const Withdraw = require('./models/Withdraw');
@@ -992,6 +992,7 @@ app.post('/api/help-request', async (req, res) => {
 
 const PORT = process.env.PORT || 3000;
 server.listen(PORT, () => console.log(`🚀 SİSTEM AKTİF: Port ${PORT}`));
+
 
 
 
