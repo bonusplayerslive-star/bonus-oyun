@@ -596,22 +596,7 @@ async function startBattle(p1, p2, io, roomId = null) {
     } catch (err) { console.error("Savaş Hatası:", err); }
 }
 // --- 6. SOCKET.IO ---
-io.on('connection', async (socket) => {
-    const uId = socket.request.session?.userId;
-    if (!uId) return;
-    const user = await User.findById(uId);
-    if (!user) return;
 
-    socket.userId = uId;
-    socket.nickname = user.nickname;
-    onlineUsers.set(user.nickname, socket.id);
-    socket.join("general-chat");
-
-    const broadcastOnlineList = () => {
-        const usersArray = Array.from(onlineUsers.keys()).map(nick => ({ nickname: nick }));
-        io.to("general-chat").emit('update-user-list', usersArray);
-    };
-    broadcastOnlineList();
 
 // --- TÜM SOCKET SİSTEMİ (TEK BAĞLANTI BLOĞU - HATASIZ) ---
 io.on('connection', async (socket) => {
@@ -766,4 +751,5 @@ server.listen(PORT, () => console.log(`🚀 SİSTEM AKTİF: Port ${PORT}`));
 
 const PORT = process.env.PORT || 3000;
 server.listen(PORT, () => console.log(`🚀 SİSTEM AKTİF: Port ${PORT}`));
+
 
