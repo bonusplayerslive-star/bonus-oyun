@@ -173,7 +173,42 @@ app.post('/login', async (req, res) => {
     } catch (err) { res.status(500).send("Giriş hatası."); }
 });
 
+// --- YARDIM / DESTEK FORMU VE MAİL BİLDİRİMİ ---
+app.post('/api/help-request', async (req, res) => {
+    try {
+        const { nickname, email, subject, message } = req.body;
+        const Help = require('./models/Help');
 
+        // 1. Veritabanına Kaydet
+        const newHelp = new Help({ nickname, email, subject, message });
+        await newHelp.save();
+
+        // 2. Sana (Admin) Bildirim Maili Gönder
+        const adminMailOptions = {
+            from: process.env.MAIL_USER,
+            to: process.env.MAIL_USER, // Kendi adresine gönderiyorsun
+            subject: `YENİ DESTEK TALEBİ: ${subject}`,
+            html: `
+                <div style="background:#111; color:#fff; padding:20px; border:1px solid #39FF14; font-family:sans-serif;">
+                    <h2 style="color:#39FF14;">Terminal Mesajı Alındı</h2>
+                    <p><b>Gönderen:</b> ${nickname} (${email})</p>
+                    <p><b>Konu:</b> ${subject}</p>
+                    <hr style="border-color:#333;">
+                    <p><b>Mesaj:</b></p>
+                    <p style="background:#000; padding:15px; border-radius:5px;">${message}</p>
+                </div>
+            `
+        };
+
+        transporter.sendMail(adminMailOptions);
+
+        res.json({ success: true, msg: 'Mesajınız merkeze iletildi.' });
+
+    } catch (err) {
+        console.error("Yardım hatası:", err);
+        res.json({ success: false, error: 'Mesaj iletimi başarısız.' });
+    }
+});
 
 
 
@@ -247,21 +282,30 @@ app.post('/verify-payment', async (req, res) => {
 
 
 
+// --- BPL ÇEKİM TALEBİ ROTASI ---
 app.post('/api/withdraw-request', async (req, res) => {
     try {
         const { amount } = req.body;
-        const user = await User.findById(req.session.userId);
+        // User modelinin ve session kontrolünün doğruluğundan emin olun
+        const user = await require('./models/User').findById(req.session.userId);
 
-        // Güvenlik kontrolleri
+        // 1. Güvenlik Kontrolleri
         if (!user) return res.json({ success: false, error: 'Oturum kapalı.' });
-        if (user.bpl < 5000 + amount) {
-            return res.json({ success: false, error: `Yetersiz bakiye. Çekim sonrası en az 5.000 BPL kalmalıdır. Mevcut çekilebilir: ${user.bpl - 5000}` });
+        
+        // Kullanıcının mevcut BPL miktarını kontrol et
+        const availableToWithdraw = user.bpl - 5000;
+        if (amount <= 0 || amount > availableToWithdraw) {
+            return res.json({ 
+                success: false, 
+                error: `Yetersiz bakiye. En az 5.000 BPL kalmalıdır. Çekilebilir miktar: ${availableToWithdraw}` 
+            });
         }
 
+        // 2. Hesaplamalar (%25 Komisyon)
         const commission = amount * 0.25;
         const netAmount = amount - commission;
 
-        // MongoDB'ye Kayıt (Withdraw modelini çağırmayı unutma)
+        // 3. MongoDB'ye Kayıt
         const Withdraw = require('./models/Withdraw');
         const newRequest = new Withdraw({
             userId: user._id,
@@ -275,22 +319,49 @@ app.post('/api/withdraw-request', async (req, res) => {
 
         await newRequest.save();
 
-        // Kullanıcı bakiyesinden düş
+        // 4. Kullanıcı Bakiyesini Güncelle
         user.bpl -= amount;
         await user.save();
 
-        // Mail gönderimini burada tetikleyebilirsin (transporter.sendMail)
+        // 5. Mail Gönderimi (transporter daha önce tanımlanmış olmalı)
+        const userMailOptions = {
+            from: process.env.MAIL_USER, // Render Env: MAIL_USER
+            to: user.email,
+            subject: 'BPL TASFİYE PROTOKOLÜ BAŞLATILDI',
+            html: `
+                <div style="background:#050505; color:#eee; padding:30px; font-family:monospace; border-left: 5px solid #ff003c;">
+                    <h1 style="color:#ff003c; border-bottom:1px solid #333; padding-bottom:10px;">GÜVENLİK UYARISI</h1>
+                    <p>Sayın <b>${user.nickname}</b>,</p>
+                    <p>Hesabınızdan tasfiye talebi oluşturuldu:</p>
+                    <ul style="list-style:none; padding:0;">
+                        <li>>> <b>Brüt:</b> ${amount} BPL</li>
+                        <li>>> <b>Komisyon:</b> ${commission} BPL</li>
+                        <li>>> <b>Net Ödeme:</b> <span style="color:#39FF14;">${netAmount} BPL</span></li>
+                    </ul>
+                    <div style="background:#111; padding:15px; border:1px dashed #555; margin-top:20px;">
+                        <p style="margin:0; color:#ffcc00;"><b>DİKKAT:</b> İşlem size ait değilse, 12 saat içinde bize ulaşın.</p>
+                    </div>
+                    <p style="font-size:12px; color:#666; margin-top:20px;">Talep No: ${newRequest._id}</p>
+                </div>
+            `
+        };
 
+        // Maili gerçekten gönderen komut budur:
+        transporter.sendMail(userMailOptions, (error, info) => {
+            if (error) console.log("Mail gönderim hatası:", error);
+        });
+
+        // 6. Yanıt Döndür
         res.json({ 
             success: true, 
-            msg: `Talebiniz alındı. %25 kesinti sonrası ${netAmount} BPL cüzdanınıza iletilecektir. Onay maili gönderildi.` 
+            msg: `Talebiniz alındı. %25 kesinti sonrası ${netAmount} BPL iletilecektir.` 
         });
 
     } catch (err) {
+        console.error("Çekim Hatası:", err);
         res.json({ success: false, error: 'İşlem sırasında bir hata oluştu.' });
     }
 });
-
 
 
 
@@ -678,6 +749,7 @@ app.post('/api/help-request', async (req, res) => {
 
 const PORT = process.env.PORT || 3000;
 server.listen(PORT, () => console.log(`🚀 SİSTEM AKTİF: Port ${PORT}`));
+
 
 
 
