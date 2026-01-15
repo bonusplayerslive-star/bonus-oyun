@@ -6,170 +6,67 @@
     <title>BPL - Stratejik Operasyon Merkezi</title>
     <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
     <link href="https://fonts.googleapis.com/css2?family=Orbitron:wght@400;700&family=Rajdhani:wght@500;700&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
     <style>
-        :root { --neon-turq: #00f2ff; --neon-red: #ff004c; --bg-dark: #050a0f; }
+        :root { --neon-turq: #00f2ff; --neon-red: #ff004c; --neon-yellow: #ffcc00; --bg-dark: #050a0f; }
         body { 
             background-color: var(--bg-dark); color: #fff; font-family: 'Rajdhani', sans-serif; 
-            height: 100vh; overflow: hidden; display: flex;
+            height: 100vh; overflow: hidden; display: flex; flex-direction: column;
             padding: env(safe-area-inset-top) 10px env(safe-area-inset-bottom) 10px;
         }
 
-        /* Ana Panel */
-        .main-layout { display: flex; width: 100%; gap: 10px; height: 95vh; margin-top: auto; margin-bottom: auto; }
+        .main-layout { display: flex; width: 100%; gap: 15px; flex: 1; margin-top: 10px; overflow: hidden; }
 
-        /* Sol Taraf: Chat */
         .chat-section { 
             flex: 3; border: 2px solid var(--neon-turq); border-radius: 15px; 
-            box-shadow: 0 0 15px rgba(0,242,255,0.3); display: flex; flex-direction: column; background: rgba(0,0,0,0.4);
+            box-shadow: 0 0 15px rgba(0,242,255,0.2); display: flex; flex-direction: column; background: rgba(0,0,0,0.6);
         }
 
-        /* Sağ Taraf: Aktif Kullanıcılar */
         .users-section { 
-            flex: 1; border: 1px solid rgba(0,242,255,0.3); border-radius: 15px; 
-            background: rgba(0,0,0,0.6); display: flex; flex-direction: column; padding: 10px;
+            flex: 1.2; border: 1px solid rgba(0,242,255,0.3); border-radius: 15px; 
+            background: rgba(0,0,0,0.8); display: flex; flex-direction: column; padding: 15px;
         }
 
         #chat-messages { flex: 1; overflow-y: auto; padding: 15px; }
+        .msg-line { margin-bottom: 10px; padding: 10px; border-radius: 8px; background: rgba(255,255,255,0.03); border-left: 3px solid var(--neon-turq); }
+        .msg-sender { color: var(--neon-turq); font-weight: 700; font-family: 'Orbitron'; font-size: 0.75rem; }
+
+        .user-item { padding: 12px; border-bottom: 1px solid rgba(0,242,255,0.1); display: flex; flex-direction: column; gap: 8px; }
+        .user-nick { color: #fff; font-weight: 600; font-family: 'Orbitron'; font-size: 0.8rem; }
         
-        /* Mesaj Stilleri */
-        .msg-line { margin-bottom: 8px; border-bottom: 1px solid rgba(255,255,255,0.05); padding-bottom: 4px; }
-        .msg-sender { color: var(--neon-turq); font-weight: 700; text-shadow: 0 0 5px var(--neon-turq); }
-        .msg-text { color: #fff; text-shadow: 0 0 2px rgba(255,255,255,0.3); }
-        .msg-system { color: var(--neon-red); font-weight: bold; animation: pulse 1s infinite; }
+        .action-btns { display: flex; gap: 5px; }
+        .btn-action { font-size: 9px; padding: 6px 8px; border-radius: 5px; font-family: 'Orbitron'; border: none; color: #fff; flex: 1; cursor: pointer; }
+        .btn-arena { background: var(--neon-red); }
+        .btn-meeting { background: var(--neon-yellow); color: #000; font-weight: bold; }
 
-        /* Kullanıcı Listesi ve Butonlar */
-        .user-item { 
-            padding: 8px; border-bottom: 1px solid rgba(0,242,255,0.2); 
-            display: flex; flex-direction: column; gap: 5px;
-        }
-        .user-actions { display: flex; gap: 5px; }
-        .btn-mini { font-size: 10px; padding: 2px 6px; border-radius: 5px; font-family: 'Orbitron'; }
-
-        /* Giriş Alanı */
-        .input-area { padding: 15px; display: flex; gap: 10px; background: rgba(0,0,0,0.8); }
-        .neon-input { 
-            flex: 1; background: transparent; border: 1px solid var(--neon-turq); 
-            color: #fff; border-radius: 20px; padding: 8px 15px; 
-        }
-        .btn-send-neon { 
-            width: 45px; height: 45px; border-radius: 50%; background: var(--neon-red); 
-            border: none; box-shadow: 0 0 15px var(--neon-red); color: #fff;
-        }
-
-        @keyframes pulse { 0% { opacity: 0.6; } 50% { opacity: 1; } 100% { opacity: 0.6; } }
-        @media (max-width: 768px) { .main-layout { flex-direction: column; } .users-section { flex: 0.4; } }
+        .input-area { padding: 15px; display: flex; gap: 10px; background: rgba(0,0,0,0.4); border-top: 1px solid rgba(0,242,255,0.2); }
+        .neon-input { flex: 1; background: rgba(255,255,255,0.05); border: 1px solid var(--neon-turq); color: #fff; border-radius: 20px; padding: 10px 20px; outline: none; }
+        .btn-send { width: 45px; height: 45px; border-radius: 50%; background: var(--neon-turq); border: none; color: #000; cursor: pointer; }
     </style>
 </head>
 <body>
 
 <div class="main-layout">
     <div class="chat-section">
-        <div class="p-2 border-bottom border-info d-flex justify-content-between">
-            <span style="color:var(--neon-turq); font-family:'Orbitron'">STRATEJİK KANAL</span>
-            <a href="/profil" class="btn btn-outline-info btn-sm" style="font-size: 10px;">GERİ DÖN</a>
+        <div class="p-3 border-bottom border-info d-flex justify-content-between align-items-center">
+            <div>
+                <span style="color:var(--neon-turq); font-family:'Orbitron'; font-weight: bold;">STRATEJİK KANAL</span>
+                <div id="bakiye-status" style="font-size: 11px; color: var(--neon-yellow);">Bakiye: <%= user.bpl %> BPL</div>
+            </div>
+            <a href="/profil" class="btn btn-outline-info btn-sm">ÜS MERKEZİ</a>
         </div>
+        
         <div id="chat-messages"></div>
-        <form id="chat-form" class="input-area">
+
+        <div class="input-area">
             <input type="text" id="chat-input" class="neon-input" placeholder="Mesaj..." autocomplete="off">
-            <button type="submit" class="btn-send-neon">➤</button>
-        </form>
+            <button onclick="sendMessage()" class="btn-send">➤</button>
+        </div>
     </div>
 
     <div class="users-section">
-        <h6 class="text-center border-bottom pb-2" style="color:var(--neon-turq)">AKTİF KOMUTANLAR</h6>
+        <h6 class="text-center border-bottom pb-2 mb-3" style="color:var(--neon-turq); font-family:'Orbitron'">AKTİF KOMUTANLAR</h6>
         <div id="user-list" class="overflow-auto"></div>
-    </div>
-</div>
-<%- include('header') %>
-
-<style>
-    body, html {
-        margin: 0; padding: 0; width: 100%; height: 100%;
-        background: radial-gradient(circle, #0a0a0a 0%, #000 100%) !important;
-        overflow-x: hidden; color: #fff; font-family: 'Orbitron', sans-serif;
-    }
-
-    .arena-main-container {
-        min-height: 100vh; display: flex; flex-direction: column;
-        justify-content: flex-start; align-items: center; padding: 10px;
-    }
-
-    #bet-screen {
-        z-index: 10; width: 100%; max-width: 1100px;
-        display: flex; flex-direction: column; align-items: center; text-align: center; padding-top: 20px;
-    }
-
-    .bet-grid { display: flex; flex-wrap: wrap; justify-content: center; gap: 12px; width: 100%; margin-bottom: 25px; }
-
-    .bet-card {
-        flex: 1 1 140px; max-width: 240px; background: rgba(255, 255, 255, 0.03);
-        border: 2px solid rgba(0, 255, 136, 0.1); border-radius: 15px; padding: 15px 10px;
-        transition: all 0.3s ease; cursor: pointer; backdrop-filter: blur(10px);
-    }
-
-    .bet-card.active { border-color: #00ff88; background: rgba(0, 255, 136, 0.1); box-shadow: 0 0 20px rgba(0, 255, 136, 0.2); }
-
-    .multiplier { font-size: 1.8rem; font-weight: 900; display: block; }
-
-    .start-btn {
-        background: #00ff88; color: #000; border: none; padding: 12px 60px;
-        font-size: 1.2rem; font-weight: 900; border-radius: 40px; cursor: pointer;
-        opacity: 0.2; pointer-events: none; text-transform: uppercase; width: 90%; max-width: 350px;
-    }
-
-    .start-btn.ready { opacity: 1; pointer-events: auto; }
-
-    /* Bekleme ve Savaş Alanı */
-    #wait-screen { display: none; text-align: center; margin-top: 20%; }
-    .countdown-number { font-size: 80px; color: #00ff88; font-weight: 900; }
-
-    #battle-area { position: fixed; top: 0; left: 0; width: 100vw; height: 100vh; background: #000; display: none; z-index: 9999; }
-    #battle-video { width: 100%; height: 100%; object-fit: cover; }
-    .video-overlay { position: absolute; top: 10%; width: 100%; text-align: center; z-index: 10001; }
-    #battle-status { font-size: 1.5rem; color: #00ff88; background: rgba(0,0,0,0.6); padding: 10px 20px; border-radius: 10px; display: inline-block; }
-</style>
-
-<div class="arena-main-container">
-    <div id="bet-screen">
-        <% if (!user.selectedAnimal || user.selectedAnimal === 'none') { %>
-            <div class="text-center p-4">
-                <h2 class="text-danger">DÖVÜŞÇÜ SEÇİLMEDİ!</h2>
-                <a href="/profil" class="btn btn-success mt-3">PROFİLE GİT</a>
-            </div>
-        <% } else { %>
-            <h1 class="mb-4">ARENA DÜELLOSU</h1>
-            <div class="bet-grid">
-                <div class="bet-card" onclick="selectBet(this, 25, 50)">
-                    <span class="multiplier" style="color: #fff;">X</span>
-                    <small>Giriş: 25 BPL / Ödül: 50 BPL</small>
-                </div>
-                <div class="bet-card" onclick="selectBet(this, 35, 100)">
-                    <span class="multiplier" style="color: #00ff88;">2X</span>
-                    <small>Giriş: 35 BPL / Ödül: 100 BPL</small>
-                </div>
-                <div class="bet-card" onclick="selectBet(this, 50, 150)">
-                    <span class="multiplier" style="color: #00d4ff;">6X</span>
-                    <small>Giriş: 50 BPL / Ödül: 150 BPL</small>
-                </div>
-                <div class="bet-card" onclick="selectBet(this, 100, 250)">
-                    <span class="multiplier" style="color: #ff0055;">10X</span>
-                    <small>Giriş: 100 BPL / Ödül: 250 BPL</small>
-                </div>
-            </div>
-            <button id="start-btn" class="start-btn" onclick="joinQueue()">SIRAYA GİR</button>
-        <% } %>
-    </div>
-
-    <div id="wait-screen">
-        <div class="countdown-number" id="timer">13</div>
-        <h2 class="text-white mt-4">RAKİP ARANIYOR...</h2>
-    </div>
-
-    <div id="battle-area">
-        <div class="video-overlay">
-            <div id="battle-status">HAZIRLAN...</div>
-        </div>
-        <video id="battle-video" playsinline muted autoplay></video>
     </div>
 </div>
 
@@ -178,73 +75,75 @@
 
 <script>
     const socket = io();
-    let selectedData = null;
-    const urlParams = new URLSearchParams(window.location.search);
-    const roomID = urlParams.get('room');
+    const myNick = "<%= user.nickname %>";
+    const userBPL = parseInt("<%= user.bpl %>");
 
-    // Eğer chatten bir room ile gelindiyse doğrudan bekleme ekranına geç
-    if (roomID) {
-        document.getElementById('bet-screen').style.display = 'none';
-        document.getElementById('battle-area').style.display = 'block';
-        document.getElementById('battle-status').innerText = "DÜELLO BAŞLIYOR...";
-        // Not: Server tarafında oda eşleştiğinde 'arena-match-found' tetiklenecek.
+    // Mesaj Gönder
+    function sendMessage() {
+        const text = document.getElementById('chat-input').value.trim();
+        if (text) {
+            socket.emit('chat-message', { text });
+            document.getElementById('chat-input').value = '';
+        }
     }
 
-    function selectBet(element, bet, prize) {
-        document.querySelectorAll('.bet-card').forEach(c => c.classList.remove('active'));
-        element.classList.add('active');
-        selectedData = { bet, prize };
-        document.getElementById('start-btn').classList.add('ready');
-    }
-
-    function joinQueue() {
-        if (!selectedData) return;
-        document.getElementById('bet-screen').style.display = 'none';
-        document.getElementById('wait-screen').style.display = 'block';
-
-        socket.emit('arena-join-queue', { 
-            bet: selectedData.bet, 
-            prize: selectedData.prize 
+    // Kullanıcı Listesi ve Davetler
+    socket.on('update-user-list', (users) => {
+        const userList = document.getElementById('user-list');
+        userList.innerHTML = '';
+        users.forEach(u => {
+            if(u.nickname === myNick) return;
+            const div = document.createElement('div');
+            div.className = 'user-item';
+            div.innerHTML = `
+                <span class="user-nick">${u.nickname}</span>
+                <div class="action-btns">
+                    <button class="btn-action btn-arena" onclick="invite('arena', '${u.nickname}')">ARENA (50)</button>
+                    <button class="btn-action btn-meeting" onclick="invite('meeting', '${u.nickname}')">MEETING (50)</button>
+                </div>
+            `;
+            userList.appendChild(div);
         });
+    });
 
-        let count = 13;
-        const timer = setInterval(() => {
-            count--;
-            document.getElementById('timer').innerText = count;
-            if (count <= 0) clearInterval(timer);
-        }, 1000);
+    function invite(type, target) {
+        Swal.fire({
+            title: 'OPERASYON ONAYI',
+            text: `${target} kullanıcısına 50 BPL ile davet gönderilsin mi?`,
+            background: '#050a0f', color: '#fff', showCancelButton: true,
+            confirmButtonText: 'BPL ÖDE', cancelButtonText: 'İPTAL'
+        }).then((res) => {
+            if (res.isConfirmed) {
+                socket.emit('send-bpl-invite', { type, target, cost: 50 });
+            }
+        });
     }
 
-    socket.on('arena-match-found', (data) => {
-        document.getElementById('wait-screen').style.display = 'none';
-        document.getElementById('battle-area').style.display = 'block';
-        
-        const video = document.getElementById('battle-video');
-        const status = document.getElementById('battle-status');
-        
-        status.innerText = "SAVAŞ BAŞLADI!";
-
-        // 1. Hamle Videosu (Rakip)
-        const move1 = `/caracter/move/${data.opponentAnimal}/${data.opponentAnimal}1.mp4`;
-        video.src = move1;
-        video.play();
-
-        video.onended = () => {
-            // 2. Zafer Videosu (Kazanan)
-            status.innerText = `KAZANAN: ${data.winnerNick}`;
-            video.src = `/caracter/move/${data.winnerAnimal}/${data.winnerAnimal}.mp4`;
-            video.play();
-            
-            video.onended = () => {
-                setTimeout(() => { window.location.href = '/profil'; }, 2000);
-            };
-        };
+    socket.on('receive-bpl-invite', (data) => {
+        Swal.fire({
+            title: 'DAVET ALINDI!',
+            text: `${data.from} seni ${data.type.toUpperCase()} operasyonuna çağırıyor!`,
+            background: '#050a0f', color: '#fff', showCancelButton: true,
+            confirmButtonText: 'KATIL', cancelButtonText: 'REDDET'
+        }).then((res) => {
+            if (res.isConfirmed) socket.emit('accept-bpl-invite', { type: data.type, from: data.from });
+        });
     });
 
-    socket.on('error', (msg) => {
-        Swal.fire('Hata', msg, 'error').then(() => window.location.href = '/arena');
+    socket.on('redirect-to-room', (data) => {
+        // Ücreti ödeyen role=host parametresiyle gider, diğeri guest
+        window.location.href = `/${data.type}?room=${data.roomId}&role=${data.role}`;
     });
+
+    socket.on('new-chat-message', (data) => {
+        const msgDiv = document.createElement('div');
+        msgDiv.className = 'msg-line';
+        msgDiv.innerHTML = `<span class="msg-sender">${data.sender}:</span> <span class="msg-text">${data.text}</span>`;
+        document.getElementById('chat-messages').appendChild(msgDiv);
+        document.getElementById('chat-messages').scrollTop = document.getElementById('chat-messages').scrollHeight;
+    });
+
+    socket.on('error', (msg) => Swal.fire('Hata', msg, 'error'));
 </script>
 </body>
 </html>
-
