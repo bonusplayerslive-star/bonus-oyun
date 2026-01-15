@@ -646,57 +646,89 @@ io.on('connection', async (socket) => {
     });
 
     // 4. DAVET KABUL VE ÜCRET KESİNTİSİ
+io.on('connection', async (socket) => {
+    const uId = socket.request.session?.userId;
+    if (!uId) return;
+    const user = await User.findById(uId);
+    if (!user) return;
+
+    socket.userId = uId;
+    socket.nickname = user.nickname;
+    onlineUsers.set(user.nickname, socket.id);
+    socket.join("general-chat");
+
+    const broadcastOnlineList = () => {
+        const usersArray = Array.from(onlineUsers.keys()).map(nick => ({ nickname: nick }));
+        io.to("general-chat").emit('update-user-list', usersArray);
+    };
+    broadcastOnlineList();
+
+    // Mesajlaşma
+    socket.on('chat-message', (data) => {
+        if (!data.text) return;
+        io.to("general-chat").emit('new-chat-message', { 
+            sender: socket.nickname, 
+            text: data.text 
+        });
+    });
+
+    // 50 BPL'LİK DAVET SİSTEMİ (ARENA & MEETING)
+    socket.on('send-bpl-invite', async (data) => {
+        const senderUser = await User.findById(socket.userId);
+        if (senderUser.bpl < 50) {
+            return socket.emit('error', 'Yeterli BPL yok (Gerekli: 50)');
+        }
+
+        const targetSocketId = onlineUsers.get(data.target);
+        if (targetSocketId) {
+            io.to(targetSocketId).emit('receive-bpl-invite', {
+                from: socket.nickname,
+                type: data.type
+            });
+        } else {
+            socket.emit('error', 'Kullanıcı şu an çevrimdışı.');
+        }
+    });
+
     socket.on('accept-bpl-invite', async (data) => {
-        const senderNick = data.from; // Daveti ilk gönderen
-        const accepterNick = socket.nickname; // Kabul eden (şu anki socket)
-
+        const senderNick = data.from;
         const senderSocketId = onlineUsers.get(senderNick);
-        if (!senderSocketId) return socket.emit('error', 'Davet sahibi oyundan ayrıldı.');
+        if (!senderSocketId) return socket.emit('error', 'Davet sahibi ayrıldı.');
 
-        // 50 BPL Kesme Operasyonu (Sadece daveti gönderen öder)
         const hostUser = await User.findOne({ nickname: senderNick });
         if (hostUser.bpl < 50) {
-            return io.to(senderSocketId).emit('error', 'BPL yetersiz, işlem iptal edildi.');
+            return io.to(senderSocketId).emit('error', 'BPL yetersiz, işlem iptal.');
         }
 
         hostUser.bpl -= 50;
         await hostUser.save();
 
         const roomId = `room_${Date.now()}`;
-
-        // Davet Edene (Ödeyen): Host rolü ver
+        
+        // Önemli: Davet edene HOST, kabul edene GUEST rolü
         io.to(senderSocketId).emit('redirect-to-room', {
-            type: data.type,
-            roomId: roomId,
-            role: 'host'
+            type: data.type, roomId: roomId, role: 'host'
         });
-
-        // Kabul Edene: Guest rolü ver
         socket.emit('redirect-to-room', {
-            type: data.type,
-            roomId: roomId,
-            role: 'guest'
+            type: data.type, roomId: roomId, role: 'guest'
         });
     });
 
-    // 5. HEDİYE BPL SINIRI (5500 BPL Kuralı)
+    // 5500 BPL HEDİYE SINIRI
     socket.on('send-gift-bpl', async (data) => {
         const sender = await User.findById(socket.userId);
-        
-        // Sadece hediye gönderirken 5500 sınırı!
         if (sender.bpl < 5500) {
-            return socket.emit('error', 'Hediye göndermek için bakiyeniz en az 5500 BPL olmalıdır.');
+            return socket.emit('error', 'Hediye göndermek için en az 5500 BPL gereklidir!');
         }
-
-        // Hediyeleşme kodları buraya (miktar düşme, alıcıya ekleme vb.)
+        // Buraya bakiye transfer kodlarını ekleyebilirsin
     });
 
     socket.on('disconnect', () => {
         onlineUsers.delete(socket.nickname);
         broadcastOnlineList();
     });
-});
 
+}); // <--- ANA BAĞLANTI BURADA BİTMELİ, DIŞARIDA SOCKET KULLANILMAZ!
   // --- MEVCUT DAVET SİSTEMİN (AYNEN KALSIN) ---
     socket.on('meeting-invite-request', (data) => {
         const targetSid = onlineUsers.get(data.to);
@@ -992,6 +1024,7 @@ app.post('/api/help-request', async (req, res) => {
 
 const PORT = process.env.PORT || 3000;
 server.listen(PORT, () => console.log(`🚀 SİSTEM AKTİF: Port ${PORT}`));
+
 
 
 
