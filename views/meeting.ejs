@@ -385,6 +385,54 @@ function inviteUser() {
     
     document.getElementById('invite-nick').value = ""; // Kutuyu temizle
 }
+// --- ARENA ENTEGRASYON DİNLEYİCİLERİ (BOZMADAN EKLE) ---
+
+// 1. Meeting içindeyken Arena daveti gelirse yakala
+socket.on('arena-invite-received', (data) => {
+    Swal.fire({
+        title: 'ARENA DAVETİ!',
+        text: `${data.from} seni düelloya çağırıyor! Bakiyen ve statların kontrol edilecek.`,
+        icon: 'warning',
+        showCancelButton: true,
+        confirmButtonText: 'KABUL ET (ARENAYA GİT)',
+        cancelButtonText: 'REDDET',
+        background: '#0a1520',
+        color: '#fff',
+        confirmButtonColor: '#ff004c'
+    }).then((res) => {
+        if (res.isConfirmed) {
+            // Kamera ve mikrofonu kapat (donanım çakışmasını önlemek için)
+            if (localStream) {
+                localStream.getTracks().forEach(track => track.stop());
+            }
+            socket.emit('arena-invite-accept', { from: data.from });
+        }
+    });
+});
+
+// 2. Arena eşleşmesi tamamlandığında zorla yönlendir
+socket.on('force-arena-match', (data) => {
+    // Toplantıdan güvenli çıkış yap ve Arena'ya uç
+    if (localStream) {
+        localStream.getTracks().forEach(track => track.stop());
+    }
+    window.location.href = `/arena?room=${data.room}`;
+});
+
+// 3. Hata mesajlarını yakala (Bakiye yetersizliği vb.)
+socket.on('error', (msg) => {
+    Swal.fire({
+        title: 'OPERASYON HATASI',
+        text: msg,
+        icon: 'error',
+        background: '#0a1520',
+        color: '#fff'
+    });
+});
+
+
+
+
     function exitRoom() { window.location.href = "/chat"; }
     window.onclick = () => document.getElementById('user-menu').style.display = 'none';
     
@@ -392,6 +440,7 @@ function inviteUser() {
 </script>
 </body>
 </html>
+
 
 
 
