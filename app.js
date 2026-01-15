@@ -737,41 +737,33 @@ app.post('/api/withdraw-request', async (req, res) => {
 // --- YARDIM / DESTEK FORMU ROTASI ---
 app.post('/api/help-request', async (req, res) => {
     try {
-        // Sadece ihtiyacımız olanları alıyoruz
+        // 1. Verileri al ve DB'ye kaydet
         const { email, subject, message } = req.body; 
         const Help = require('./models/Help');
 
-        // Nickname olmadan yeni kayıt oluşturuyoruz
         const newHelp = new Help({ email, subject, message }); 
         await newHelp.save();
 
-        // Admin'e bildirim maili (Sadece email bilgisiyle)
+        // 2. SANA (ADMIN) GİDECEK BİLDİRİM MAİLİ
         const adminMailOptions = {
-            from: process.env.MAIL_USER, // Render Env'den çekilir
+            from: process.env.MAIL_USER, // Render Env: MAIL_USER
             to: process.env.MAIL_USER,
             subject: `DESTEK TALEBİ: ${subject}`,
             html: `
-                <div style="background:#111; color:#fff; padding:20px; border:1px solid #39FF14;">
-                    <h3>Yeni Destek Mesajı</h3>
+                <div style="background:#111; color:#fff; padding:20px; border:1px solid #39FF14; font-family:sans-serif;">
+                    <h3 style="color:#39FF14;">Yeni Destek Mesajı</h3>
                     <p><b>E-posta:</b> ${email}</p>
                     <p><b>Konu:</b> ${subject}</p>
-                    <hr>
+                    <hr style="border-color:#333;">
                     <p><b>Mesaj:</b></p>
-                    <p>${message}</p>
+                    <p style="background:#000; padding:10px;">${message}</p>
                 </div>
             `
         };
-
         transporter.sendMail(adminMailOptions);
 
-        res.json({ success: true });
-    } catch (err) {
-        console.error("Yardım Rotası Hatası:", err);
-        res.json({ success: false, error: 'Mesaj iletilemedi.' });
-    }
-
-
-if (subject === "Sifre Islemleri") {
+        // 3. KULLANICIYA GİDECEK OTOMATİK MAİL (Sadece Şifre İşlemleri İçin)
+        if (subject === "Sifre Islemleri") {
             const userMailOptions = {
                 from: process.env.MAIL_USER,
                 to: email,
@@ -780,7 +772,7 @@ if (subject === "Sifre Islemleri") {
                     <div style="background:#000; color:#fff; padding:20px; border:2px solid #00d4ff; font-family:monospace;">
                         <h2 style="color:#00d4ff;">PROTOKOL: ŞİFRE YENİLEME</h2>
                         <p>Sistemimize e-posta adresiniz üzerinden bir şifre yenileme talebi iletilmiştir.</p>
-                        <p>Güvenlik nedeniyle işlemler manuel olarak kontrol edilmektedir. Lütfen <b>24 saat</b> içerisinde size gönderilecek olan geçici şifreyi bekleyin.</p>
+                        <p>Güvenlik nedeniyle işlemler manuel kontrol edilmektedir. Lütfen <b>24 saat</b> içerisinde size gönderilecek olan geçici şifreyi bekleyin.</p>
                         <hr style="border-color:#333;">
                         <p style="color:#888; font-size:12px;">Bu işlem size ait değilse, lütfen bu maili dikkate almayın.</p>
                     </div>
@@ -789,16 +781,19 @@ if (subject === "Sifre Islemleri") {
             transporter.sendMail(userMailOptions);
         }
 
-        res.json({ success: true });
+        // 4. BAŞARILI YANITI (Sadece bir kez gönderilir)
+        res.json({ success: true, msg: 'Talebiniz merkeze iletildi.' });
+
     } catch (err) {
-        res.json({ success: false, error: 'Hata oluştu.' });
+        console.error("Yardım Rotası Hatası:", err);
+        res.json({ success: false, error: 'İşlem sırasında bir hata oluştu.' });
     }
-});    
 });
 
 
 const PORT = process.env.PORT || 3000;
 server.listen(PORT, () => console.log(`🚀 SİSTEM AKTİF: Port ${PORT}`));
+
 
 
 
