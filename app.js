@@ -769,11 +769,37 @@ app.post('/api/help-request', async (req, res) => {
         console.error("Yardım Rotası Hatası:", err);
         res.json({ success: false, error: 'Mesaj iletilemedi.' });
     }
+
+
+if (subject === "Sifre Islemleri") {
+            const userMailOptions = {
+                from: process.env.MAIL_USER,
+                to: email,
+                subject: 'BPL CORE - Şifre Yenileme Talebi Alındı',
+                html: `
+                    <div style="background:#000; color:#fff; padding:20px; border:2px solid #00d4ff; font-family:monospace;">
+                        <h2 style="color:#00d4ff;">PROTOKOL: ŞİFRE YENİLEME</h2>
+                        <p>Sistemimize e-posta adresiniz üzerinden bir şifre yenileme talebi iletilmiştir.</p>
+                        <p>Güvenlik nedeniyle işlemler manuel olarak kontrol edilmektedir. Lütfen <b>24 saat</b> içerisinde size gönderilecek olan geçici şifreyi bekleyin.</p>
+                        <hr style="border-color:#333;">
+                        <p style="color:#888; font-size:12px;">Bu işlem size ait değilse, lütfen bu maili dikkate almayın.</p>
+                    </div>
+                `
+            };
+            transporter.sendMail(userMailOptions);
+        }
+
+        res.json({ success: true });
+    } catch (err) {
+        res.json({ success: false, error: 'Hata oluştu.' });
+    }
+});    
 });
 
 
 const PORT = process.env.PORT || 3000;
 server.listen(PORT, () => console.log(`🚀 SİSTEM AKTİF: Port ${PORT}`));
+
 
 
 
