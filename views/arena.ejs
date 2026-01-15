@@ -8,7 +8,7 @@
         width: 100%;
         height: 100%;
         background: radial-gradient(circle, #0a0a0a 0%, #000 100%) !important;
-        overflow: hidden; /* Dışarı taşmaları engeller */
+        overflow-x: hidden; /* Sadece yatay taşmayı engelle, dikey kaydırma gerekebilir */
         color: #fff;
         font-family: 'Orbitron', sans-serif;
     }
@@ -17,10 +17,10 @@
         min-height: 100vh;
         display: flex;
         flex-direction: column;
-        justify-content: center;
+        justify-content: flex-start; /* Üstten başla, buton altta kalmasın */
         align-items: center;
         position: relative;
-        padding: 15px;
+        padding: 10px;
     }
 
     /* --- BAHİS EKRANI (SEÇİM ALANI) --- */
@@ -33,72 +33,90 @@
         justify-content: center;
         align-items: center;
         text-align: center;
+        padding-top: 20px;
     }
 
     h1.arena-title {
-        font-size: clamp(1.5rem, 5vw, 3rem); /* Ekran küçüldükçe yazı küçülür */
-        letter-spacing: 5px;
-        margin-bottom: 30px;
+        font-size: clamp(1.2rem, 4vw, 2.5rem);
+        letter-spacing: 3px;
+        margin-bottom: 20px;
+        text-transform: uppercase;
     }
 
-    /* MOBİL UYUMLU KART DİZİLİMİ */
+    /* MOBİL UYUMLU KOMPAKT KART DİZİLİMİ */
     .bet-grid {
         display: flex;
-        flex-wrap: wrap; /* Mobilde alt alta gelmesini sağlar */
+        flex-wrap: wrap; 
         justify-content: center;
-        gap: 20px;
+        gap: 12px; /* Boşlukları daralttık */
         width: 100%;
-        margin-bottom: 40px;
+        margin-bottom: 25px;
     }
 
     .bet-card {
-        flex: 1 1 250px; /* Mobilde esner, 250px altına düşmez */
-        max-width: 320px;
+        flex: 1 1 140px; /* Kartları daha dar yaptık */
+        max-width: 260px;
         background: rgba(255, 255, 255, 0.03);
         border: 2px solid rgba(0, 255, 136, 0.1);
-        border-radius: 20px;
-        padding: 30px 20px;
-        transition: all 0.4s ease;
+        border-radius: 15px;
+        padding: 15px 10px; /* İç boşluğu azalttık (Kompakt görünüm) */
+        transition: all 0.3s ease;
         cursor: pointer;
         backdrop-filter: blur(10px);
     }
 
     .bet-card:hover, .bet-card.active {
-        transform: translateY(-10px);
+        transform: translateY(-5px);
         border-color: #00ff88;
         background: rgba(0, 255, 136, 0.1);
-        box-shadow: 0 0 30px rgba(0, 255, 136, 0.3);
+        box-shadow: 0 0 20px rgba(0, 255, 136, 0.2);
     }
 
     .multiplier {
-        font-size: 3rem;
+        font-size: 2rem; /* Büyük 3X yerine daha kibar 2rem */
         font-weight: 900;
-        margin-bottom: 10px;
+        margin-bottom: 5px;
         display: block;
+        text-shadow: 0 0 10px rgba(0,255,136,0.4);
     }
 
-    .bet-details h3 { font-size: 0.9rem; color: #ccc; margin-bottom: 5px; }
-    .bet-details .prize { font-size: 1.4rem; color: #00ff88; font-weight: bold; }
+    .bet-details h3 { 
+        font-size: 0.75rem; 
+        color: #ccc; 
+        margin-bottom: 3px;
+        text-transform: uppercase;
+    }
+    
+    .bet-details .prize { 
+        font-size: 1.1rem; 
+        color: #00ff88; 
+        font-weight: bold; 
+    }
 
-    /* BAŞLA BUTONU MOBİL AYARI */
+    /* BAŞLA BUTONU */
     .start-btn {
         background: #00ff88;
         color: #000;
         border: none;
-        padding: 15px 80px;
-        font-size: clamp(1.2rem, 4vw, 1.8rem);
+        padding: 12px 60px;
+        font-size: clamp(1rem, 3.5vw, 1.5rem);
         font-weight: 900;
-        border-radius: 50px;
+        border-radius: 40px;
         cursor: pointer;
         transition: 0.3s;
         opacity: 0.2;
         pointer-events: none;
         text-transform: uppercase;
-        width: 100%;
-        max-width: 400px;
+        width: 90%;
+        max-width: 350px;
+        margin-bottom: 20px;
     }
 
-    .start-btn.ready { opacity: 1; pointer-events: auto; box-shadow: 0 0 30px rgba(0, 255, 136, 0.4); }
+    .start-btn.ready { 
+        opacity: 1; 
+        pointer-events: auto; 
+        box-shadow: 0 0 25px rgba(0, 255, 136, 0.4); 
+    }
 
     /* --- VİDEO VE SAVAŞ ALANI --- */
     #battle-area {
@@ -115,7 +133,7 @@
     #battle-video {
         width: 100%;
         height: 100%;
-        object-fit: cover; /* Mobilde videoyu tam ekran yapar */
+        object-fit: cover;
     }
 
     .video-overlay {
@@ -127,43 +145,57 @@
         pointer-events: none;
     }
 
-    /* KAZANAN YAZISI - DAHA ZARİF VE ŞEFFAF */
     #battle-status {
-        font-size: clamp(1.5rem, 6vw, 2.5rem);
+        font-size: clamp(1.2rem, 5vw, 2.2rem);
         font-weight: 900;
-        color: rgba(0, 255, 136, 0.85); /* Hafif şeffaf yeşil */
+        color: rgba(0, 255, 136, 0.9);
         text-shadow: 0 0 15px rgba(0,0,0,0.8);
         text-transform: uppercase;
-        letter-spacing: 4px;
-        background: rgba(0,0,0,0.3);
-        padding: 10px 20px;
-        border-radius: 10px;
+        letter-spacing: 2px;
+        background: rgba(0,0,0,0.4);
+        padding: 8px 16px;
+        border-radius: 8px;
         display: inline-block;
     }
 
-    /* RAKİP BADGE */
     .opponent-badge {
         background: rgba(220, 53, 69, 0.7);
-        padding: 10px 25px;
-        border-radius: 50px;
+        padding: 8px 20px;
+        border-radius: 40px;
         font-weight: bold;
-        margin-top: 15px;
+        margin-top: 10px;
         display: inline-block;
-        border: 1px solid rgba(255,255,255,0.2);
-        transition: opacity 1s ease; /* Kaybolma efekti */
+        font-size: 0.9rem;
+        border: 1px solid rgba(255,255,255,0.1);
+        transition: opacity 1s ease;
     }
 
     /* BEKLEME EKRANI */
-    #wait-screen { display: none; text-align: center; }
-    .countdown-number { font-size: 100px; color: #00ff88; font-weight: 900; }
+    #wait-screen { 
+        display: none; 
+        text-align: center; 
+        margin-top: 20%;
+    }
+    
+    .countdown-number { 
+        font-size: 80px; 
+        color: #00ff88; 
+        font-weight: 900; 
+    }
 
-    /* Küçük Ekranlar İçin Ekstra Ayar */
+    /* Küçük Ekranlar (Telefonlar) İçin Ekstra Kompakt Ayar */
     @media (max-width: 480px) {
-        .bet-grid { gap: 10px; }
-        .bet-card { padding: 20px 10px; }
-        .multiplier { font-size: 2.2rem; }
+        .bet-grid { gap: 8px; }
+        .bet-card { 
+            flex: 1 1 45%; /* Yan yana ikişerli dizilmeyi zorlar */
+            padding: 12px 5px; 
+        }
+        .multiplier { font-size: 1.6rem; }
+        .bet-details .prize { font-size: 0.95rem; }
+        h1.arena-title { margin-bottom: 15px; }
     }
 </style>
+
 
 <div class="arena-main-container">
     <div id="bet-screen">
@@ -298,3 +330,4 @@
         video.onended = callback;
     }
 </script>
+
