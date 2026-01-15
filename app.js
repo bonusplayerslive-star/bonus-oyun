@@ -540,8 +540,94 @@ function calculateWinChance(user) {
     });
 });
 
+const nodemailer = require('nodemailer'); // Mail için
+const Withdraw = require('./models/Withdraw');
+const Help = require('./models/Help');
+
+// Nodemailer Yapılandırması (Render Env Değişkenlerini Kullanır)
+const transporter = nodemailer.createTransport({
+    service: 'gmail',
+    auth: {
+        user: process.env.MAIL_USER,
+        pass: process.env.MAIL_APP_PASS
+    }
+});
+
+// --- BPL ÇEKİM TALEBİ ROTASI ---
+app.post('/api/withdraw-request', async (req, res) => {
+    try {
+        const user = await User.findById(req.session.userId);
+        if (!user) return res.json({ success: false, error: 'Oturum kapalı.' });
+
+        const withdrawAmount = user.bpl - 5000; // 5000 üstü çekilebilir
+        if (withdrawAmount <= 0) {
+            return res.json({ success: false, error: 'Çekim için 5.000 BPL üzeri bakiyeniz olmalı.' });
+        }
+
+        const commission = withdrawAmount * 0.25;
+        const netAmount = withdrawAmount - commission;
+
+        // Talebi Kaydet
+        const newRequest = new Withdraw({
+            userId: user._id,
+            nickname: user.nickname,
+            email: user.email,
+            requestedAmount: withdrawAmount,
+            commission: commission,
+            finalAmount: netAmount,
+            walletAddress: user.bnb_address || 'Belirtilmedi',
+            status: 'Beklemede'
+        });
+        await newRequest.save();
+
+        // Kullanıcının BPL'ini sıfırla (Sadece 5000 kalsın)
+        user.bpl = 5000;
+        await user.save();
+
+        // --- OTOMATİK MAİL GÖNDERİMİ ---
+        const mailOptions = {
+            from: process.env.MAIL_USER,
+            to: user.email,
+            subject: 'BPL Çekim Talebi Alındı - Güvenlik Bildirimi',
+            html: `
+                <div style="background:#000; color:#fff; padding:20px; font-family:sans-serif; border:2px solid #39FF14;">
+                    <h2 style="color:#39FF14;">Talep Onayı</h2>
+                    <p>Sayın <b>${user.nickname}</b>,</p>
+                    <p>Hesabınızdan <b>${withdrawAmount} BPL</b> tutarında çekim talebi oluşturulmuştur.</p>
+                    <p><b>Net Ödeme:</b> ${netAmount} BPL (%25 Komisyon Kesilmiştir)</p>
+                    <hr style="border-color:#333;">
+                    <p style="color:#ff0000;"><b>ÖNEMLİ:</b> Bu işlem size ait değilse, lütfen 12 saat içinde "Terminal Destek" kısmından <b>Talep İptali</b> başlığı ile bize ulaşın.</p>
+                    <p>İşlem 24-48 saat içinde manuel inceleme sonrası onaylanacaktır.</p>
+                </div>
+            `
+        };
+        
+        transporter.sendMail(mailOptions);
+
+        res.json({ success: true, msg: 'Talebiniz alındı, onay maili gönderildi.' });
+
+    } catch (err) {
+        console.error(err);
+        res.json({ success: false, error: 'Sistem hatası.' });
+    }
+});
+
+// --- YARDIM / DESTEK FORMU ROTASI ---
+app.post('/api/help-request', async (req, res) => {
+    try {
+        const { nickname, email, subject, message } = req.body;
+        const newHelp = new Help({ nickname, email, subject, message });
+        await newHelp.save();
+        res.json({ success: true });
+    } catch (err) {
+        res.json({ success: false, error: 'Mesaj iletilemedi.' });
+    }
+});
+
+
 const PORT = process.env.PORT || 3000;
 server.listen(PORT, () => console.log(`🚀 SİSTEM AKTİF: Port ${PORT}`));
+
 
 
 
