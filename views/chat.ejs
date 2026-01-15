@@ -80,109 +80,171 @@
         <div id="user-list" class="overflow-auto"></div>
     </div>
 </div>
+<%- include('header') %>
+
+<style>
+    body, html {
+        margin: 0; padding: 0; width: 100%; height: 100%;
+        background: radial-gradient(circle, #0a0a0a 0%, #000 100%) !important;
+        overflow-x: hidden; color: #fff; font-family: 'Orbitron', sans-serif;
+    }
+
+    .arena-main-container {
+        min-height: 100vh; display: flex; flex-direction: column;
+        justify-content: flex-start; align-items: center; padding: 10px;
+    }
+
+    #bet-screen {
+        z-index: 10; width: 100%; max-width: 1100px;
+        display: flex; flex-direction: column; align-items: center; text-align: center; padding-top: 20px;
+    }
+
+    .bet-grid { display: flex; flex-wrap: wrap; justify-content: center; gap: 12px; width: 100%; margin-bottom: 25px; }
+
+    .bet-card {
+        flex: 1 1 140px; max-width: 240px; background: rgba(255, 255, 255, 0.03);
+        border: 2px solid rgba(0, 255, 136, 0.1); border-radius: 15px; padding: 15px 10px;
+        transition: all 0.3s ease; cursor: pointer; backdrop-filter: blur(10px);
+    }
+
+    .bet-card.active { border-color: #00ff88; background: rgba(0, 255, 136, 0.1); box-shadow: 0 0 20px rgba(0, 255, 136, 0.2); }
+
+    .multiplier { font-size: 1.8rem; font-weight: 900; display: block; }
+
+    .start-btn {
+        background: #00ff88; color: #000; border: none; padding: 12px 60px;
+        font-size: 1.2rem; font-weight: 900; border-radius: 40px; cursor: pointer;
+        opacity: 0.2; pointer-events: none; text-transform: uppercase; width: 90%; max-width: 350px;
+    }
+
+    .start-btn.ready { opacity: 1; pointer-events: auto; }
+
+    /* Bekleme ve Savaş Alanı */
+    #wait-screen { display: none; text-align: center; margin-top: 20%; }
+    .countdown-number { font-size: 80px; color: #00ff88; font-weight: 900; }
+
+    #battle-area { position: fixed; top: 0; left: 0; width: 100vw; height: 100vh; background: #000; display: none; z-index: 9999; }
+    #battle-video { width: 100%; height: 100%; object-fit: cover; }
+    .video-overlay { position: absolute; top: 10%; width: 100%; text-align: center; z-index: 10001; }
+    #battle-status { font-size: 1.5rem; color: #00ff88; background: rgba(0,0,0,0.6); padding: 10px 20px; border-radius: 10px; display: inline-block; }
+</style>
+
+<div class="arena-main-container">
+    <div id="bet-screen">
+        <% if (!user.selectedAnimal || user.selectedAnimal === 'none') { %>
+            <div class="text-center p-4">
+                <h2 class="text-danger">DÖVÜŞÇÜ SEÇİLMEDİ!</h2>
+                <a href="/profil" class="btn btn-success mt-3">PROFİLE GİT</a>
+            </div>
+        <% } else { %>
+            <h1 class="mb-4">ARENA DÜELLOSU</h1>
+            <div class="bet-grid">
+                <div class="bet-card" onclick="selectBet(this, 25, 50)">
+                    <span class="multiplier" style="color: #fff;">X</span>
+                    <small>Giriş: 25 BPL / Ödül: 50 BPL</small>
+                </div>
+                <div class="bet-card" onclick="selectBet(this, 35, 100)">
+                    <span class="multiplier" style="color: #00ff88;">2X</span>
+                    <small>Giriş: 35 BPL / Ödül: 100 BPL</small>
+                </div>
+                <div class="bet-card" onclick="selectBet(this, 50, 150)">
+                    <span class="multiplier" style="color: #00d4ff;">6X</span>
+                    <small>Giriş: 50 BPL / Ödül: 150 BPL</small>
+                </div>
+                <div class="bet-card" onclick="selectBet(this, 100, 250)">
+                    <span class="multiplier" style="color: #ff0055;">10X</span>
+                    <small>Giriş: 100 BPL / Ödül: 250 BPL</small>
+                </div>
+            </div>
+            <button id="start-btn" class="start-btn" onclick="joinQueue()">SIRAYA GİR</button>
+        <% } %>
+    </div>
+
+    <div id="wait-screen">
+        <div class="countdown-number" id="timer">13</div>
+        <h2 class="text-white mt-4">RAKİP ARANIYOR...</h2>
+    </div>
+
+    <div id="battle-area">
+        <div class="video-overlay">
+            <div id="battle-status">HAZIRLAN...</div>
+        </div>
+        <video id="battle-video" playsinline muted autoplay></video>
+    </div>
+</div>
 
 <script src="/socket.io/socket.io.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
+
 <script>
     const socket = io();
-    const chatForm = document.getElementById('chat-form');
-    const chatInput = document.getElementById('chat-input');
-    const chatMessages = document.getElementById('chat-messages');
-    const userList = document.getElementById('user-list');
+    let selectedData = null;
+    const urlParams = new URLSearchParams(window.location.search);
+    const roomID = urlParams.get('room');
 
-    // 1. MESAJLAŞMA SİSTEMİ
-    chatForm.addEventListener('submit', (e) => {
-        e.preventDefault();
-        if (chatInput.value.trim()) {
-            socket.emit('chat-message', { text: chatInput.value });
-            chatInput.value = '';
-        }
-    });
-
-    socket.on('new-message', (data) => {
-        const div = document.createElement('div');
-        div.className = 'msg-line';
-        if(data.sender === "SİSTEM") {
-            div.innerHTML = `<span class="msg-system">⚠️ ${data.text}</span>`;
-        } else {
-            div.innerHTML = `<span class="msg-sender">${data.sender}:</span> <span class="msg-text">${data.text}</span>`;
-        }
-        chatMessages.appendChild(div);
-        chatMessages.scrollTop = chatMessages.scrollHeight;
-    });
-
-    // 2. AKTİF KULLANICILAR VE AKSİYON BUTONLARI
-    socket.on('update-online-users', (users) => {
-        userList.innerHTML = '';
-        users.forEach(u => {
-            const div = document.createElement('div');
-            div.className = 'user-item';
-            div.innerHTML = `
-                <span style="font-size:13px">${u.nickname}</span>
-                <div class="user-actions">
-                    <button class="btn btn-danger btn-mini" onclick="inviteArena('${u.nickname}')">ARENA</button>
-                    <button class="btn btn-warning btn-mini" onclick="sendGift('${u.nickname}')">BPL</button>
-                    <button class="btn btn-info btn-mini" onclick="inviteMeeting('${u.nickname}')">MEET</button>
-                </div>
-            `;
-            userList.appendChild(div);
-        });
-    });
-
-    // 3. FONKSİYONLAR (HEDİYE, ARENA, MEETING)
-    function sendGift(nick) {
-        Swal.fire({
-            title: `BPL Gönder: ${nick}`,
-            input: 'number',
-            inputLabel: 'Miktar (100 - 2000)',
-            showCancelButton: true,
-            confirmButtonColor: '#ff004c',
-            background: '#050a0f',
-            color: '#fff'
-        }).then((res) => {
-            if (res.isConfirmed) socket.emit('send-gift-bpl', { to: nick, amount: res.value });
-        });
+    // Eğer chatten bir room ile gelindiyse doğrudan bekleme ekranına geç
+    if (roomID) {
+        document.getElementById('bet-screen').style.display = 'none';
+        document.getElementById('battle-area').style.display = 'block';
+        document.getElementById('battle-status').innerText = "DÜELLO BAŞLIYOR...";
+        // Not: Server tarafında oda eşleştiğinde 'arena-match-found' tetiklenecek.
     }
 
-    function inviteArena(nick) {
-        socket.emit('arena-invite-request', { to: nick });
-        Swal.fire({ title: 'Davet gönderildi...', toast: true, position: 'top-end', timer: 2000, showConfirmButton: false });
+    function selectBet(element, bet, prize) {
+        document.querySelectorAll('.bet-card').forEach(c => c.classList.remove('active'));
+        element.classList.add('active');
+        selectedData = { bet, prize };
+        document.getElementById('start-btn').classList.add('ready');
     }
 
-    function inviteMeeting(nick) {
-        socket.emit('send-meeting-invite', { target: nick });
-        Swal.fire({ title: 'Meeting daveti iletildi!', icon: 'success', timer: 1500 });
+    function joinQueue() {
+        if (!selectedData) return;
+        document.getElementById('bet-screen').style.display = 'none';
+        document.getElementById('wait-screen').style.display = 'block';
+
+        socket.emit('arena-join-queue', { 
+            bet: selectedData.bet, 
+            prize: selectedData.prize 
+        });
+
+        let count = 13;
+        const timer = setInterval(() => {
+            count--;
+            document.getElementById('timer').innerText = count;
+            if (count <= 0) clearInterval(timer);
+        }, 1000);
     }
 
-    // 4. GELEN DAVETLERİN KARŞILANMASI
-    socket.on('arena-invite-received', (data) => {
-        Swal.fire({
-            title: 'ARENA DAVETİ!',
-            text: `${data.from} seni düelloya çağırıyor! (25 BPL)`,
-            showCancelButton: true,
-            confirmButtonText: 'KABUL ET',
-            cancelButtonText: 'REDDET'
-        }).then((res) => {
-            if (res.isConfirmed) socket.emit('arena-invite-accept', { from: data.from });
-        });
+    socket.on('arena-match-found', (data) => {
+        document.getElementById('wait-screen').style.display = 'none';
+        document.getElementById('battle-area').style.display = 'block';
+        
+        const video = document.getElementById('battle-video');
+        const status = document.getElementById('battle-status');
+        
+        status.innerText = "SAVAŞ BAŞLADI!";
+
+        // 1. Hamle Videosu (Rakip)
+        const move1 = `/caracter/move/${data.opponentAnimal}/${data.opponentAnimal}1.mp4`;
+        video.src = move1;
+        video.play();
+
+        video.onended = () => {
+            // 2. Zafer Videosu (Kazanan)
+            status.innerText = `KAZANAN: ${data.winnerNick}`;
+            video.src = `/caracter/move/${data.winnerAnimal}/${data.winnerAnimal}.mp4`;
+            video.play();
+            
+            video.onended = () => {
+                setTimeout(() => { window.location.href = '/profil'; }, 2000);
+            };
+        };
     });
 
-    socket.on('meeting-invite-received', (data) => {
-        Swal.fire({
-            title: 'MEETING DAVETİ',
-            text: `${data.from} seni masasına bekliyor.`,
-            showCancelButton: true,
-            confirmButtonText: 'KATIL',
-        }).then((res) => {
-            if (res.isConfirmed) window.location.href = `/meeting?room=${data.room}&role=guest`;
-        });
+    socket.on('error', (msg) => {
+        Swal.fire('Hata', msg, 'error').then(() => window.location.href = '/arena');
     });
-
-    // Yönlendirmeler
-    socket.on('force-arena-match', (data) => window.location.href = `/arena?room=${data.room}`);
-    socket.on('force-join-meeting', (data) => window.location.href = `/meeting?room=${data.room}&role=${data.role || 'guest'}`);
-    socket.on('error', (msg) => Swal.fire('Hata', msg, 'error'));
-
 </script>
 </body>
 </html>
+
