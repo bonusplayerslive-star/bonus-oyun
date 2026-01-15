@@ -607,18 +607,95 @@ io.on('connection', async (socket) => {
     onlineUsers.set(user.nickname, socket.id);
     socket.join("general-chat");
 
+    // 1. ONLINE LİSTESİNİ GÜNCELLE (EJS ile uyumlu isim: update-user-list)
     const broadcastOnlineList = () => {
         const usersArray = Array.from(onlineUsers.keys()).map(nick => ({ nickname: nick }));
-        io.to("general-chat").emit('update-online-users', usersArray);
+        io.to("general-chat").emit('update-user-list', usersArray);
     };
     broadcastOnlineList();
-    socket.emit('load-history', chatHistory);
 
+    // 2. CHAT MESAJLAŞMA (EJS ile uyumlu isim: new-chat-message)
     socket.on('chat-message', (data) => {
         if (!data.text) return;
-        addToHistory(socket.nickname, data.text);
-        io.to("general-chat").emit('new-message', { sender: socket.nickname, text: data.text });
+        // Opsiyonel: addToHistory(socket.nickname, data.text); 
+        io.to("general-chat").emit('new-chat-message', { 
+            sender: socket.nickname, 
+            text: data.text 
+        });
     });
+
+    // 3. DAVET SİSTEMİ (Arena & Meeting)
+    socket.on('send-bpl-invite', async (data) => {
+        const senderUser = await User.findById(socket.userId);
+        
+        // Bakiye Kontrolü (50 BPL var mı?)
+        if (senderUser.bpl < 50) {
+            return socket.emit('error', 'Yeterli BPL yok (Gerekli: 50)');
+        }
+
+        const targetSocketId = onlineUsers.get(data.target);
+        if (targetSocketId) {
+            // Davet gidiyor...
+            io.to(targetSocketId).emit('receive-bpl-invite', {
+                from: socket.nickname,
+                type: data.type
+            });
+        } else {
+            socket.emit('error', 'Kullanıcı şu an çevrimdışı.');
+        }
+    });
+
+    // 4. DAVET KABUL VE ÜCRET KESİNTİSİ
+    socket.on('accept-bpl-invite', async (data) => {
+        const senderNick = data.from; // Daveti ilk gönderen
+        const accepterNick = socket.nickname; // Kabul eden (şu anki socket)
+
+        const senderSocketId = onlineUsers.get(senderNick);
+        if (!senderSocketId) return socket.emit('error', 'Davet sahibi oyundan ayrıldı.');
+
+        // 50 BPL Kesme Operasyonu (Sadece daveti gönderen öder)
+        const hostUser = await User.findOne({ nickname: senderNick });
+        if (hostUser.bpl < 50) {
+            return io.to(senderSocketId).emit('error', 'BPL yetersiz, işlem iptal edildi.');
+        }
+
+        hostUser.bpl -= 50;
+        await hostUser.save();
+
+        const roomId = `room_${Date.now()}`;
+
+        // Davet Edene (Ödeyen): Host rolü ver
+        io.to(senderSocketId).emit('redirect-to-room', {
+            type: data.type,
+            roomId: roomId,
+            role: 'host'
+        });
+
+        // Kabul Edene: Guest rolü ver
+        socket.emit('redirect-to-room', {
+            type: data.type,
+            roomId: roomId,
+            role: 'guest'
+        });
+    });
+
+    // 5. HEDİYE BPL SINIRI (5500 BPL Kuralı)
+    socket.on('send-gift-bpl', async (data) => {
+        const sender = await User.findById(socket.userId);
+        
+        // Sadece hediye gönderirken 5500 sınırı!
+        if (sender.bpl < 5500) {
+            return socket.emit('error', 'Hediye göndermek için bakiyeniz en az 5500 BPL olmalıdır.');
+        }
+
+        // Hediyeleşme kodları buraya (miktar düşme, alıcıya ekleme vb.)
+    });
+
+    socket.on('disconnect', () => {
+        onlineUsers.delete(socket.nickname);
+        broadcastOnlineList();
+    });
+});
 
   // --- MEVCUT DAVET SİSTEMİN (AYNEN KALSIN) ---
     socket.on('meeting-invite-request', (data) => {
@@ -915,6 +992,7 @@ app.post('/api/help-request', async (req, res) => {
 
 const PORT = process.env.PORT || 3000;
 server.listen(PORT, () => console.log(`🚀 SİSTEM AKTİF: Port ${PORT}`));
+
 
 
 
