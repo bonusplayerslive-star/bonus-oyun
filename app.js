@@ -613,7 +613,7 @@ io.on('connection', async (socket) => {
     };
     broadcastOnlineList();
 
- // --- TÜM SOCKET SİSTEMİ (TEK PARÇA) ---
+// --- TÜM SOCKET SİSTEMİ (TEK BAĞLANTI BLOĞU - HATASIZ) ---
 io.on('connection', async (socket) => {
     const uId = socket.request.session?.userId;
     if (!uId) return;
@@ -632,7 +632,7 @@ io.on('connection', async (socket) => {
     };
     broadcastOnlineList();
 
-    // 2. Genel Chat Mesajlaşma (Chat.ejs ile uyumlu)
+    // 2. Genel Chat Mesajlaşma
     socket.on('chat-message', (data) => {
         if (!data.text) return;
         io.to("general-chat").emit('new-chat-message', { 
@@ -641,16 +641,17 @@ io.on('connection', async (socket) => {
         });
     });
 
-    // 3. 50 BPL'lik Davet Sistemi (Arena & Meeting)
+    // 3. 50 BPL Davet Sistemi
     socket.on('send-bpl-invite', async (data) => {
         const senderUser = await User.findById(socket.userId);
-        if (senderUser.bpl < 50) return socket.emit('error', 'Yeterli BPL yok (Gerekli: 50)');
-
+        if (!senderUser || senderUser.bpl < 50) {
+            return socket.emit('error', 'Yeterli BPL yok (Gerekli: 50)');
+        }
         const targetSocketId = onlineUsers.get(data.target);
         if (targetSocketId) {
             io.to(targetSocketId).emit('receive-bpl-invite', { from: socket.nickname, type: data.type });
         } else {
-            socket.emit('error', 'Kullanıcı çevrimdışı.');
+            socket.emit('error', 'Kullanıcı şu an çevrimdışı.');
         }
     });
 
@@ -660,7 +661,9 @@ io.on('connection', async (socket) => {
         if (!senderSocketId) return socket.emit('error', 'Davet sahibi ayrıldı.');
 
         const hostUser = await User.findOne({ nickname: senderNick });
-        if (hostUser.bpl < 50) return io.to(senderSocketId).emit('error', 'BPL yetersiz.');
+        if (!hostUser || hostUser.bpl < 50) {
+            return io.to(senderSocketId).emit('error', 'BPL yetersiz, işlem iptal.');
+        }
 
         hostUser.bpl -= 50;
         await hostUser.save();
@@ -670,24 +673,27 @@ io.on('connection', async (socket) => {
         socket.emit('redirect-to-room', { type: data.type, roomId: roomId, role: 'guest' });
     });
 
-    // 4. Meeting Odası İşlemleri
+    // 4. Meeting & Arena İç İşlemleri
     socket.on('join-meeting', (data) => {
         socket.join(data.roomId);
         socket.to(data.roomId).emit('user-connected', { peerId: data.peerId, nickname: data.nickname });
     });
 
     socket.on('meeting-message', (data) => {
-        if (data.room && data.text) io.to(data.room).emit('new-meeting-message', { sender: socket.nickname, text: data.text });
+        if (data.room && data.text) {
+            io.to(data.room).emit('new-meeting-message', { sender: socket.nickname, text: data.text });
+        }
     });
 
+    // 5. Hediye Sistemi (5500 Sınırı)
     socket.on('meeting-gift-send', async (data) => {
         try {
             const sender = await User.findById(socket.userId);
-            if (!sender || sender.bpl < 5500) return socket.emit('error', 'Hediye sınırı: 5500 BPL!');
-            
+            if (!sender || sender.bpl < 5500) return socket.emit('error', 'Hediye için 5500 BPL gerekli!');
             const receiver = await User.findOne({ nickname: data.targetNick });
             if (receiver) {
-                sender.bpl -= data.amount; receiver.bpl += data.amount;
+                sender.bpl -= data.amount;
+                receiver.bpl += data.amount;
                 await sender.save(); await receiver.save();
                 socket.emit('update-bpl', sender.bpl);
                 const tSid = onlineUsers.get(data.targetNick);
@@ -697,198 +703,67 @@ io.on('connection', async (socket) => {
         } catch (err) { console.error(err); }
     });
 
-    // 5. Arena Savaş Sistemi
-    socket.on('arena-join-queue', async (data) => {
-        try {
-            const u = await User.findById(socket.userId);
-            if (!u || u.bpl < (data.bet || 0)) return socket.emit('error', 'Yetersiz bakiye!');
-
-            u.bpl -= (data.bet || 0);
-            await u.save();
-            socket.emit('update-bpl', u.bpl);
-
-            const player = { nickname: u.nickname, socketId: socket.id, animal: u.selectedAnimal || 'Lion', dbData: u, bet: data.bet, prize: data.prize };
-
-            if (arenaQueue.length > 0) {
-                const opponent = arenaQueue.shift();
-                startBattle(player, opponent, io);
-            } else {
-                arenaQueue.push(player);
-                setTimeout(() => {
-                    const idx = arenaQueue.findIndex(p => p.socketId === socket.id);
-                    if (idx !== -1) {
-                        const p = arenaQueue.splice(idx, 1)[0];
-                        const botPlayer = { nickname: "Bot_" + p.animal, socketId: null, animal: p.animal, dbData: { atk: p.dbData.atk * 0.9, def: p.dbData.def * 0.9, hp: 100 }, bet: p.bet, prize: p.prize };
-                        startBattle(p, botPlayer, io);
-                    }
-                }, 13000);
-            }
-        } catch (err) { console.error(err); }
-    });
-
-    // 6. Genel Hediye Sistemi (Chat)
-    socket.on('send-gift-bpl', async (data) => {
-        try {
-            const amount = parseInt(data.amount);
-            const fromUser = await User.findById(socket.userId);
-            if (fromUser.bpl < 5500) return socket.emit('error', 'Hediye sınırı: 5500 BPL!');
-            
-            const toUser = await User.findOne({ nickname: data.to });
-            if (!toUser) return socket.emit('error', 'Kullanıcı bulunamadı.');
-            
-            fromUser.bpl -= amount; toUser.bpl += amount;
-            await fromUser.save(); await toUser.save();
-            socket.emit('update-bpl', fromUser.bpl);
-            const tSid = onlineUsers.get(data.to);
-            if (tSid) io.to(tSid).emit('update-bpl', toUser.bpl);
-            io.to("general-chat").emit('new-chat-message', { sender: "SİSTEM", text: `🎁 ${socket.nickname}, ${data.to}'ya ${amount} BPL gönderdi!` });
-        } catch (e) {}
-    });
-
-    socket.on('host-action', (data) => {
-        if (socket.nickname === data.room) {
-            const tId = onlineUsers.get(data.targetNick);
-            if (tId && data.action === 'kick') io.to(tId).emit('command-kick');
-        }
-    });
-
     socket.on('disconnect', () => {
         onlineUsers.delete(socket.nickname);
-        arenaQueue = arenaQueue.filter(p => p.socketId !== socket.id);
         broadcastOnlineList();
     });
-
-});});
-
-
-const nodemailer = require('nodemailer'); // Mail için
-const Withdraw = require('./models/Withdraw');
-const Help = require('./models/Help');
-
-// Nodemailer Yapılandırması (Render Env Değişkenlerini Kullanır)
-const transporter = nodemailer.createTransport({
-    service: 'gmail',
-    auth: {
-        user: process.env.MAIL_USER,
-        pass: process.env.MAIL_APP_PASS
-    }
 });
 
-// --- BPL ÇEKİM TALEBİ ROTASI ---
+// --- API ROTALARI (BSC YÜKLEME VE MANUEL ÇEKİM) ---
+
+// 1. Ödeme Doğrulama (BscScan)
+app.post('/verify-payment', async (req, res) => {
+    try {
+        const { txid, bpl } = req.body;
+        const user = await User.findById(req.session.userId);
+        if (!user || user.usedHashes.includes(txid)) return res.json({ status: 'error', msg: 'Geçersiz işlem veya TxID kullanılmış.' });
+
+        const bscUrl = `https://api.bscscan.com/api?module=proxy&action=eth_getTransactionReceipt&txhash=${txid}&apikey=${process.env.BSCSCAN_API_KEY}`;
+        const response = await axios.get(bscUrl);
+        const receipt = response.data.result;
+
+        if (receipt && receipt.status === "0x1") {
+            user.bpl += parseInt(bpl);
+            user.usedHashes.push(txid);
+            await user.save();
+            return res.json({ status: 'success', msg: `${bpl} BPL yüklendi!` });
+        }
+        res.json({ status: 'error', msg: 'BscScan doğrulaması başarısız.' });
+    } catch (err) { res.json({ status: 'error', msg: 'Sistem hatası.' }); }
+});
+
+// 2. Manuel Çekim Talebi (Senin istediğin sistem)
 app.post('/api/withdraw-request', async (req, res) => {
     try {
         const user = await User.findById(req.session.userId);
         if (!user) return res.json({ success: false, error: 'Oturum kapalı.' });
+        
+        const withdrawAmount = user.bpl - 5000;
+        if (withdrawAmount <= 0) return res.json({ success: false, error: '5000 BPL altı çekilemez.' });
 
-        const withdrawAmount = user.bpl - 5000; // 5000 üstü çekilebilir
-        if (withdrawAmount <= 0) {
-            return res.json({ success: false, error: 'Çekim için 5.000 BPL üzeri bakiyeniz olmalı.' });
-        }
-
-        const commission = withdrawAmount * 0.25;
-        const netAmount = withdrawAmount - commission;
-
-        // Talebi Kaydet
+        const netAmount = withdrawAmount * 0.75;
+        
+        const Withdraw = require('./models/Withdraw');
         const newRequest = new Withdraw({
             userId: user._id,
             nickname: user.nickname,
-            email: user.email,
             requestedAmount: withdrawAmount,
-            commission: commission,
             finalAmount: netAmount,
             walletAddress: user.bnb_address || 'Belirtilmedi',
             status: 'Beklemede'
         });
+        
         await newRequest.save();
-
-        // Kullanıcının BPL'ini sıfırla (Sadece 5000 kalsın)
-        user.bpl = 5000;
+        user.bpl = 5000; // Bakiyeyi sabitle
         await user.save();
 
-        // --- OTOMATİK MAİL GÖNDERİMİ ---
-        const mailOptions = {
-            from: process.env.MAIL_USER,
-            to: user.email,
-            subject: 'BPL Çekim Talebi Alındı - Güvenlik Bildirimi',
-            html: `
-                <div style="background:#000; color:#fff; padding:20px; font-family:sans-serif; border:2px solid #39FF14;">
-                    <h2 style="color:#39FF14;">Talep Onayı</h2>
-                    <p>Sayın <b>${user.nickname}</b>,</p>
-                    <p>Hesabınızdan <b>${withdrawAmount} BPL</b> tutarında çekim talebi oluşturulmuştur.</p>
-                    <p><b>Net Ödeme:</b> ${netAmount} BPL (%25 Komisyon Kesilmiştir)</p>
-                    <hr style="border-color:#333;">
-                    <p style="color:#ff0000;"><b>ÖNEMLİ:</b> Bu işlem size ait değilse, lütfen 12 saat içinde "Terminal Destek" kısmından <b>Talep İptali</b> başlığı ile bize ulaşın.</p>
-                    <p>İşlem 24-48 saat içinde manuel inceleme sonrası onaylanacaktır.</p>
-                </div>
-            `
-        };
-        
-        transporter.sendMail(mailOptions);
-
-        res.json({ success: true, msg: 'Talebiniz alındı, onay maili gönderildi.' });
-
-    } catch (err) {
-        console.error(err);
-        res.json({ success: false, error: 'Sistem hatası.' });
-    }
+        res.json({ success: true, msg: 'Talebiniz kaydedildi, manuel onay bekliyor.' });
+    } catch (err) { res.json({ success: false, error: 'İşlem başarısız.' }); }
 });
-
-// --- YARDIM / DESTEK FORMU ROTASI ---
-app.post('/api/help-request', async (req, res) => {
-    try {
-        // 1. Verileri al ve DB'ye kaydet
-        const { email, subject, message } = req.body; 
-        const Help = require('./models/Help');
-
-        const newHelp = new Help({ email, subject, message }); 
-        await newHelp.save();
-
-        // 2. SANA (ADMIN) GİDECEK BİLDİRİM MAİLİ
-        const adminMailOptions = {
-            from: process.env.MAIL_USER, // Render Env: MAIL_USER
-            to: process.env.MAIL_USER,
-            subject: `DESTEK TALEBİ: ${subject}`,
-            html: `
-                <div style="background:#111; color:#fff; padding:20px; border:1px solid #39FF14; font-family:sans-serif;">
-                    <h3 style="color:#39FF14;">Yeni Destek Mesajı</h3>
-                    <p><b>E-posta:</b> ${email}</p>
-                    <p><b>Konu:</b> ${subject}</p>
-                    <hr style="border-color:#333;">
-                    <p><b>Mesaj:</b></p>
-                    <p style="background:#000; padding:10px;">${message}</p>
-                </div>
-            `
-        };
-        transporter.sendMail(adminMailOptions);
-
-        // 3. KULLANICIYA GİDECEK OTOMATİK MAİL (Sadece Şifre İşlemleri İçin)
-        if (subject === "Sifre Islemleri") {
-            const userMailOptions = {
-                from: process.env.MAIL_USER,
-                to: email,
-                subject: 'BPL CORE - Şifre Yenileme Talebi Alındı',
-                html: `
-                    <div style="background:#000; color:#fff; padding:20px; border:2px solid #00d4ff; font-family:monospace;">
-                        <h2 style="color:#00d4ff;">PROTOKOL: ŞİFRE YENİLEME</h2>
-                        <p>Sistemimize e-posta adresiniz üzerinden bir şifre yenileme talebi iletilmiştir.</p>
-                        <p>Güvenlik nedeniyle işlemler manuel kontrol edilmektedir. Lütfen <b>24 saat</b> içerisinde size gönderilecek olan geçici şifreyi bekleyin.</p>
-                        <hr style="border-color:#333;">
-                        <p style="color:#888; font-size:12px;">Bu işlem size ait değilse, lütfen bu maili dikkate almayın.</p>
-                    </div>
-                `
-            };
-            transporter.sendMail(userMailOptions);
-        }
-
-        // 4. BAŞARILI YANITI (Sadece bir kez gönderilir)
-        res.json({ success: true, msg: 'Talebiniz merkeze iletildi.' });
-
-    } catch (err) {
-        console.error("Yardım Rotası Hatası:", err);
-        res.json({ success: false, error: 'İşlem sırasında bir hata oluştu.' });
-    }
-});
-
 
 const PORT = process.env.PORT || 3000;
 server.listen(PORT, () => console.log(`🚀 SİSTEM AKTİF: Port ${PORT}`));
+
+const PORT = process.env.PORT || 3000;
+server.listen(PORT, () => console.log(`🚀 SİSTEM AKTİF: Port ${PORT}`));
+
