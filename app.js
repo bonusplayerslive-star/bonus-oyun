@@ -758,7 +758,7 @@ io.on('connection', async (socket) => {
         broadcastOnlineList();
     });
 
-}); // <--- ANA BAĞLANTI BURADA KAPANIR (BAŞKA YERDE DEĞİL!)
+});});
 
 
 const nodemailer = require('nodemailer'); // Mail için
@@ -892,12 +892,3 @@ app.post('/api/help-request', async (req, res) => {
 
 const PORT = process.env.PORT || 3000;
 server.listen(PORT, () => console.log(`🚀 SİSTEM AKTİF: Port ${PORT}`));
-
-
-
-
-
-
-
-
-
