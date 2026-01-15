@@ -61,18 +61,60 @@
             </div>
         </div>
 
-        <div class="col-md-6">
-            <div class="card p-4 neon-border h-100" style="border-color: var(--neon-red)">
-                <h4 class="text-danger mb-4 border-bottom border-danger pb-2">BPL Tasfiye</h4>
-                <div class="mb-3">
-                    <label class="form-label">Çekilecek Miktar</label>
-                    <input type="number" id="withdrawAmount" class="form-control" placeholder="Min: 7500">
-                </div>
-                <button onclick="Swal.fire('Bilgi', 'Tasfiye sistemi şu an bakımda.', 'info')" class="btn btn-danger w-100 py-3 fw-bold">TALEBİ İLET</button>
-            </div>
+ <div class="col-md-6">
+    <div class="card p-4 neon-border h-100" style="border-color: var(--neon-red)">
+        <h4 class="text-danger mb-4 border-bottom border-danger pb-2">BPL Tasfiye</h4>
+        <div class="mb-3">
+            <label class="form-label text-white-50">Çekilecek Miktar (BPL)</label>
+            <input type="number" id="withdrawInput" class="form-control bg-dark text-white border-secondary" placeholder="Miktar girin...">
+            <small class="text-muted mt-1 d-block" style="font-size: 0.75rem;">
+                * Sadece 5.000 BPL üzerindeki tutarlar çekilebilir. <br>
+                * %25 Tasfiye komisyonu uygulanır.
+            </small>
         </div>
+        <button onclick="handleWithdraw()" id="withdrawBtn" class="btn btn-danger w-100 py-3 fw-bold">TALEBİ İLET</button>
     </div>
+</div>
 
+<script>
+async function handleWithdraw() {
+    const amount = document.getElementById('withdrawInput').value;
+    const btn = document.getElementById('withdrawBtn');
+
+    if (!amount || amount <= 0) {
+        return Swal.fire('Hata', 'Lütfen geçerli bir miktar girin.', 'warning');
+    }
+
+    btn.disabled = true;
+    btn.innerText = "İŞLENİYOR...";
+
+    try {
+        const response = await fetch('/api/withdraw-request', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ amount: parseInt(amount) })
+        });
+        
+        const data = await response.json();
+
+        if (data.success) {
+            Swal.fire({
+                title: 'BAŞARILI',
+                text: data.msg,
+                icon: 'success',
+                confirmButtonColor: '#39FF14'
+            }).then(() => window.location.reload());
+        } else {
+            Swal.fire('Hata', data.error, 'error');
+            btn.disabled = false;
+            btn.innerText = "TALEBİ İLET";
+        }
+    } catch (err) {
+        Swal.fire('Hata', 'Sunucu bağlantısı kurulamadı.', 'error');
+        btn.disabled = false;
+    }
+}
+</script>
     <div class="row mt-5">
         <div class="col-12 text-center mb-4">
             <h3 class="text-neon">ASSET INVENTORY</h3>
@@ -168,3 +210,4 @@
 </script>
 </body>
 </html>
+
