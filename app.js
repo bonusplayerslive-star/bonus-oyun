@@ -528,16 +528,15 @@ app.post('/api/buy-stamina', async (req, res) => {
 });
 async function startBattle(p1, p2, io) {
     try {
-        // 1. ADIM: Kazanma şansını hesapla
+        // 1. ADIM: Kazanma şansını hesapla (Statlar üzerinden)
         const p1Modifier = calculateWinChance(p1.dbData, p2.dbData);
         const p2Modifier = calculateWinChance(p2.dbData, p1.dbData);
 
         let p1WinChance = 50 + p1Modifier - p2Modifier;
 
+        // Bot varsa dengeyi bot lehine %5 kaydır (Senin özel kuralın)
         const isP1Bot = !p1.socketId;
         const isP2Bot = !p2.socketId;
-
-        // Bot varsa bot lehine dengeyi %5 kaydır
         if (isP1Bot || isP2Bot) {
             p1WinChance = isP1Bot ? p1WinChance + 5 : p1WinChance - 5;
         }
@@ -546,25 +545,19 @@ async function startBattle(p1, p2, io) {
         const roll = Math.random() * 100;
         const winner = roll <= p1WinChance ? p1 : p2;
 
-        // 3. ADIM: Veritabanı Güncelleme (Hata Buradaydı)
+        // 3. ADIM: Ödül ve DB Güncelleme (Sadece gerçek oyuncuysa)
         if (winner.socketId && winner.dbData && winner.dbData._id) {
-            try {
-                const winUser = await User.findById(winner.dbData._id);
-                if (winUser) {
-                    winUser.bpl += winner.prize;
-                    winUser.lastBattleTime = new Date();
-                    winUser.hasStaminaDoping = false;
-                    await winUser.save();
-
-                    // Güncel bakiyeyi socket üzerinden gönder
-                    io.to(winner.socketId).emit('update-bpl', winUser.bpl);
-                }
-            } catch (dbErr) {
-                console.error("Arena DB Güncelleme Hatası:", dbErr);
+            const winUser = await User.findById(winner.dbData._id);
+            if (winUser) {
+                winUser.bpl += winner.prize;
+                winUser.lastBattleTime = new Date();
+                winUser.hasStaminaDoping = false; // Savaşıp dopingi harcadı
+                await winUser.save();
+                io.to(winner.socketId).emit('update-bpl', winUser.bpl);
             }
         }
 
-        // 4. ADIM: Sinyalleri Gönder (Her iki kullanıcıya da)
+        // 4. ADIM: Frontend'e Sinyal Gönder (Bu kısım 0 saniye takılmasını çözer)
         const matchData = (p, opp) => ({
             opponent: opp.nickname,
             opponentAnimal: opp.animal,
@@ -576,8 +569,8 @@ async function startBattle(p1, p2, io) {
         if (p1.socketId) io.to(p1.socketId).emit('arena-match-found', matchData(p1, p2));
         if (p2.socketId) io.to(p2.socketId).emit('arena-match-found', matchData(p2, p1));
 
-    } catch (globalErr) {
-        console.error("startBattle Kritik Sistem Hatası:", globalErr);
+    } catch (err) {
+        console.error("CRITICAL BATTLE ERROR:", err);
     }
 }
 // --- 6. SOCKET.IO ---
@@ -641,33 +634,33 @@ io.on('connection', async (socket) => {
         }
     });
 
-// Savaş başlangıcında kontrol edilecek fonksiyon taslağı
 function calculateWinChance(user, target) {
+    if (!user || !target) return 0; // Güvenlik kontrolü
+    
     let modifier = 0;
     const now = new Date();
     const twoHours = 2 * 60 * 60 * 1000;
 
-    // --- Yorgunluk Kontrolü ---
+    // Yorgunluk Kontrolü
     if (user.lastBattleTime && (now - user.lastBattleTime < twoHours)) {
-        if (!user.hasStaminaDoping) {
-            modifier -= 35; // Yorgunsa çok ağır ceza
-        }
+        if (!user.hasStaminaDoping) modifier -= 35;
     }
 
-    // --- KRİTİK STAT KURALI ---
-    // Eğer saldırın rakibin defansından %3 fazlaysa, canının %2'si kadar şans kazanırsın
-    if (user.atk > (target.def * 1.03)) {
-        // Örn: 500 HP varsa +10 şans puanı
-        modifier += (user.hp * 0.02); 
+    // KRİTİK STAT KURALI (%3 ATK farkına %2 HP Bonusu)
+    const userAtk = user.atk || 0;
+    const targetDef = target.def || 0;
+    const userHp = user.hp || 0;
+
+    if (userAtk > (targetDef * 1.03)) {
+        modifier += (userHp * 0.02); 
     }
 
-    // Temel stat üstünlükleri (Küçük bonuslar)
-    if (user.atk > target.def) modifier += 5;
-    if (user.hp > target.hp) modifier += 5;
+    // Temel Bonuslar
+    if (userAtk > targetDef) modifier += 5;
+    if (userHp > (target.hp || 0)) modifier += 5;
 
     return modifier;
 }
-
 
 
     
@@ -887,25 +880,4 @@ app.post('/api/help-request', async (req, res) => {
 
 const PORT = process.env.PORT || 3000;
 server.listen(PORT, () => console.log(`🚀 SİSTEM AKTİF: Port ${PORT}`));
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
 
