@@ -737,11 +737,36 @@ app.post('/api/withdraw-request', async (req, res) => {
 // --- YARDIM / DESTEK FORMU ROTASI ---
 app.post('/api/help-request', async (req, res) => {
     try {
-        const { nickname, email, subject, message } = req.body;
-        const newHelp = new Help({ nickname, email, subject, message });
+        // Sadece ihtiyacımız olanları alıyoruz
+        const { email, subject, message } = req.body; 
+        const Help = require('./models/Help');
+
+        // Nickname olmadan yeni kayıt oluşturuyoruz
+        const newHelp = new Help({ email, subject, message }); 
         await newHelp.save();
+
+        // Admin'e bildirim maili (Sadece email bilgisiyle)
+        const adminMailOptions = {
+            from: process.env.MAIL_USER, // Render Env'den çekilir
+            to: process.env.MAIL_USER,
+            subject: `DESTEK TALEBİ: ${subject}`,
+            html: `
+                <div style="background:#111; color:#fff; padding:20px; border:1px solid #39FF14;">
+                    <h3>Yeni Destek Mesajı</h3>
+                    <p><b>E-posta:</b> ${email}</p>
+                    <p><b>Konu:</b> ${subject}</p>
+                    <hr>
+                    <p><b>Mesaj:</b></p>
+                    <p>${message}</p>
+                </div>
+            `
+        };
+
+        transporter.sendMail(adminMailOptions);
+
         res.json({ success: true });
     } catch (err) {
+        console.error("Yardım Rotası Hatası:", err);
         res.json({ success: false, error: 'Mesaj iletilemedi.' });
     }
 });
@@ -749,6 +774,7 @@ app.post('/api/help-request', async (req, res) => {
 
 const PORT = process.env.PORT || 3000;
 server.listen(PORT, () => console.log(`🚀 SİSTEM AKTİF: Port ${PORT}`));
+
 
 
 
