@@ -506,45 +506,43 @@ app.post('/api/buy-stamina', async (req, res) => {
         res.json({ success: false, error: 'İksir alınamadı.' });
     }
 });
-// --- ARENA SAVAŞ MOTORU (GÜNCELLENMİŞ) ---
+// --- ARENA SAVAŞ MOTORU (GÜNCEL & TEMİZ) ---
 async function startBattle(p1, p2, io) {
     let winner;
     const isP1Bot = !p1.socketId;
     const isP2Bot = !p2.socketId;
 
-    // 1. ADIM: Bahisleri Tahsil Et (Kaybedenden/Herkesden BPL düşer)
-    try {
-        if (!isP1Bot) {
-            await User.findOneAndUpdate({ nickname: p1.nickname }, { $inc: { bpl: -p1.bet } });
-        }
-        if (!isP2Bot) {
-            await User.findOneAndUpdate({ nickname: p2.nickname }, { $inc: { bpl: -p2.bet } });
-        }
-    } catch (err) { console.error("Bahis Tahsil Hatası:", err); }
+    // NOT: Bahisler (bet) arena-join-queue aşamasında peşin kesildiği için 
+    // burada sadece kazananı belirleyip ödülü veriyoruz.
 
-    // 2. ADIM: Kazananı Belirle (Bot varsa %55 bot kazanır)
+    // 1. ADIM: Kazananı Belirle (Bot varsa %55 bot kazanır)
     if (isP1Bot || isP2Bot) {
+        // Eğer bir taraf botsa, botun kazanma ihtimali %55
         const botWon = Math.random() < 0.55; 
         winner = isP2Bot ? (botWon ? p2 : p1) : (botWon ? p1 : p2);
     } else {
-        // İki gerçek oyuncuysa gücü yüksek olan (rastgelelik de eklenebilir)
+        // İki gerçek oyuncuysa güç (power) değerine bakılır
         winner = p1.power >= p2.power ? p1 : p2;
     }
 
-    // 3. ADIM: Ödülü Kazananın Hesabına Yatır
-    if (winner.socketId) {
+    // 2. ADIM: Ödülü Kazananın Hesabına Yatır
+    if (winner.socketId) { // Kazanan bot değilse ödülü ver
         try {
             const winUser = await User.findOne({ nickname: winner.nickname });
             if (winUser) {
-                // Seçtiği odanın ödülünü ekliyoruz (Örn: 100 yatırdıysa 1000 eklenir)
+                // Seçilen çarpanın ödülünü ekle (Örn: 10X ise 1000 BPL)
                 winUser.bpl += winner.prize; 
                 await winUser.save();
+                
+                // Canlı bakiyeyi frontend'e gönder
                 io.to(winner.socketId).emit('update-bpl', winUser.bpl);
             }
-        } catch (err) { console.error("Ödül Dağıtım Hatası:", err); }
+        } catch (err) { 
+            console.error("Arena Ödül Yatırma Hatası:", err); 
+        }
     }
 
-    // 4. ADIM: Bilgileri Frontend'e Gönder
+    // 3. ADIM: Savaş Sonucunu Her İki Tarafa Da Gönder
     const matchData = (p, opp) => ({
         opponent: opp.nickname,
         opponentAnimal: opp.animal, 
@@ -556,7 +554,6 @@ async function startBattle(p1, p2, io) {
     if (p1.socketId) io.to(p1.socketId).emit('arena-match-found', matchData(p1, p2));
     if (p2.socketId) io.to(p2.socketId).emit('arena-match-found', matchData(p2, p1));
 }
-
 // --- 6. SOCKET.IO ---
 io.on('connection', async (socket) => {
     const uId = socket.request.session?.userId;
@@ -638,27 +635,66 @@ function calculateWinChance(user) {
 
 
     
-    socket.on('arena-join-queue', async (data) => {
+   socket.on('arena-join-queue', async (data) => {
+    try {
         const u = await User.findById(socket.userId);
-        if (!u || u.bpl < data.bet) return socket.emit('error', 'Yetersiz bakiye!');
-        u.bpl -= data.bet; await u.save();
+        
+        // Güvenlik Kontrolü: Kullanıcı yoksa veya bakiyesi yetersizse işlemi durdur
+        if (!u || u.bpl < data.bet) {
+            return socket.emit('error', 'Yetersiz bakiye!');
+        }
+
+        // 1. ADIM: Bahis miktarını hemen düş (Savaşa giriş ücreti)
+        u.bpl -= data.bet; 
+        await u.save();
+        
+        // Frontend'deki BPL miktarını güncelle
         socket.emit('update-bpl', u.bpl);
-        const player = { nickname: u.nickname, socketId: socket.id, animal: u.selectedAnimal || 'Lion', power: Math.random()*100, prize: data.prize };
+
+        // 2. ADIM: Oyuncu nesnesini oluştur (bet ve prize değerlerini ekledik)
+        const player = { 
+            nickname: u.nickname, 
+            socketId: socket.id, 
+            animal: u.selectedAnimal || 'Lion', 
+            power: Math.random() * 100, 
+            bet: data.bet,     // Yatırılan
+            prize: data.prize  // Hedeflenen ödül
+        };
+
+        // 3. ADIM: Eşleşme Kontrolü
         if (arenaQueue.length > 0) {
-            startBattle(player, arenaQueue.shift(), io);
+            // Sırada bekleyen gerçek bir oyuncu varsa onunla savaştır
+            const opponent = arenaQueue.shift();
+            startBattle(player, opponent, io);
         } else {
+            // Kimse yoksa sıraya ekle
             arenaQueue.push(player);
-            setTimeout(() => {
+
+            // 5 Saniye sonra hala kimse gelmemişse BOT ile eşleştir
+            setTimeout(async () => {
                 const idx = arenaQueue.findIndex(p => p.socketId === socket.id);
                 if (idx !== -1) {
                     const p = arenaQueue.splice(idx, 1)[0];
                     const bName = BOTS[Math.floor(Math.random() * BOTS.length)];
-                    startBattle(p, { nickname: bName + "_Bot", socketId: null, animal: bName, power: Math.random()*100, prize: data.prize }, io);
-                }
-            }, 5000);
-        }
-    });
+                    
+                    const botPlayer = { 
+                        nickname: bName + "_Bot", 
+                        socketId: null, 
+                        animal: bName, 
+                        power: Math.random() * 100,
+                        bet: p.bet,    // Botun "hayali" bahsi (denge için)
+                        prize: p.prize 
+                    };
 
+                    startBattle(p, botPlayer, io);
+                }
+            }, 5000); // Bekleme süresi 5 saniye
+        }
+    } catch (err) {
+        console.error("Arena Join Queue Hatası:", err);
+        socket.emit('error', 'Sistemsel bir hata oluştu.');
+    }
+});
     socket.on('send-gift-bpl', async (data) => {
         try {
             const amount = parseInt(data.amount);
@@ -812,6 +848,7 @@ app.post('/api/help-request', async (req, res) => {
 
 const PORT = process.env.PORT || 3000;
 server.listen(PORT, () => console.log(`🚀 SİSTEM AKTİF: Port ${PORT}`));
+
 
 
 
