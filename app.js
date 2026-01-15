@@ -607,63 +607,13 @@ io.on('connection', async (socket) => {
     onlineUsers.set(user.nickname, socket.id);
     socket.join("general-chat");
 
-    // 1. ONLINE LİSTESİNİ GÜNCELLE (EJS ile uyumlu isim: update-user-list)
     const broadcastOnlineList = () => {
         const usersArray = Array.from(onlineUsers.keys()).map(nick => ({ nickname: nick }));
         io.to("general-chat").emit('update-user-list', usersArray);
     };
     broadcastOnlineList();
 
-    // 2. CHAT MESAJLAŞMA (EJS ile uyumlu isim: new-chat-message)
-    socket.on('chat-message', (data) => {
-        if (!data.text) return;
-        // Opsiyonel: addToHistory(socket.nickname, data.text); 
-        io.to("general-chat").emit('new-chat-message', { 
-            sender: socket.nickname, 
-            text: data.text 
-        });
-    });
-
-    // 3. DAVET SİSTEMİ (Arena & Meeting)
-    socket.on('send-bpl-invite', async (data) => {
-        const senderUser = await User.findById(socket.userId);
-        
-        // Bakiye Kontrolü (50 BPL var mı?)
-        if (senderUser.bpl < 50) {
-            return socket.emit('error', 'Yeterli BPL yok (Gerekli: 50)');
-        }
-
-        const targetSocketId = onlineUsers.get(data.target);
-        if (targetSocketId) {
-            // Davet gidiyor...
-            io.to(targetSocketId).emit('receive-bpl-invite', {
-                from: socket.nickname,
-                type: data.type
-            });
-        } else {
-            socket.emit('error', 'Kullanıcı şu an çevrimdışı.');
-        }
-    });
-
-    // 4. DAVET KABUL VE ÜCRET KESİNTİSİ
-io.on('connection', async (socket) => {
-    const uId = socket.request.session?.userId;
-    if (!uId) return;
-    const user = await User.findById(uId);
-    if (!user) return;
-
-    socket.userId = uId;
-    socket.nickname = user.nickname;
-    onlineUsers.set(user.nickname, socket.id);
-    socket.join("general-chat");
-
-    const broadcastOnlineList = () => {
-        const usersArray = Array.from(onlineUsers.keys()).map(nick => ({ nickname: nick }));
-        io.to("general-chat").emit('update-user-list', usersArray);
-    };
-    broadcastOnlineList();
-
-    // Mesajlaşma
+    // --- GENEL CHAT MESAJLAŞMA ---
     socket.on('chat-message', (data) => {
         if (!data.text) return;
         io.to("general-chat").emit('new-chat-message', { 
@@ -672,7 +622,7 @@ io.on('connection', async (socket) => {
         });
     });
 
-    // 50 BPL'LİK DAVET SİSTEMİ (ARENA & MEETING)
+    // --- 50 BPL'LİK DAVET SİSTEMİ (ARENA & MEETING) ---
     socket.on('send-bpl-invite', async (data) => {
         const senderUser = await User.findById(socket.userId);
         if (senderUser.bpl < 50) {
@@ -705,7 +655,7 @@ io.on('connection', async (socket) => {
 
         const roomId = `room_${Date.now()}`;
         
-        // Önemli: Davet edene HOST, kabul edene GUEST rolü
+        // Önemli: Ücreti ödeyen HOST, kabul eden GUEST
         io.to(senderSocketId).emit('redirect-to-room', {
             type: data.type, roomId: roomId, role: 'host'
         });
@@ -714,13 +664,54 @@ io.on('connection', async (socket) => {
         });
     });
 
-    // 5500 BPL HEDİYE SINIRI
-    socket.on('send-gift-bpl', async (data) => {
-        const sender = await User.findById(socket.userId);
-        if (sender.bpl < 5500) {
-            return socket.emit('error', 'Hediye göndermek için en az 5500 BPL gereklidir!');
+    // --- MEETING ODASI İÇİNDEKİ İŞLEMLER ---
+    socket.on('join-meeting', (data) => {
+        socket.join(data.roomId);
+        socket.to(data.roomId).emit('user-connected', { peerId: data.peerId, nickname: data.nickname });
+    });
+
+    socket.on('meeting-message', (data) => {
+        if (data.room && data.text) {
+            io.to(data.room).emit('new-meeting-message', { sender: socket.nickname, text: data.text });
         }
-        // Buraya bakiye transfer kodlarını ekleyebilirsin
+    });
+
+    // Meeting Hediye Gönderimi (5500 BPL Sınırı ile)
+    socket.on('meeting-gift-send', async (data) => {
+        try {
+            const sender = await User.findById(socket.userId);
+            
+            // Komutan, senin kesin kuralın: 5500 altı hediye atamaz!
+            if (!sender || sender.bpl < 5500) {
+                return socket.emit('error', 'Hediye göndermek için bakiyen 5500 BPL üzerinde olmalı!');
+            }
+
+            const receiver = await User.findOne({ nickname: data.targetNick });
+            if (receiver) {
+                sender.bpl -= data.amount;
+                receiver.bpl += data.amount;
+                await sender.save();
+                await receiver.save();
+
+                socket.emit('update-bpl', sender.bpl);
+                const targetSid = onlineUsers.get(data.targetNick);
+                if (targetSid) io.to(targetSid).emit('update-bpl', receiver.bpl);
+
+                io.to(data.room).emit('new-meeting-message', {
+                    sender: "SİSTEM",
+                    text: `🎁 ${socket.nickname}, ${data.targetNick} komutana ${data.amount} BPL hediye gönderdi!`
+                });
+            }
+        } catch (err) { console.error("Gift Error:", err); }
+    });
+
+    // Meeting içinden Host aksiyonları (Kick vb.)
+    socket.on('host-action', (data) => {
+        // Sadece odanın sahibi (host) kickleyebilir
+        const tId = onlineUsers.get(data.targetNick);
+        if (tId && data.action === 'kick') {
+            io.to(tId).emit('command-kick');
+        }
     });
 
     socket.on('disconnect', () => {
@@ -728,7 +719,12 @@ io.on('connection', async (socket) => {
         broadcastOnlineList();
     });
 
-}); // <--- ANA BAĞLANTI BURADA BİTMELİ, DIŞARIDA SOCKET KULLANILMAZ!
+}); // <--- io.on connection burada kapandı. Dosya sonu temiz.
+
+
+
+
+
   // --- MEVCUT DAVET SİSTEMİN (AYNEN KALSIN) ---
     socket.on('meeting-invite-request', (data) => {
         const targetSid = onlineUsers.get(data.to);
@@ -1024,6 +1020,7 @@ app.post('/api/help-request', async (req, res) => {
 
 const PORT = process.env.PORT || 3000;
 server.listen(PORT, () => console.log(`🚀 SİSTEM AKTİF: Port ${PORT}`));
+
 
 
 
