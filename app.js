@@ -620,6 +620,7 @@ io.on('connection', async (socket) => {
         io.to("general-chat").emit('new-message', { sender: socket.nickname, text: data.text });
     });
 
+  // --- MEVCUT DAVET SİSTEMİN (AYNEN KALSIN) ---
     socket.on('meeting-invite-request', (data) => {
         const targetSid = onlineUsers.get(data.to);
         if (targetSid) {
@@ -647,6 +648,57 @@ io.on('connection', async (socket) => {
 
     socket.on('meeting-message', (data) => {
         if (data.room && data.text) io.to(data.room).emit('new-meeting-message', { sender: socket.nickname, text: data.text });
+    });
+
+    socket.on('host-action', (data) => {
+        if (socket.nickname === data.room) {
+            const tId = onlineUsers.get(data.targetNick);
+            if (tId && data.action === 'kick') io.to(tId).emit('command-kick');
+        }
+    });
+
+    // --- YENİ EKLENEN ÖZELLİKLER (BURAYI EKLE) ---
+
+    // 1. Kameradan Hediye Gönderimi (BPL Kuralı ile)
+    socket.on('meeting-gift-send', async (data) => {
+        try {
+            const sender = await User.findById(socket.userId);
+            // BPL Kuralı: Bakiyesi yetersizse engelle
+            if (!sender || sender.bpl < data.amount) {
+                return socket.emit('error', 'Yetersiz BPL! Hediye gönderilemedi.');
+            }
+
+            const receiver = await User.findOne({ nickname: data.targetNick });
+            if (receiver) {
+                sender.bpl -= data.amount;
+                receiver.bpl += data.amount;
+                await sender.save();
+                await receiver.save();
+
+                // Bakiyeleri her iki tarafa da anlık bildir
+                socket.emit('update-bpl', sender.bpl);
+                const targetSid = onlineUsers.get(data.targetNick);
+                if (targetSid) io.to(targetSid).emit('update-bpl', receiver.bpl);
+
+                // Sohbet odasına bilgi mesajı düş
+                io.to(data.room).emit('new-meeting-message', {
+                    sender: "SİSTEM",
+                    text: `🎁 ${socket.nickname}, ${data.targetNick} komutana ${data.amount} BPL hediye gönderdi!`
+                });
+            }
+        } catch (err) { console.error("Gift Error:", err); }
+    });
+
+    // 2. Kameradan Arena Daveti (Özel Oda Bağlantısı)
+    socket.on('meeting-arena-invite-send', (data) => {
+        const targetSid = onlineUsers.get(data.targetNick);
+        if (targetSid) {
+            io.to(targetSid).emit('arena-invite-received', {
+                from: socket.nickname,
+                bet: data.bet,
+                roomId: data.room // Mevcut meeting odasını referans alır
+            });
+        }
     });
 
     socket.on('host-action', (data) => {
@@ -863,5 +915,6 @@ app.post('/api/help-request', async (req, res) => {
 
 const PORT = process.env.PORT || 3000;
 server.listen(PORT, () => console.log(`🚀 SİSTEM AKTİF: Port ${PORT}`));
+
 
 
