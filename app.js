@@ -506,27 +506,45 @@ app.post('/api/buy-stamina', async (req, res) => {
         res.json({ success: false, error: 'İksir alınamadı.' });
     }
 });
-// --- ARENA SAVAŞ MOTORU ---
+// --- ARENA SAVAŞ MOTORU (GÜNCELLENMİŞ) ---
 async function startBattle(p1, p2, io) {
     let winner;
     const isP1Bot = !p1.socketId;
     const isP2Bot = !p2.socketId;
+
+    // 1. ADIM: Bahisleri Tahsil Et (Kaybedenden/Herkesden BPL düşer)
+    try {
+        if (!isP1Bot) {
+            await User.findOneAndUpdate({ nickname: p1.nickname }, { $inc: { bpl: -p1.bet } });
+        }
+        if (!isP2Bot) {
+            await User.findOneAndUpdate({ nickname: p2.nickname }, { $inc: { bpl: -p2.bet } });
+        }
+    } catch (err) { console.error("Bahis Tahsil Hatası:", err); }
+
+    // 2. ADIM: Kazananı Belirle (Bot varsa %55 bot kazanır)
     if (isP1Bot || isP2Bot) {
         const botWon = Math.random() < 0.55; 
         winner = isP2Bot ? (botWon ? p2 : p1) : (botWon ? p1 : p2);
     } else {
+        // İki gerçek oyuncuysa gücü yüksek olan (rastgelelik de eklenebilir)
         winner = p1.power >= p2.power ? p1 : p2;
     }
+
+    // 3. ADIM: Ödülü Kazananın Hesabına Yatır
     if (winner.socketId) {
         try {
             const winUser = await User.findOne({ nickname: winner.nickname });
             if (winUser) {
-                winUser.bpl += p1.prize;
+                // Seçtiği odanın ödülünü ekliyoruz (Örn: 100 yatırdıysa 1000 eklenir)
+                winUser.bpl += winner.prize; 
                 await winUser.save();
                 io.to(winner.socketId).emit('update-bpl', winUser.bpl);
             }
-        } catch (err) { console.error("Ödül Hatası:", err); }
+        } catch (err) { console.error("Ödül Dağıtım Hatası:", err); }
     }
+
+    // 4. ADIM: Bilgileri Frontend'e Gönder
     const matchData = (p, opp) => ({
         opponent: opp.nickname,
         opponentAnimal: opp.animal, 
@@ -534,6 +552,7 @@ async function startBattle(p1, p2, io) {
         winnerAnimal: winner.animal, 
         prize: p.prize
     });
+
     if (p1.socketId) io.to(p1.socketId).emit('arena-match-found', matchData(p1, p2));
     if (p2.socketId) io.to(p2.socketId).emit('arena-match-found', matchData(p2, p1));
 }
@@ -793,6 +812,7 @@ app.post('/api/help-request', async (req, res) => {
 
 const PORT = process.env.PORT || 3000;
 server.listen(PORT, () => console.log(`🚀 SİSTEM AKTİF: Port ${PORT}`));
+
 
 
 
