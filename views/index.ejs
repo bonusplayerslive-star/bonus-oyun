@@ -62,7 +62,76 @@
             box-shadow: 0 10px 30px rgba(0,0,0,0.8);
             backdrop-filter: blur(10px);
         }
+<style>
+    .article-section {
+        display: flex;
+        flex-wrap: wrap;
+        justify-content: center;
+        gap: 25px;
+        padding: 40px 20px;
+        width: 100%;
+        max-width: 1200px;
+        margin: 0 auto;
+    }
 
+    .article-box {
+        flex: 1 1 300px;
+        background: rgba(0, 0, 0, 0.6);
+        border: 1px solid rgba(0, 255, 255, 0.2); /* Hafif turkuaz kenarlık */
+        border-radius: 15px;
+        padding: 25px;
+        position: relative;
+        transition: all 0.4s ease;
+        backdrop-filter: blur(5px);
+        box-shadow: inset 0 0 15px rgba(0, 255, 255, 0.05);
+    }
+
+    /* Üstteki küçük kategori etiketi (span) */
+    .article-category {
+        display: inline-block;
+        color: #00ffff; /* Turkuaz neon */
+        font-size: 0.7rem;
+        font-weight: bold;
+        letter-spacing: 2px;
+        text-transform: uppercase;
+        margin-bottom: 15px;
+        border-bottom: 2px solid #00ffff;
+        padding-bottom: 2px;
+    }
+
+    .article-title {
+        color: #ffffff; /* Saf beyaz */
+        font-size: 1.4rem;
+        margin-bottom: 15px;
+        text-shadow: 0 0 10px rgba(255, 255, 255, 0.3);
+    }
+
+    .article-content {
+        color: #cccccc; /* Hafif gri-beyaz (okunabilirlik için) */
+        font-size: 0.9rem;
+        line-height: 1.6;
+        font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+    }
+
+    /* Hover Efekti: Kutuya gelince neon parlaması artsın */
+    .article-box:hover {
+        transform: translateY(-8px);
+        border-color: #00ffff;
+        box-shadow: 0 0 25px rgba(0, 255, 255, 0.3), 
+                    inset 0 0 10px rgba(0, 255, 255, 0.1);
+    }
+
+    /* Mobilde dikey dizilim */
+    @media (max-width: 768px) {
+        .article-section {
+            flex-direction: column;
+            align-items: center;
+        }
+        .article-box {
+            width: 90%;
+        }
+    }
+</style>
         /* Token Grafik */
         .token-bar-container { 
             height: 220px; 
@@ -167,7 +236,31 @@
             </div>
         </div>
     </div>
+<div class="article-section">
+    <div class="article-box">
+        <span class="article-category">SİSTEM</span>
+        <h2 class="article-title">BAŞLIK 1</h2>
+        <div class="article-content">
+            Buraya açıklama metni gelecek. Turkuaz ve beyazın uyumu neon efektleriyle birleşti.
+        </div>
+    </div>
 
+    <div class="article-box">
+        <span class="article-category">STRATEJİ</span>
+        <h2 class="article-title">BAŞLIK 2</h2>
+        <div class="article-content">
+            İkinci kutu içeriği buraya gelecek. Neon detaylar kutu kenarlarında kendini gösteriyor.
+        </div>
+    </div>
+
+    <div class="article-box">
+        <span class="article-category">GÜNCELLEME</span>
+        <h2 class="article-title">BAŞLIK 3</h2>
+        <div class="article-content">
+            Üçüncü kutu içeriği buraya gelecek. Modern ve scifi (bilim kurgu) tarzında hazırlandı.
+        </div>
+    </div>
+</div>
     <div class="auth-overlay" id="authOverlay">
         <div class="glass-card" style="width: 100%; max-width: 400px;">
             <div class="text-center mb-4">
@@ -292,5 +385,6 @@
     <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
 </body>
 </html>
+
 
 
