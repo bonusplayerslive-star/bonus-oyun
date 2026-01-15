@@ -527,51 +527,58 @@ app.post('/api/buy-stamina', async (req, res) => {
     }
 });
 async function startBattle(p1, p2, io) {
-    // 1. ADIM: Her iki oyuncu için statlara dayalı kazanma çarpanını hesapla
-    // (p1Data ve p2Data veritabanından gelen tam user nesneleri olmalı)
-    const p1Modifier = calculateWinChance(p1.dbData, p2.dbData);
-    const p2Modifier = calculateWinChance(p2.dbData, p1.dbData);
+    try {
+        // 1. ADIM: Kazanma şansını hesapla
+        const p1Modifier = calculateWinChance(p1.dbData, p2.dbData);
+        const p2Modifier = calculateWinChance(p2.dbData, p1.dbData);
 
-    // Temel şans dengesi (50-50 üzerine modifierlar eklenir)
-    let p1WinChance = 50 + p1Modifier - p2Modifier;
+        let p1WinChance = 50 + p1Modifier - p2Modifier;
 
-    // Bot koruması (Senin %55 kuralını koruyoruz ama modifierlara da şans veriyoruz)
-    const isP1Bot = !p1.socketId;
-    const isP2Bot = !p2.socketId;
-    
-    if (isP1Bot || isP2Bot) {
-        // Bot varsa dengeyi bot lehine %5 kaydırıyoruz
-        p1WinChance = isP1Bot ? p1WinChance + 5 : p1WinChance - 5;
+        const isP1Bot = !p1.socketId;
+        const isP2Bot = !p2.socketId;
+
+        // Bot varsa bot lehine dengeyi %5 kaydır
+        if (isP1Bot || isP2Bot) {
+            p1WinChance = isP1Bot ? p1WinChance + 5 : p1WinChance - 5;
+        }
+
+        // 2. ADIM: Kazananı Belirle
+        const roll = Math.random() * 100;
+        const winner = roll <= p1WinChance ? p1 : p2;
+
+        // 3. ADIM: Veritabanı Güncelleme (Hata Buradaydı)
+        if (winner.socketId && winner.dbData && winner.dbData._id) {
+            try {
+                const winUser = await User.findById(winner.dbData._id);
+                if (winUser) {
+                    winUser.bpl += winner.prize;
+                    winUser.lastBattleTime = new Date();
+                    winUser.hasStaminaDoping = false;
+                    await winUser.save();
+
+                    // Güncel bakiyeyi socket üzerinden gönder
+                    io.to(winner.socketId).emit('update-bpl', winUser.bpl);
+                }
+            } catch (dbErr) {
+                console.error("Arena DB Güncelleme Hatası:", dbErr);
+            }
+        }
+
+        // 4. ADIM: Sinyalleri Gönder (Her iki kullanıcıya da)
+        const matchData = (p, opp) => ({
+            opponent: opp.nickname,
+            opponentAnimal: opp.animal,
+            winnerNick: winner.nickname,
+            winnerAnimal: winner.animal,
+            prize: p.prize
+        });
+
+        if (p1.socketId) io.to(p1.socketId).emit('arena-match-found', matchData(p1, p2));
+        if (p2.socketId) io.to(p2.socketId).emit('arena-match-found', matchData(p2, p1));
+
+    } catch (globalErr) {
+        console.error("startBattle Kritik Sistem Hatası:", globalErr);
     }
-
-    // 2. ADIM: Kazananı Belirle
-    const roll = Math.random() * 100;
-    const winner = roll <= p1WinChance ? p1 : p2;
-    const loser = (winner === p1) ? p2 : p1;
-
-    // 3. ADIM: Ödül ve Veritabanı Güncelleme
-    if (winner.socketId) {
-        try {
-            await User.findByIdAndUpdate(winner.dbData._id, { 
-                $inc: { bpl: winner.prize },
-                lastBattleTime: new Date(),
-                hasStaminaDoping: false // Savaşıp dopingi harcadı
-            });
-            io.to(winner.socketId).emit('update-bpl', winner.dbData.bpl + winner.prize);
-        } catch (err) { console.error("Ödül hatası:", err); }
-    }
-
-    // 4. ADIM: Sinyalleri Gönder (Frontend videoları oynatsın)
-    const matchData = (p, opp) => ({
-        opponent: opp.nickname,
-        opponentAnimal: opp.animal,
-        winnerNick: winner.nickname,
-        winnerAnimal: winner.animal,
-        prize: p.prize
-    });
-
-    if (p1.socketId) io.to(p1.socketId).emit('arena-match-found', matchData(p1, p2));
-    if (p2.socketId) io.to(p2.socketId).emit('arena-match-found', matchData(p2, p1));
 }
 // --- 6. SOCKET.IO ---
 io.on('connection', async (socket) => {
@@ -880,6 +887,7 @@ app.post('/api/help-request', async (req, res) => {
 
 const PORT = process.env.PORT || 3000;
 server.listen(PORT, () => console.log(`🚀 SİSTEM AKTİF: Port ${PORT}`));
+
 
 
 
