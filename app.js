@@ -613,8 +613,8 @@ io.on('connection', async (socket) => {
     };
     broadcastOnlineList();
 
-    // --- GENEL CHAT MESAJLAŞMA ---
-  io.on('connection', async (socket) => {
+ // --- TÜM SOCKET SİSTEMİ (TEK PARÇA) ---
+io.on('connection', async (socket) => {
     const uId = socket.request.session?.userId;
     if (!uId) return;
     const user = await User.findById(uId);
@@ -632,7 +632,7 @@ io.on('connection', async (socket) => {
     };
     broadcastOnlineList();
 
-    // 2. Genel Chat Mesajlaşma
+    // 2. Genel Chat Mesajlaşma (Chat.ejs ile uyumlu)
     socket.on('chat-message', (data) => {
         if (!data.text) return;
         io.to("general-chat").emit('new-chat-message', { 
@@ -641,121 +641,36 @@ io.on('connection', async (socket) => {
         });
     });
 
-    // 3. 50 BPL'lik Davet Gönderimi (Arena & Meeting)
+    // 3. 50 BPL'lik Davet Sistemi (Arena & Meeting)
     socket.on('send-bpl-invite', async (data) => {
         const senderUser = await User.findById(socket.userId);
-        if (senderUser.bpl < 50) {
-            return socket.emit('error', 'Yeterli BPL yok (Gerekli: 50)');
-        }
+        if (senderUser.bpl < 50) return socket.emit('error', 'Yeterli BPL yok (Gerekli: 50)');
 
         const targetSocketId = onlineUsers.get(data.target);
         if (targetSocketId) {
-            io.to(targetSocketId).emit('receive-bpl-invite', {
-                from: socket.nickname,
-                type: data.type
-            });
+            io.to(targetSocketId).emit('receive-bpl-invite', { from: socket.nickname, type: data.type });
         } else {
-            socket.emit('error', 'Kullanıcı şu an çevrimdışı.');
+            socket.emit('error', 'Kullanıcı çevrimdışı.');
         }
     });
 
-    // 4. Davet Kabulü ve Rol Dağıtımı (Ücreti Host Öder)
     socket.on('accept-bpl-invite', async (data) => {
         const senderNick = data.from;
         const senderSocketId = onlineUsers.get(senderNick);
         if (!senderSocketId) return socket.emit('error', 'Davet sahibi ayrıldı.');
 
         const hostUser = await User.findOne({ nickname: senderNick });
-        if (hostUser.bpl < 50) {
-            return io.to(senderSocketId).emit('error', 'BPL yetersiz, işlem iptal.');
-        }
+        if (hostUser.bpl < 50) return io.to(senderSocketId).emit('error', 'BPL yetersiz.');
 
-        // Ücreti kes ve kaydet
         hostUser.bpl -= 50;
         await hostUser.save();
 
         const roomId = `room_${Date.now()}`;
-        
-        // Önemli: Davet edene HOST (mikrofon sahibi), kabul edene GUEST rolü
-        io.to(senderSocketId).emit('redirect-to-room', {
-            type: data.type, roomId: roomId, role: 'host'
-        });
-        socket.emit('redirect-to-room', {
-            type: data.type, roomId: roomId, role: 'guest'
-        });
+        io.to(senderSocketId).emit('redirect-to-room', { type: data.type, roomId: roomId, role: 'host' });
+        socket.emit('redirect-to-room', { type: data.type, roomId: roomId, role: 'guest' });
     });
 
-    // 5. Meeting Odası İçindeki Mesajlar ve İşlemler
-    socket.on('join-meeting', (data) => {
-        socket.join(data.roomId);
-        socket.to(data.roomId).emit('user-connected', { peerId: data.peerId, nickname: data.nickname });
-    });
-
-    socket.on('meeting-message', (data) => {
-        if (data.room && data.text) {
-            io.to(data.room).emit('new-meeting-message', { sender: socket.nickname, text: data.text });
-        }
-    });
-
-    // 6. Meeting İçi Hediyeleşme (5500 BPL Kuralı)
-    socket.on('meeting-gift-send', async (data) => {
-        try {
-            const sender = await User.findById(socket.userId);
-            // Kural: 5500 BPL altı bakiye ile hediye gönderilemez
-            if (!sender || sender.bpl < 5500) {
-                return socket.emit('error', 'Hediye göndermek için bakiyen 5500 BPL üzerinde olmalı!');
-            }
-
-            const receiver = await User.findOne({ nickname: data.targetNick });
-            if (receiver) {
-                sender.bpl -= data.amount;
-                receiver.bpl += data.amount;
-                await sender.save();
-                await receiver.save();
-
-                socket.emit('update-bpl', sender.bpl);
-                const targetSid = onlineUsers.get(data.targetNick);
-                if (targetSid) io.to(targetSid).emit('update-bpl', receiver.bpl);
-
-                io.to(data.room).emit('new-meeting-message', {
-                    sender: "SİSTEM",
-                    text: `🎁 ${socket.nickname}, ${data.targetNick} komutana ${data.amount} BPL hediye gönderdi!`
-                });
-            }
-        } catch (err) { console.error("Hediye Hatası:", err); }
-    });
-
-    // 7. Bağlantı Kesilmesi
-    socket.on('disconnect', () => {
-        onlineUsers.delete(socket.nickname);
-        broadcastOnlineList();
-    });
-
-}); // <--- Ana blok burada güvenle kapanıyor.
-
-
-
-  // --- MEVCUT DAVET SİSTEMİN (AYNEN KALSIN) ---
-    socket.on('meeting-invite-request', (data) => {
-        const targetSid = onlineUsers.get(data.to);
-        if (targetSid) {
-            io.to(targetSid).emit('meeting-invite-received', { from: socket.nickname, roomId: data.roomId });
-        } else {
-            socket.emit('error', 'Kullanıcı online değil.');
-        }
-    });
-
-    socket.on('send-meeting-invite', (data) => {
-        const targetSId = onlineUsers.get(data.target);
-        if (targetSId) {
-            socket.join(socket.nickname); 
-            io.to(targetSId).emit('meeting-invite-received', { from: socket.nickname, room: socket.nickname, role: 'guest' });
-            socket.emit('force-join-meeting', { room: socket.nickname, role: 'host' });
-        } else {
-            socket.emit('error', 'Kullanıcı online değil.');
-        }
-    });
-
+    // 4. Meeting Odası İşlemleri
     socket.on('join-meeting', (data) => {
         socket.join(data.roomId);
         socket.to(data.roomId).emit('user-connected', { peerId: data.peerId, nickname: data.nickname });
@@ -765,131 +680,76 @@ io.on('connection', async (socket) => {
         if (data.room && data.text) io.to(data.room).emit('new-meeting-message', { sender: socket.nickname, text: data.text });
     });
 
-    socket.on('host-action', (data) => {
-        if (socket.nickname === data.room) {
-            const tId = onlineUsers.get(data.targetNick);
-            if (tId && data.action === 'kick') io.to(tId).emit('command-kick');
-        }
-    });
-
-    // --- YENİ EKLENEN ÖZELLİKLER (BURAYI EKLE) ---
-
-    // 1. Kameradan Hediye Gönderimi (BPL Kuralı ile)
     socket.on('meeting-gift-send', async (data) => {
         try {
             const sender = await User.findById(socket.userId);
-            // BPL Kuralı: Bakiyesi yetersizse engelle
-            if (!sender || sender.bpl < data.amount) {
-                return socket.emit('error', 'Yetersiz BPL! Hediye gönderilemedi.');
-            }
-
+            if (!sender || sender.bpl < 5500) return socket.emit('error', 'Hediye sınırı: 5500 BPL!');
+            
             const receiver = await User.findOne({ nickname: data.targetNick });
             if (receiver) {
-                sender.bpl -= data.amount;
-                receiver.bpl += data.amount;
-                await sender.save();
-                await receiver.save();
-
-                // Bakiyeleri her iki tarafa da anlık bildir
+                sender.bpl -= data.amount; receiver.bpl += data.amount;
+                await sender.save(); await receiver.save();
                 socket.emit('update-bpl', sender.bpl);
-                const targetSid = onlineUsers.get(data.targetNick);
-                if (targetSid) io.to(targetSid).emit('update-bpl', receiver.bpl);
-
-                // Sohbet odasına bilgi mesajı düş
-                io.to(data.room).emit('new-meeting-message', {
-                    sender: "SİSTEM",
-                    text: `🎁 ${socket.nickname}, ${data.targetNick} komutana ${data.amount} BPL hediye gönderdi!`
-                });
+                const tSid = onlineUsers.get(data.targetNick);
+                if (tSid) io.to(tSid).emit('update-bpl', receiver.bpl);
+                io.to(data.room).emit('new-meeting-message', { sender: "SİSTEM", text: `🎁 ${socket.nickname}, ${data.targetNick}'a ${data.amount} BPL gönderdi!` });
             }
-        } catch (err) { console.error("Gift Error:", err); }
+        } catch (err) { console.error(err); }
     });
 
-    // 2. Kameradan Arena Daveti (Özel Oda Bağlantısı)
-    socket.on('meeting-arena-invite-send', (data) => {
-        const targetSid = onlineUsers.get(data.targetNick);
-        if (targetSid) {
-            io.to(targetSid).emit('arena-invite-received', {
-                from: socket.nickname,
-                bet: data.bet,
-                roomId: data.room // Mevcut meeting odasını referans alır
-            });
-        }
-    });
-
-    socket.on('host-action', (data) => {
-        if (socket.nickname === data.room) {
-            const tId = onlineUsers.get(data.targetNick);
-            if (tId && data.action === 'kick') io.to(tId).emit('command-kick');
-        }
-    });
-
-
-
-socket.on('arena-join-queue', async (data) => {
+    // 5. Arena Savaş Sistemi
+    socket.on('arena-join-queue', async (data) => {
         try {
             const u = await User.findById(socket.userId);
             if (!u || u.bpl < (data.bet || 0)) return socket.emit('error', 'Yetersiz bakiye!');
 
-            // Bahis düş ve güncelle
             u.bpl -= (data.bet || 0);
             await u.save();
             socket.emit('update-bpl', u.bpl);
 
-            const player = { 
-                nickname: u.nickname, socketId: socket.id, 
-                animal: u.selectedAnimal || 'Lion', dbData: u, 
-                bet: data.bet, prize: data.prize 
-            };
+            const player = { nickname: u.nickname, socketId: socket.id, animal: u.selectedAnimal || 'Lion', dbData: u, bet: data.bet, prize: data.prize };
 
-            // SENARYO A: ÖZEL ODA (Meeting/Chat Daveti)
-            if (data.roomId) {
-                socket.join(data.roomId);
-                const roomSize = io.sockets.adapter.rooms.get(data.roomId)?.size || 0;
-
-                if (roomSize >= 2) {
-                    // Odada iki kişi oldu, savaşı başlat
-                    const clients = Array.from(io.sockets.adapter.rooms.get(data.roomId));
-                    // Not: Bu kısım için özel oda eşleşme mantığı eklenmelidir.
-                    // Şimdilik davetli düellosu için odaya yayın yapıyoruz.
-                    startBattle(player, { nickname: "Rakip", animal: "Tiger", dbData: {} }, io, data.roomId);
-                }
-                return; 
-            }
-
-            // SENARYO B: NORMAL SIRA (Bot Destekli)
             if (arenaQueue.length > 0) {
                 const opponent = arenaQueue.shift();
                 startBattle(player, opponent, io);
             } else {
                 arenaQueue.push(player);
-                setTimeout(async () => {
+                setTimeout(() => {
                     const idx = arenaQueue.findIndex(p => p.socketId === socket.id);
                     if (idx !== -1) {
                         const p = arenaQueue.splice(idx, 1)[0];
-                        const botPlayer = { 
-                            nickname: "Bot_" + p.animal, socketId: null, animal: p.animal, 
-                            dbData: { atk: p.dbData.atk * 0.9, def: p.dbData.def * 0.9, hp: 100 },
-                            bet: p.bet, prize: p.prize 
-                        };
+                        const botPlayer = { nickname: "Bot_" + p.animal, socketId: null, animal: p.animal, dbData: { atk: p.dbData.atk * 0.9, def: p.dbData.def * 0.9, hp: 100 }, bet: p.bet, prize: p.prize };
                         startBattle(p, botPlayer, io);
                     }
                 }, 13000);
             }
         } catch (err) { console.error(err); }
     });
+
+    // 6. Genel Hediye Sistemi (Chat)
     socket.on('send-gift-bpl', async (data) => {
         try {
             const amount = parseInt(data.amount);
             const fromUser = await User.findById(socket.userId);
+            if (fromUser.bpl < 5500) return socket.emit('error', 'Hediye sınırı: 5500 BPL!');
+            
             const toUser = await User.findOne({ nickname: data.to });
-            if (!toUser || fromUser.bpl - amount < 25) return socket.emit('error', 'İşlem başarısız.');
+            if (!toUser) return socket.emit('error', 'Kullanıcı bulunamadı.');
+            
             fromUser.bpl -= amount; toUser.bpl += amount;
             await fromUser.save(); await toUser.save();
             socket.emit('update-bpl', fromUser.bpl);
             const tSid = onlineUsers.get(data.to);
             if (tSid) io.to(tSid).emit('update-bpl', toUser.bpl);
-            io.to("general-chat").emit('new-message', { sender: "SİSTEM", text: `🎁 ${socket.nickname}, ${data.to}'ya ${amount} BPL gönderdi!` });
+            io.to("general-chat").emit('new-chat-message', { sender: "SİSTEM", text: `🎁 ${socket.nickname}, ${data.to}'ya ${amount} BPL gönderdi!` });
         } catch (e) {}
+    });
+
+    socket.on('host-action', (data) => {
+        if (socket.nickname === data.room) {
+            const tId = onlineUsers.get(data.targetNick);
+            if (tId && data.action === 'kick') io.to(tId).emit('command-kick');
+        }
     });
 
     socket.on('disconnect', () => {
@@ -897,6 +757,8 @@ socket.on('arena-join-queue', async (data) => {
         arenaQueue = arenaQueue.filter(p => p.socketId !== socket.id);
         broadcastOnlineList();
     });
+
+}); // <--- ANA BAĞLANTI BURADA KAPANIR (BAŞKA YERDE DEĞİL!)
 
 
 const nodemailer = require('nodemailer'); // Mail için
@@ -1030,6 +892,7 @@ app.post('/api/help-request', async (req, res) => {
 
 const PORT = process.env.PORT || 3000;
 server.listen(PORT, () => console.log(`🚀 SİSTEM AKTİF: Port ${PORT}`));
+
 
 
 
