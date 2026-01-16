@@ -651,28 +651,33 @@ io.on('connection', async (socket) => {
         }
     });
 
-    // --- MEETING (Beşgen Masa El Sıkışma) ---
-    socket.on('join-meeting', (data) => {
-        const roomId = data.roomId;
-        socket.join(roomId);
-        socket.peerId = data.peerId; 
+   // app.js içindeki join-meeting kısmı
+socket.on('join-meeting', (data) => {
+    socket.join(data.roomId);
+    socket.peerId = data.peerId; 
 
-        // İçeridekilere "ben geldim" de
-        socket.to(roomId).emit('user-connected', { peerId: data.peerId, nickname: socket.nickname });
-
-        // İçeride olanları yeni gelene tanıt (Handshake Fix)
-        const roomClients = io.sockets.adapter.rooms.get(roomId);
-        if (roomClients) {
-            roomClients.forEach(cid => {
-                if (cid !== socket.id) {
-                    const other = io.sockets.sockets.get(cid);
-                    if (other?.peerId) {
-                        socket.emit('user-connected', { peerId: other.peerId, nickname: other.nickname });
-                    }
-                }
-            });
-        }
+    // 1. Yeni geleni içerdekilere haber ver
+    socket.to(data.roomId).emit('user-connected', { 
+        peerId: data.peerId, 
+        nickname: socket.nickname 
     });
+
+    // 2. KRİTİK: İçeride zaten biri varsa, yeni gelene onu tanıt
+    const room = io.sockets.adapter.rooms.get(data.roomId);
+    if (room) {
+        room.forEach(clientId => {
+            if (clientId !== socket.id) {
+                const other = io.sockets.sockets.get(clientId);
+                if (other && other.peerId) {
+                    socket.emit('user-connected', { 
+                        peerId: other.peerId, 
+                        nickname: other.nickname 
+                    });
+                }
+            }
+        });
+    }
+});
 
     // Davet ve Mesajlaşma
     socket.on('send-bpl-invite', (data) => {
@@ -748,6 +753,7 @@ app.post('/api/withdraw-request', async (req, res) => {
 
 const PORT = process.env.PORT || 3000;
 server.listen(PORT, () => console.log(`🚀 SİSTEM AKTİF: Port ${PORT}`));
+
 
 
 
