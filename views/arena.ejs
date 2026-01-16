@@ -159,25 +159,58 @@
         }
 
         // SAVAŞ BAŞLADIĞINDA TETİKLENİR
-        socket.on('match-started', async (data) => {
-            const opponent = data.players.find(p => p.nick !== myNick);
-            overlay.style.display = 'flex';
-            
-            // Rakip bilgilerini güncelle (.jpg olarak)
-            document.getElementById('opp-name').innerText = opponent.nick;
-            document.getElementById('opp-img').src = `/caracter/profile/${opponent.animal}.jpg`;
+ socket.on('match-started', async (data) => {
+    const opponent = data.players.find(p => p.nick !== myNick);
+    overlay.style.display = 'flex';
+    
+    // 1. AŞAMA: Profilleri Yaz
+    document.getElementById('opp-name').innerText = opponent.nick;
+    document.getElementById('opp-img').src = `/caracter/profile/${opponent.animal}.jpg`;
 
-            // SIRAYLA VİDEOLARI OYNAT
-            // 1. Hamle: Senin Saldırın (Animal1.mp4)
-            await playMove(myAnimal, "1");
-            
-            // 2. Hamle: Rakibin Saldırısı (Animal1.mp4)
-            await playMove(opponent.animal, "1");
-            
-            // 3. Final: Kazananın Zafer Videosu (Animal.mp4)
-            const winner = data.winner;
-            await playFinal(winner.animal, winner.nick === myNick);
-        });
+    // 2. AŞAMA: Senin Saldırın (Animal1.mp4)
+    await playMove(myAnimal, "1", `${myNick.toUpperCase()} SALDIRIYOR!`);
+    
+    // 3. AŞAMA: Rakibin Saldırısı (Animal1.mp4)
+    await playMove(opponent.animal, "1", `${opponent.nick.toUpperCase()} SALDIRIYOR!`);
+    
+    // 4. AŞAMA: FİNAL (ZAFER VİDEOSU - Animal.mp4)
+    // Server'dan gelen winner bilgisini kullanıyoruz
+    const winner = data.winner;
+    const amIWinner = (winner.nick === myNick);
+    
+    await playFinal(winner.animal, amIWinner);
+});
+
+// Video Oynatma Fonksiyonu (Daha sağlam hali)
+async function playMove(animal, suffix, statusText) {
+    return new Promise(res => {
+        document.getElementById('battle-status').innerText = statusText;
+        video.src = `/caracter/move/${animal}/${animal}${suffix}.mp4`;
+        video.onended = () => {
+            video.onended = null; // Hafızayı temizle
+            res();
+        };
+        video.play().catch(e => { console.log("Video hatası, geçiliyor..."); res(); });
+    });
+}
+
+async function playFinal(animal, amIWinner) {
+    document.getElementById('battle-status').innerText = "SAVAŞ SONUÇLANDI!";
+    video.src = `/caracter/move/${animal}/${animal}.mp4`; // Zafer videosu (Suffixsiz)
+    
+    video.play();
+
+    // Video oynarken yazıyı çıkar
+    setTimeout(() => {
+        winText.innerText = amIWinner ? "KAZANDIN!" : "KAYBETTİN!";
+        winText.style.color = amIWinner ? "var(--neon-green)" : "var(--neon-red)";
+        winText.style.display = "block";
+    }, 2000);
+
+    video.onended = () => {
+        setTimeout(() => window.location.href = "/profil", 4000);
+    };
+}
 
         // HAMLE VİDEOSU FONKSİYONU
         async function playMove(animal, suffix) {
@@ -215,3 +248,4 @@
     </script>
 </body>
 </html>
+
