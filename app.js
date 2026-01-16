@@ -2,7 +2,7 @@ require('dotenv').config();
 const express = require('express');
 const mongoose = require('mongoose');
 const session = require('express-session');
-const MongoStore = require('connect-mongo').default;
+const MongoStore = require('connect-mongo');
 const path = require('path');
 const http = require('http');
 const socketIo = require('socket.io');
@@ -33,13 +33,7 @@ app.use(express.json());
 app.use(helmet({ contentSecurityPolicy: false })); 
 app.use(mongoSanitize());
 
-// --- SESSION YÖNETİMİ ---
-app.use(session({
-    secret: process.env.SESSION_SECRET || 'bpl_super_secret_2026',
-    resave: false,
-    saveUninitialized: false,
-   // --- SESSION YÖNETİMİ ---
-// --- SESSION YÖNETİMİ ---
+// --- SESSION YÖNETİMİ (DÜZELTİLDİ) ---
 app.use(session({
     secret: process.env.SESSION_SECRET || 'bpl_super_secret_2026',
     resave: false,
@@ -63,8 +57,10 @@ app.get('/', (req, res) => {
 });
 
 app.get('/profil', isAuth, async (req, res) => {
-    const user = await User.findById(req.session.user._id);
-    res.render('profil', { user });
+    try {
+        const user = await User.findById(req.session.user._id);
+        res.render('profil', { user });
+    } catch (err) { res.redirect('/logout'); }
 });
 
 app.get('/chat', isAuth, async (req, res) => {
@@ -129,14 +125,12 @@ io.on('connection', (socket) => {
         io.emit('new-chat-message', { from: socket.nickname, msg: data.msg });
     });
 
-    // Hediye Sistemi
     socket.on('send-gift', async (data) => {
         const sender = await User.findOne({ nickname: socket.nickname });
         if (sender && sender.bpl >= data.amount && data.amount >= 5500) {
             const netAmount = Math.floor(data.amount * 0.7);
             await User.findOneAndUpdate({ nickname: data.receiver }, { $inc: { bpl: netAmount } });
             const updatedSender = await User.findOneAndUpdate({ nickname: socket.nickname }, { $inc: { bpl: -data.amount } }, { new: true });
-
             if (onlineUsers.has(data.receiver)) {
                 io.to(onlineUsers.get(data.receiver)).emit('gift-received', { from: socket.nickname, amount: netAmount });
                 const target = await User.findOne({ nickname: data.receiver });
@@ -148,7 +142,6 @@ io.on('connection', (socket) => {
         }
     });
 
-    // Arena & Meeting
     socket.on('invite-to-arena', (target) => {
         if (onlineUsers.has(target)) {
             io.to(onlineUsers.get(target)).emit('arena-invitation', { from: socket.nickname });
@@ -177,6 +170,3 @@ io.on('connection', (socket) => {
 server.listen(PORT, () => {
     console.log(`🚀 BPL Sistemi Aktif: http://localhost:${PORT}`);
 });
-
-
-
