@@ -1,81 +1,58 @@
-
+require('dotenv').config();
 const express = require('express');
 const mongoose = require('mongoose');
 const session = require('express-session');
-const MongoStore = require('connect-mongo').default; 
+const MongoStore = require('connect-mongo');
+const path = require('path');
 const http = require('http');
 const socketIo = require('socket.io');
-const path = require('path');
-const bcrypt = require('bcryptjs');
-const axios = require('axios');
-
-const User = require('./models/User');
+const helmet = require('helmet');
+const mongoSanitize = require('express-mongo-sanitize');
+const bcrypt = require('bcrypt');
+const User = require('./models/User'); 
 
 const app = express();
 const server = http.createServer(app);
-const io = socketIo(server);
+const io = socketIo(server, {
+    cors: { origin: "*", methods: ["GET", "POST"] }
+});
 
-// --- GLOBAL DEĞİŞKENLER ---
+// BURASI EKSİKTİ:
+const PORT = process.env.PORT || 10000;
 
-let arenaQueue = [];
-let chatHistory = [];
-const BOTS = ['Lion', 'Kurd', 'Peregrinefalcon', 'Rhino'];
+// --- VERİTABANI BAĞLANTISI ---
+mongoose.connect(process.env.MONGO_URI)
+    .then(() => console.log('✅ BPL Veritabanı Aktif'))
+    .catch(err => console.error('❌ DB Hatası:', err));
 
-function addToHistory(sender, text) {
-    const msg = { sender, text, time: Date.now() };
-    chatHistory.push(msg);
-    if (chatHistory.length > 50) chatHistory.shift();
-}
-
-// --- 1. VERİTABANI VE SESSION ---
-const MONGO_URI = process.env.MONGO_URI;
-const SESSION_SECRET = process.env.SESSION_SECRET || 'bpl_ultimate_megasecret_2024';
-
-mongoose.connect(MONGO_URI)
-    .then(() => console.log('✅ MongoDB Bağlantısı Başarılı'))
-    .catch(err => console.error('❌ MongoDB Hatası:', err));
-
+// --- AYARLAR ---
 app.set('view engine', 'ejs');
+app.set('views', path.join(__dirname, 'views'));
 app.use(express.static(path.join(__dirname, 'public')));
-app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
+app.use(express.json());
+app.use(helmet({ contentSecurityPolicy: false })); 
+app.use(mongoSanitize());
 
-const sessionMiddleware = session({
-    secret: SESSION_SECRET,
+// --- SESSION YÖNETİMİ ---
+app.use(session({
+    secret: process.env.SESSION_SECRET || 'bpl_super_secret_2026',
     resave: false,
     saveUninitialized: false,
-    store: MongoStore.create({ mongoUrl: MONGO_URI, ttl: 24 * 60 * 60 }),
-    cookie: { secure: false, maxAge: 24 * 60 * 60 * 1000 }
-});
-app.use(sessionMiddleware);
+    store: MongoStore.create({ 
+        mongoUrl: process.env.MONGO_URI,
+        ttl: 14 * 24 * 60 * 60
+    }),
+    cookie: { maxAge: 1000 * 60 * 60 * 24 } 
+}));
 
-io.use((socket, next) => {
-    sessionMiddleware(socket.request, {}, next);
-});
-
-// --- 2. KULLANICI KONTROLÜ ---
-app.use(async (req, res, next) => {
-    res.locals.user = null;
-    if (req.session && req.session.userId) {
-        try {
-            const user = await User.findById(req.session.userId);
-            if (user) res.locals.user = user;
-        } catch (e) { console.error("Session Hatası:", e); }
-    }
-    next();
-});
-
-const authRequired = (req, res, next) => {
-    if (req.session && req.session.userId) return next();
-    res.redirect('/');
-};
-
+// GİRİŞ KONTROLÜ
 const isAuth = (req, res, next) => {
     if (req.session.user) return next();
     res.redirect('/');
 };
 
-// --- ROTALAR (ROUTES) ---
+// --- ROTALAR ---
 app.get('/', (req, res) => {
     if (req.session.user) return res.redirect('/profil');
     res.render('index');
@@ -103,22 +80,6 @@ app.get('/meeting', isAuth, async (req, res) => {
     res.render('meeting', { user, role: req.query.role || 'guest' });
 });
 
-// --- KAYIT & GİRİŞ ---
-app.post('/register', async (req, res) => {
-    try {
-        const { nickname, password } = req.body;
-        const hashedPassword = await bcrypt.hash(password, 10);
-        const newUser = new User({ 
-            nickname, 
-            password: hashedPassword,
-            bpl: 1000,
-            selectedAnimal: 'none'
-        });
-        await newUser.save();
-        res.redirect('/');
-    } catch (err) { res.send("Kayıt hatası veya kullanıcı adı dolu."); }
-});
-
 app.post('/login', async (req, res) => {
     try {
         const { nickname, password } = req.body;
@@ -137,7 +98,7 @@ app.get('/logout', (req, res) => {
 });
 
 // --- SOCKET LOGIC ---
-
+const onlineUsers = new Map();
 
 io.on('connection', (socket) => {
     socket.on('update-online-status', (data) => {
@@ -150,40 +111,6 @@ io.on('connection', (socket) => {
         io.emit('new-chat-message', { from: socket.nickname, msg: data.msg });
     });
 
-    socket.on('send-gift', async (data) => {
-        const sender = await User.findOne({ nickname: socket.nickname });
-        if (sender && sender.bpl >= data.amount && data.amount >= 5500) {
-            const netAmount = Math.floor(data.amount * 0.7);
-            await User.findOneAndUpdate({ nickname: data.receiver }, { $inc: { bpl: netAmount } });
-            const updatedSender = await User.findOneAndUpdate({ nickname: socket.nickname }, { $inc: { bpl: -data.amount } }, { new: true });
-            if (onlineUsers.has(data.receiver)) {
-                io.to(onlineUsers.get(data.receiver)).emit('gift-received', { from: socket.nickname, amount: netAmount });
-                const target = await User.findOne({ nickname: data.receiver });
-                io.to(onlineUsers.get(data.receiver)).emit('update-balance', target.bpl);
-            }
-            socket.emit('update-balance', updatedSender.bpl);
-        } else {
-            socket.emit('error-msg', 'Yetersiz bakiye veya geçersiz tutar.');
-        }
-    });
-
-    socket.on('invite-to-arena', (target) => {
-        if (onlineUsers.has(target)) {
-            io.to(onlineUsers.get(target)).emit('arena-invitation', { from: socket.nickname });
-        }
-    });
-
-    socket.on('create-meeting', async () => {
-        const user = await User.findOne({ nickname: socket.nickname });
-        if (user && user.bpl >= 50) {
-            const updated = await User.findOneAndUpdate({ nickname: socket.nickname }, { $inc: { bpl: -50 } }, { new: true });
-            socket.emit('meeting-created', { roomId: `room_${socket.nickname}` });
-            socket.emit('update-balance', updated.bpl);
-        } else {
-            socket.emit('error-msg', 'Oda açmak için 50 BPL gerekli.');
-        }
-    });
-
     socket.on('disconnect', () => {
         if (socket.nickname) {
             onlineUsers.delete(socket.nickname);
@@ -192,9 +119,7 @@ io.on('connection', (socket) => {
     });
 });
 
+// SUNUCUYU BAŞLAT
 server.listen(PORT, () => {
     console.log(`🚀 BPL Sistemi Aktif: http://localhost:${PORT}`);
 });
-
-
-
