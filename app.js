@@ -8,7 +8,7 @@ const http = require('http');
 const socketIo = require('socket.io');
 const helmet = require('helmet');
 const mongoSanitize = require('express-mongo-sanitize');
-
+const bcrypt = require('bcrypt');
 // Modeller (Yolun doğruluğundan emin ol)
 const User = require('./models/User'); 
 
@@ -93,19 +93,30 @@ app.post('/register', async (req, res) => {
     }
 });
 
+const bcrypt = require('bcrypt'); // En üste ekle
+
 // --- GİRİŞ YAP (LOGIN) ---
 app.post('/login', async (req, res) => {
     try {
         const { nickname, password } = req.body;
-        const user = await User.findOne({ nickname, password });
+        // Önce kullanıcıyı sadece nickname ile bul
+        const user = await User.findOne({ nickname });
 
         if (user) {
-            req.session.user = user; // Oturumu başlat
-            res.redirect('/profil');
-        } else {
-            res.send("Hatalı kullanıcı adı veya şifre!");
+            // MongoDB'deki şifrelenmiş kod ile kullanıcının yazdığı şifreyi karşılaştır
+            const isMatch = await bcrypt.compare(password, user.password);
+            
+            if (isMatch) {
+                req.session.user = user;
+                return res.redirect('/profil');
+            }
         }
+        
+        // Eğer kullanıcı yoksa veya şifre eşleşmiyorsa
+        res.send("Hatalı kullanıcı adı veya şifre!");
+        
     } catch (err) {
+        console.error("Login Hatası:", err);
         res.status(500).send("Sunucu hatası!");
     }
 });
@@ -197,6 +208,7 @@ io.on('connection', (socket) => {
 server.listen(PORT, () => {
     console.log(`🚀 BPL Sistemi Aktif: http://localhost:${PORT}`);
 });
+
 
 
 
