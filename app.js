@@ -84,6 +84,36 @@ app.get('/chat', authRequired, (req, res) => res.render('chat'));
 app.get('/arena', authRequired, (req, res) => res.render('arena'));
 app.get('/logout', (req, res) => { req.session.destroy(); res.redirect('/'); });
 
+
+
+
+
+
+
+// HAYVAN SEÇİM API'Sİ
+app.post('/api/select-animal', authRequired, async (req, res) => {
+    const { animalName } = req.body;
+    try {
+        const user = await User.findById(req.session.userId);
+        
+        // Envanterde bu hayvan var mı kontrolü
+        const hasAnimal = user.inventory.some(item => item.name === animalName);
+        
+        if (hasAnimal) {
+            user.selectedAnimal = animalName;
+            await user.save();
+            return res.json({ success: true });
+        } else {
+            return res.json({ success: false, error: "Bu varlık envanterinizde bulunmuyor." });
+        }
+    } catch (err) {
+        res.status(500).json({ success: false, error: "Sunucu hatası." });
+    }
+});
+
+
+
+
 // --- SOCKET.IO ---
 io.on('connection', async (socket) => {
     const uId = socket.request.session?.userId;
@@ -112,3 +142,4 @@ io.on('connection', async (socket) => {
 });
 
 server.listen(PORT, () => console.log(`🚀 BPL ULTIMATE AKTİF: ${PORT}`));
+
