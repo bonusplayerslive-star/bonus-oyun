@@ -211,6 +211,16 @@ app.post('/api/upgrade-stat', isLoggedIn, async (req, res) => {
         await user.save();
         res.json({ success: true, newBalance: user.bpl, newValue: animal[statType] });
     } catch (err) { res.status(500).json({ success: false, error: "Geliştirme hatası!" }); }
+
+// app.js içindeki örnek mantık
+if (statType === 'stamina') {
+    if (user.bpl < 10) return res.status(400).json({ error: "Yetersiz BPL!" });
+    animal.stamina = 100; // Enerjiyi fulle
+    user.bpl -= 10;
+}
+
+
+    
 });
 
 // --- 5. SOCKET.IO İŞLEMLERİ (Chat Bozmadan) ---
@@ -360,5 +370,6 @@ const PORT = process.env.PORT || 3000;
 httpServer.listen(PORT, () => {
     console.log(`🌍 Sunucu Yayında: http://localhost:${PORT}`);
 });
+
 
 
