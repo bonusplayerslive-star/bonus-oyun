@@ -2,7 +2,7 @@ require('dotenv').config();
 const express = require('express');
 const mongoose = require('mongoose');
 const session = require('express-session');
-const MongoStore = require('connect-mongo'); // .default hatasını kökten sildik
+const MongoStore = require('connect-mongo').default;
 const http = require('http');
 const socketIo = require('socket.io');
 const path = require('path');
@@ -143,5 +143,6 @@ io.on('connection', async (socket) => {
 server.listen(PORT, () => {
     console.log(`🚀 BPL ULTIMATE AKTİF: Port ${PORT}`);
 });
+
 
 
