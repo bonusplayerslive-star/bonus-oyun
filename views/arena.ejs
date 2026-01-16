@@ -53,6 +53,34 @@
         .bet-item.active { border-color: var(--neon-green); box-shadow: 0 0 15px var(--neon-green); }
         
         #timer-box { font-size: 6rem; color: var(--neon-red); line-height: 1; }
+
+.bet-grid {
+    display: grid;
+    grid-template-columns: repeat(2, 1fr); /* Yan yana 2 adet kutu */
+    gap: 10px;
+    width: 100%;
+    max-width: 450px;
+    margin: 0 auto;
+}
+
+.bet-item {
+    background: rgba(20, 20, 20, 0.8);
+    border: 2px solid #333;
+    padding: 15px;
+    border-radius: 12px;
+    cursor: pointer;
+    transition: all 0.3s ease;
+}
+
+.bet-item.active {
+    border-color: var(--neon-green);
+    background: rgba(57, 255, 20, 0.1);
+    box-shadow: 0 0 15px rgba(57, 255, 20, 0.2);
+}
+
+.bet-item h4 { font-weight: bold; margin-bottom: 5px; }
+
+
     </style>
 </head>
 <body>
@@ -82,13 +110,23 @@
         
         <div id="selection-area">
             <div class="bet-grid mb-4">
-                <div class="bet-item active" onclick="selectBet(1, 25, this)">
-                    <h4>X1</h4><span class="small">25 BPL</span>
-                </div>
-                <div class="bet-item" onclick="selectBet(10, 250, this)">
-                    <h4>X10</h4><span class="small">250 BPL</span>
-                </div>
-            </div>
+    <div class="bet-item active" onclick="selectBet(1, 25, this)">
+        <h4 class="mb-0">X1</h4>
+        <span class="small text-success">25 BPL</span>
+    </div>
+    <div class="bet-item" onclick="selectBet(2, 50, this)">
+        <h4 class="mb-0">X2</h4>
+        <span class="small text-info">50 BPL</span>
+    </div>
+    <div class="bet-item" onclick="selectBet(5, 125, this)">
+        <h4 class="mb-0">X5</h4>
+        <span class="small text-warning">125 BPL</span>
+    </div>
+    <div class="bet-item" onclick="selectBet(10, 250, this)">
+        <h4 class="mb-0">X10</h4>
+        <span class="small text-danger">250 BPL</span>
+    </div>
+</div>
             <button onclick="readyToFight()" class="btn btn-danger btn-lg w-100 py-3 fw-bold">SALDIRIYA BAŞLA</button>
         </div>
 
@@ -207,3 +245,4 @@
     </script>
 </body>
 </html>
+
