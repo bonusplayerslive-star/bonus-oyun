@@ -22,81 +22,101 @@
 
         /* Üst Durum Çubuğu */
         .header-status { 
-            height: 8vh; padding: 0 20px; background: #000; border-bottom: 2px solid var(--neon-green);
+            height: 60px; padding: 0 20px; background: #000; border-bottom: 2px solid var(--neon-green);
             display: flex; align-items: center; justify-content: space-between; z-index: 100;
         }
-        .status-item { font-family: 'Orbitron'; font-size: 0.75rem; }
+        .status-item { font-family: 'Orbitron'; font-size: 0.8rem; letter-spacing: 1px; }
 
-        /* Ana İçerik Alanı */
-        .main-layout { display: flex; height: 82vh; width: 100vw; }
+        /* Ana Düzen */
+        .main-content { display: flex; flex: 1; height: calc(100vh - 140px); }
 
-        /* Sol Dikey Menü (Online Kullanıcılar) */
+        /* SOL DİKEY MENÜ (Online Listesi) */
         .online-sidebar {
-            width: 80px; background: rgba(0,0,0,0.8); border-right: 1px solid #222;
-            display: flex; flex-direction: column; align-items: center; padding-top: 15px; overflow-y: auto;
+            width: 90px; background: rgba(0, 0, 0, 0.8); border-right: 1px solid #222;
+            display: flex; flex-direction: column; align-items: center; padding: 15px 0;
+            overflow-y: auto; scrollbar-width: none;
         }
-        .user-avatar {
-            width: 45px; height: 45px; border-radius: 50%; border: 2px solid var(--neon-green);
-            margin-bottom: 15px; cursor: pointer; transition: 0.3s; position: relative;
+        .online-sidebar::-webkit-scrollbar { display: none; }
+
+        .user-node {
+            display: flex; flex-direction: column; align-items: center; margin-bottom: 20px;
+            cursor: pointer; transition: 0.3s; position: relative; width: 100%;
         }
-        .user-avatar:hover { transform: scale(1.1); box-shadow: 0 0 10px var(--neon-green); }
-        .online-dot { 
-            position: absolute; bottom: 0; right: 0; width: 12px; height: 12px; 
+        .user-node:hover { transform: scale(1.1); }
+        
+        .avatar-circle {
+            width: 50px; height: 50px; border-radius: 50%; border: 2px solid var(--neon-blue);
+            background: #111; display: flex; align-items: center; justify-content: center;
+            position: relative; overflow: hidden;
+        }
+        .avatar-circle img { width: 100%; height: 100%; object-fit: cover; }
+        
+        .online-status {
+            position: absolute; bottom: 2px; right: 2px; width: 12px; height: 12px;
             background: var(--neon-green); border-radius: 50%; border: 2px solid #000;
         }
+        .node-name { font-size: 0.65rem; color: #aaa; margin-top: 5px; text-transform: uppercase; text-align: center; max-width: 80px; overflow: hidden; }
 
-        /* Chat Alanı */
-        .chat-area { flex: 1; display: flex; flex-direction: column; background: rgba(0,0,0,0.5); position: relative; }
-        #chatMessages { flex: 1; overflow-y: auto; padding: 15px; font-size: 0.9rem; }
+        /* Chat Penceresi */
+        .chat-window { flex: 1; display: flex; flex-direction: column; position: relative; background: rgba(0,0,0,0.3); }
+        #chatMessages { flex: 1; overflow-y: auto; padding: 20px; }
+        
+        .msg-entry { margin-bottom: 10px; padding: 8px 15px; background: rgba(255,255,255,0.03); border-left: 3px solid var(--neon-blue); }
+        .sender-tag { color: #FFFF00; font-weight: bold; cursor: pointer; font-family: 'Orbitron'; font-size: 0.75rem; margin-right: 10px; }
 
-        .msg-entry { margin-bottom: 6px; padding: 6px 12px; border-radius: 4px; background: rgba(255,255,255,0.02); }
-        .sender-tag { color: #FFFF00; font-weight: bold; cursor: pointer; font-family: 'Orbitron'; font-size: 0.7rem; }
-
-        /* Aksiyon Paneli */
+        /* Aksiyon Paneli (Popup) */
         #userActionPanel { 
             display: none; position: fixed; top: 50%; left: 50%; transform: translate(-50%, -50%);
-            width: 85vw; max-width: 320px; background: var(--panel-bg); border: 2px solid var(--neon-blue);
-            padding: 20px; z-index: 5000; box-shadow: 0 0 50px rgba(0,0,0,1);
+            width: 300px; background: var(--panel-bg); border: 1px solid var(--neon-blue);
+            padding: 25px; z-index: 5000; box-shadow: 0 0 40px rgba(0,0,0,0.9);
         }
 
-        /* Footer Giriş Alanı */
-        .input-footer { height: 10vh; background: #000; padding: 10px 15px; border-top: 1px solid #222; }
-        .terminal-input { background: #050505 !important; border: 1px solid #333 !important; color: var(--neon-green) !important; font-family: monospace; }
-        .btn-send { background: var(--neon-green) !important; color: #000 !important; font-weight: bold; }
+        /* Footer */
+        .input-footer { height: 80px; background: #000; padding: 15px; border-top: 1px solid #222; }
+        .terminal-input { background: #0a0a0a !important; border: 1px solid #333 !important; color: var(--neon-green) !important; font-family: 'Courier New', monospace; }
+        .btn-send { background: var(--neon-green) !important; color: #000 !important; font-weight: bold; padding: 0 25px; }
 
-        @media (max-width: 600px) { .online-sidebar { width: 65px; } .user-avatar { width: 40px; height: 40px; } }
+        @media (max-width: 768px) {
+            .online-sidebar { width: 70px; }
+            .avatar-circle { width: 40px; height: 40px; }
+        }
     </style>
 </head>
 <body>
 
 <div class="header-status">
-    <div class="status-item"><span class="val-neon"><%= user.nickname %></span></div>
-    <div class="status-item"><span id="myBpl" class="text-warning"><%= user.bpl %></span> BPL</div>
-    <div id="peer-status" class="status-item text-danger small">OFFLINE</div>
+    <div class="status-item text-muted">USER: <span class="val-neon"><%= user.nickname %></span></div>
+    <div class="status-item text-muted">CREDITS: <span id="myBpl" class="text-warning"><%= user.bpl %></span> BPL</div>
+    <div class="status-item text-muted">STATUS: <span id="peer-status" class="text-success small">AKTİF</span></div>
 </div>
 
-<div class="main-layout">
-    <div class="online-sidebar" id="onlineUsers">
+<div class="main-content">
+    <div class="online-sidebar" id="onlineUsersList">
         </div>
 
-    <div class="chat-area">
-        <div id="chatMessages"></div>
+    <div class="chat-window">
+        <div id="chatMessages">
+            <div class="msg-entry">
+                <span class="sender-tag">[SİSTEM]:</span>
+                <span class="text-info">Komuta merkezi aktif. Online komutanlar soldaki menüde listelenir.</span>
+            </div>
+        </div>
     </div>
 </div>
 
 <div id="userActionPanel">
-    <h6 id="selectedUserLabel" class="text-center text-info mb-3 font-orbitron">HEDEF SEÇİLDİ</h6>
-    <button id="giftBtn" class="btn btn-action btn-gift btn-outline-danger w-100 mb-2">🎁 HEDİYE GÖNDER (%25 Vergi)</button>
-    <button id="fightBtn" class="btn btn-action btn-fight btn-outline-info w-100 mb-2">⚔️ ARENA DÜELLO (-50 BPL)</button>
-    <button id="meetBtn" class="btn btn-action btn-meeting btn-outline-warning w-100 mb-2">🏛️ ÖZEL ODA (-30 BPL)</button>
-    <button onclick="closePanel()" class="btn btn-sm text-muted w-100">KAPAT</button>
+    <h5 id="selectedUserLabel">HEDEF SEÇİLDİ</h5>
+    <button onclick="sendGift(selectedUser)" id="giftBtn">🎁 HEDİYE GÖNDER</button>
+    <button onclick="handleInvite(selectedUser, 'arena', 50)" id="fightBtn">⚔️ ARENA DÜELLO</button>
+    <button onclick="handleInvite(selectedUser, 'meeting', 30)" id="meetBtn">🏛️ ÖZEL ODA</button>
+    <button onclick="closePanel()" class="btn-close-panel">KAPAT</button>
 </div>
 
 <div class="input-footer">
     <form id="chatForm" onsubmit="return false;">
         <div class="input-group">
-            <input type="text" id="messageInput" class="form-control terminal-input" placeholder="Mesaj yazın..." autocomplete="off">
-            <button onclick="sendMessage()" class="btn btn-send"><i class="fas fa-paper-plane"></i></button>
+            <input type="text" id="messageInput" class="form-control terminal-input" placeholder="Mesajınızı yazın..." autocomplete="off">
+            <button onclick="sendMessage()" class="btn btn-send"><i class="fas fa-bolt me-2"></i>GÖNDER</button>
         </div>
     </form>
 </div>
@@ -111,105 +131,95 @@
     let myBpl = <%= user.bpl %>;
     let selectedUser = "";
 
-    // 1. ONLINE LİSTESİ VE SOL MENÜ GÜNCELLEME
+    // 1. ONLİNE LİSTESİNİ GÜNCELLEME (SOL MENÜ)
     socket.on('update-user-list', (users) => {
-        const sidebar = document.getElementById('onlineUsers');
-        sidebar.innerHTML = '';
+        const listContainer = document.getElementById('onlineUsersList');
+        listContainer.innerHTML = ''; // Temizle
+
         users.forEach(u => {
+            // Kendimizi listede göstermiyoruz (isteğe bağlı)
             if(u.nickname !== myNick) {
-                const div = document.createElement('div');
-                div.className = 'user-avatar';
-                div.title = u.nickname;
-                div.innerHTML = `<img src="/caracter/page/logo.jpeg" style="width:100%; border-radius:50%">
-                                 <div class="online-dot"></div>`;
-                div.onclick = () => openUserMenu(u.nickname);
-                sidebar.appendChild(div);
+                const userDiv = document.createElement('div');
+                userDiv.className = 'user-node';
+                userDiv.onclick = () => openUserMenu(u.nickname);
+                userDiv.innerHTML = `
+                    <div class="avatar-circle">
+                        <img src="/caracter/page/logo.jpeg" alt="user">
+                        <div class="online-status"></div>
+                    </div>
+                    <div class="node-name">${u.nickname}</div>
+                `;
+                listContainer.appendChild(userDiv);
             }
         });
     });
 
-    // 2. PANEL AÇILIŞI
+    // 2. PANELİ AÇ
     function openUserMenu(nick) {
         selectedUser = nick;
-        document.getElementById('selectedUserLabel').innerText = nick;
+        document.getElementById('selectedUserLabel').innerText = "HEDEF: " + nick;
         document.getElementById('userActionPanel').style.display = 'block';
         
-        document.getElementById('giftBtn').onclick = () => showGiftPrompt(nick);
-        document.getElementById('fightBtn').onclick = () => sendInvite(nick, 'arena', 50);
-        document.getElementById('meetBtn').onclick = () => sendInvite(nick, 'meeting', 30);
+        document.getElementById('giftBtn').onclick = () => sendGift(nick);
+        document.getElementById('fightBtn').onclick = () => handleInvite(nick, 'arena', 50);
+        document.getElementById('meetBtn').onclick = () => handleInvite(nick, 'meeting', 30);
     }
 
     function closePanel() { document.getElementById('userActionPanel').style.display = 'none'; }
 
-    // 3. HEDİYE SİSTEMİ (LIMITLİ VE VERGİLİ)
-    function showGiftPrompt(nick) {
+    // 3. HEDİYE SİSTEMİ (LİMİT VE VERGİ KONTROLLÜ)
+    function sendGift(nick) {
         Swal.fire({
-            title: 'HEDİYE MİKTARI',
+            title: 'LOJİSTİK TRANSFER',
+            text: `${nick} komutanına gönderilecek BPL miktarını girin. (%25 transfer ücreti alınır)`,
             input: 'number',
-            inputLabel: 'Gönderilecek BPL miktarını yazın',
-            footer: '⚠️ %25 transfer ücreti kesilir. Alt limit: 5500 BPL',
-            background: '#0a0a0a', color: '#fff',
+            background: '#0a0b0c', color: '#fff',
             showCancelButton: true,
-            confirmButtonText: 'GÖNDER'
-        }).then((res) => {
-            if(res.isConfirmed) {
-                const amount = parseInt(res.value);
-                if(amount <= 0) return;
-                
-                // Kural 1: 5500 Altına düşemez
-                if(myBpl - amount < 5500) {
-                    return Swal.fire('HATA', 'İşlem sonrası bakiyeniz 5500 BPL altına düşemez!', 'error');
+            confirmButtonText: 'TRANSFER ET'
+        }).then((result) => {
+            if (result.isConfirmed) {
+                const amount = parseInt(result.value);
+                if(amount > 0) {
+                    // Chat sayfasındaki anlık bakiye kontrolü
+                    if(myBpl - amount < 5500) {
+                        Swal.fire('Hata', 'Bakiyeniz 5500 BPL altına düşemez!', 'error');
+                    } else {
+                        socket.emit('gift-bpl', { to: nick, amount: amount });
+                        closePanel();
+                    }
                 }
-                
-                // Kural 2: 24 Saatlik 3000 Limit (Serverda da kontrol edilmeli)
-                socket.emit('gift-bpl', { to: nick, amount: amount });
-                closePanel();
             }
         });
     }
 
     // 4. ARENA & MEETING DAVETİ
-    function sendInvite(nick, type, cost) {
-        if(myBpl < cost) return Swal.fire('HATA', 'Yetersiz bakiye!', 'error');
-        
+    function handleInvite(nick, type, cost) {
+        if(myBpl < cost) {
+            Swal.fire('Hata', 'Yetersiz bakiye!', 'error');
+            return;
+        }
+        socket.emit('send-invite', { to: nick, type: type, cost: cost });
+        closePanel();
+    }
+
+    // 5. DAVETİ ALMA VE YÖNLENDİRME
+    socket.on('receive-invite', (data) => {
         Swal.fire({
-            title: 'EMİN MİSİN?',
-            text: `${nick} kullanıcısını davet etmek için ${cost} BPL kesilecek.`,
-            icon: 'warning',
+            title: data.type === 'arena' ? '⚔️ ARENA DÜELLO!' : '🏛️ ÖZEL ODA DAVETİ!',
+            text: `${data.from} seni çağırıyor. Kabul ediyor musun?`,
             showCancelButton: true,
+            confirmButtonText: 'KATIL',
             background: '#0a0a0a', color: '#fff'
         }).then((res) => {
             if(res.isConfirmed) {
-                socket.emit('send-invite', { to: nick, type: type, cost: cost });
-                closePanel();
+                // Oda ismi davet edenin nickname'i ile açılır
+                const roomName = data.from; 
+                window.location.href = data.type === 'arena' ? `/arena?room=${roomName}` : `/meeting?room=${roomName}`;
             }
         });
-    }
-
-    // 5. DAVET ALMA (SOCKET)
-   // 5. DAVET ALMA (SOCKET) - Chat.ejs içindeki kısım
-socket.on('receive-invite', (data) => {
-    Swal.fire({
-        title: data.type === 'arena' ? '⚔️ DÜELLO DAVETİ!' : '🏛️ ÖZEL ODA DAVETİ!',
-        text: `${data.from} seni çağırıyor.`,
-        showCancelButton: true,
-        confirmButtonText: 'KABUL ET',
-        cancelButtonText: 'REDDET',
-        background: '#0a0a0a', color: '#fff'
-    }).then((res) => {
-        if(res.isConfirmed) {
-            // Davet edenin gönderdiği roomId ile aynı odaya gidiyoruz
-            const targetUrl = data.type === 'arena' ? `/arena?room=${data.roomId}` : `/meeting?room=${data.roomId}`;
-            window.location.href = targetUrl;
-        }
     });
-});
 
-// Davet edenin kendi sayfasına yönlendirilmesi için
-socket.on('redirect-to-room', (url) => {
-    window.location.href = url;
-});
-    // 6. CHAT FONKSİYONLARI
+    // 6. MESAJLAŞMA
     function sendMessage() {
         const input = document.getElementById('messageInput');
         if(input.value.trim()) {
@@ -223,7 +233,7 @@ socket.on('redirect-to-room', (url) => {
         const div = document.createElement('div');
         div.className = "msg-entry";
         div.innerHTML = `<span class="sender-tag" onclick="openUserMenu('${data.sender}')">${data.sender}:</span> 
-                         <span>${data.text}</span>`;
+                         <span class="text-light">${data.text}</span>`;
         box.appendChild(div);
         box.scrollTop = box.scrollHeight;
     });
@@ -233,13 +243,74 @@ socket.on('redirect-to-room', (url) => {
         document.getElementById('myBpl').innerText = newBpl;
     });
 
-    // PeerJS Bağlantı Durumu
-    const peer = new Peer();
-    peer.on('open', (id) => {
-        document.getElementById('peer-status').innerText = "ONLINE";
-        document.getElementById('peer-status').className = "status-item text-success small";
+// 1. PANELİ KAPATAN YARDIMCI FONKSİYON
+function closePanel() {
+    const panel = document.getElementById('userActionPanel');
+    if (panel) {
+        panel.style.display = 'none';
+        // Panelin arkasındaki karartmayı (varsa) kaldırır
+        console.log("Panel kapatıldı."); 
+    }
+}
+
+// 2. ANA DAVET/İŞLEM FONKSİYONU
+function handleInvite(nick, type, cost) {
+    // Önce bakiye kontrolü
+    if(myBpl < cost) {
+        Swal.fire({
+            title: 'Yetersiz BPL!',
+            text: `Bu işlem için ${cost} BPL gerekiyor.`,
+            icon: 'error',
+            background: '#0a0a0a', color: '#fff'
+        });
+        return;
+    }
+
+    // Seçim yapıldı, ŞİMDİ PANELİ KAPATIYORUZ
+    closePanel(); 
+
+    // Socket üzerinden isteği gönder
+    socket.emit('send-invite', { 
+        to: nick, 
+        type: type, 
+        cost: cost 
     });
+
+    // Kullanıcıya bilgi ver (Opsiyonel)
+    const actionText = type === 'arena' ? 'Düello daveti' : 'Özel oda daveti';
+    Swal.fire({
+        toast: true,
+        position: 'top-end',
+        title: `${actionText} gönderildi!`,
+        showConfirmButton: false,
+        timer: 2000,
+        background: '#1a1a1a', color: var(--neon-blue)
+    });
+}
+
+// 3. HEDİYE GÖNDERME FONKSİYONU
+function sendGift(nick) {
+    // Hediye butonuna basıldığı an seçim panelini kapatıyoruz
+    closePanel(); 
+
+    Swal.fire({
+        title: 'LOJİSTİK TRANSFER',
+        text: `${nick} için miktar girin (%25 Vergi)`,
+        input: 'number',
+        showCancelButton: true,
+        confirmButtonText: 'GÖNDER',
+        background: '#0a0a0a', color: '#fff'
+    }).then((result) => {
+        if (result.isConfirmed) {
+            const amount = parseInt(result.value);
+            // Burada server-side kontrolü tetikleyen socket yayını
+            socket.emit('gift-bpl', { to: nick, amount: amount });
+        }
+    });
+}
+
+
+    document.getElementById('messageInput').addEventListener('keypress', (e) => { if (e.key === 'Enter') sendMessage(); });
 </script>
 </body>
 </html>
-
