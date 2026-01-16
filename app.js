@@ -4,17 +4,20 @@ const mongoose = require('mongoose');
 const session = require('express-session');
 const MongoStore = require('connect-mongo');
 const path = require('path');
-const helmet = require('helmet');
-const mongoSanitize = require('express-mongo-sanitize');
-const http = require('http'); // Socket için gerekli
+const http = require('http'); // 1. Önce kütüphaneleri çağır
 const socketIo = require('socket.io');
-const User = require('./models/User'); // User modelinin yolu doğru olmalı
+const User = require('./models/User'); 
 
-const app = express();
-const server = http.createServer(app);
-const io = socketIo(server);
+const app = express(); // 2. App'i oluştur
+const server = http.createServer(app); // 3. Server'ı oluştur
+const io = socketIo(server); // 4. IO'yu tanımla (Hatanın çözümü burası)
 
-const PORT = process.env.PORT || 3000;
+const PORT = process.env.PORT || 10000;
+
+// --- Veritabanı ---
+mongoose.connect(process.env.MONGO_URI)
+    .then(() => console.log('✅ Veritabanı Hazır'))
+    .catch(err => console.error('❌ DB Hatası:', err));
 
 // --- VERİTABANI ---
 mongoose.connect(process.env.MONGO_URI)
@@ -151,3 +154,4 @@ io.on('connection', (socket) => {
 server.listen(PORT, () => {
     console.log(`🚀 BPL Ekosistemi ${PORT} portunda yayında...`);
 });
+
