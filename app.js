@@ -552,39 +552,38 @@ function calculateWinChance(user, target) {
     return modifier;
 }
 
-async function startBattle(p1, p2, io, roomId = null) {
+async function startBattle(p1, p2, io) {
     try {
         const p1Mod = calculateWinChance(p1.dbData, p2.dbData);
         const p2Mod = calculateWinChance(p2.dbData, p1.dbData);
         let p1WinChance = 50 + p1Mod - p2Mod;
 
-        // Bot dengesi (%5)
-        if (!p1.socketId || !p2.socketId) {
-            p1WinChance = !p1.socketId ? p1WinChance + 5 : p1WinChance - 5;
-        }
-
         const roll = Math.random() * 100;
         const winner = roll <= p1WinChance ? p1 : p2;
+        const prizeAmount = 100; // ÖDÜLÜ BURADA SABİTLEDİK (NaN hatasını çözer)
 
-        // Veritabanı Güncelleme
-        if (winner.socketId && winner.dbData?._id) {
+        if (winner.socketId !== 'bot') {
             const winUser = await User.findById(winner.dbData._id);
             if (winUser) {
-                winUser.bpl += winner.prize;
+                winUser.bpl += prizeAmount;
                 winUser.lastBattleTime = new Date();
-                winUser.hasStaminaDoping = false;
                 await winUser.save();
                 io.to(winner.socketId).emit('update-bpl', winUser.bpl);
             }
         }
 
-        const matchData = (p, opp) => ({
-            opponent: opp.nickname,
-            opponentAnimal: opp.animal,
+        const matchResult = {
+            opponent: p2.nickname,
+            opponentAnimal: p2.animal,
             winnerNick: winner.nickname,
-            winnerAnimal: winner.animal,
-            prize: p.prize
-        });
+            prize: prizeAmount
+        };
+
+        if (p1.socketId !== 'bot') io.to(p1.socketId).emit('arena-match-found', matchResult);
+        if (p2.socketId !== 'bot') io.to(p2.socketId).emit('arena-match-found', matchResult);
+        
+    } catch (err) { console.error("Savaşta teknik arıza:", err); }
+}
 
         // Oda bazlı veya bireysel sinyal gönderimi
         if (roomId) {
@@ -648,22 +647,30 @@ io.on('connection', async (socket) => {
         }
     });
 
-    // --- MEETING & ARENA GİRİŞ SİSTEMİ (Kavuşma Noktası) ---
-    socket.on('join-meeting', (data) => {
-        const { roomId, peerId } = data;
-        if (!roomId || !peerId) return;
+ socket.on('join-meeting', (data) => {
+    const { roomId, peerId } = data;
+    if (!roomId || !peerId) return;
 
-        socket.join(roomId);
-        socket.peerId = peerId; // Peer ID'yi sokete mühürle
-        socket.currentRoom = roomId;
+    socket.join(roomId);
+    socket.peerId = peerId; 
+    socket.currentRoom = roomId;
 
-        console.log(`[LOG] ${socket.nickname} odaya girdi: ${roomId} | Peer: ${peerId}`);
+    // Odadakilere yeni geleni tanıt
+    socket.to(roomId).emit('user-connected', { peerId, nickname: socket.nickname });
 
-        // 1. Odadaki diğer kişilere "Yeni biri geldi" haberi uçur (Kamerayı açtırır)
-        socket.to(roomId).emit('user-connected', { 
-            peerId: peerId, 
-            nickname: socket.nickname 
-        });
+    // Yeni gelene içerdekileri tanıt
+    const clients = io.sockets.adapter.rooms.get(roomId);
+    if (clients) {
+        for (const clientId of clients) {
+            if (clientId !== socket.id) {
+                const other = io.sockets.sockets.get(clientId);
+                if (other && other.peerId) {
+                    socket.emit('user-connected', { peerId: other.peerId, nickname: other.nickname });
+                }
+            }
+        }
+    }
+});
 
         // 2. KRİTİK: İçeride zaten biri varsa, misafire (yeni gelene) onu tanıt
         const clients = io.sockets.adapter.rooms.get(roomId);
@@ -754,6 +761,7 @@ app.post('/api/withdraw-request', async (req, res) => {
 
 const PORT = process.env.PORT || 3000;
 server.listen(PORT, () => console.log(`🚀 SİSTEM AKTİF: Port ${PORT}`));
+
 
 
 
