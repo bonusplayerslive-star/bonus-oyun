@@ -8,239 +8,100 @@
     <script src="https://unpkg.com/peerjs@1.5.2/dist/peerjs.min.js"></script>
     <style>
         :root { --neon: #00ffcc; --bg: #050a0f; --card: #0d161f; }
-        * { box-sizing: border-box; margin: 0; padding: 0; }
-        body { 
-            background: var(--bg); 
-            color: white; 
-            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
-            overflow: hidden; /* Taşmaları engellemek için */
-            height: 100vh;
-            display: flex;
-            flex-direction: column;
-        }
-
-        /* Video Paneli */
-        #video-grid {
-            flex: 1;
-            display: grid;
-            grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
-            gap: 15px;
-            padding: 15px;
-            overflow-y: auto;
-            align-content: start;
-        }
-
-        .video-container {
-            position: relative;
-            background: var(--card);
-            border: 2px solid #1a2a3a;
-            border-radius: 12px;
-            overflow: hidden;
-            aspect-ratio: 16/9;
-            box-shadow: 0 4px 15px rgba(0,0,0,0.5);
-        }
-
-        video {
-            width: 100%;
-            height: 100%;
-            object-fit: cover;
-            background: #000;
-        }
-
-        .user-label {
-            position: absolute;
-            bottom: 10px;
-            left: 10px;
-            background: rgba(0,0,0,0.7);
-            padding: 4px 10px;
-            border-radius: 6px;
-            font-size: 12px;
-            border-left: 3px solid var(--neon);
-            z-index: 10;
-            text-transform: uppercase;
-        }
-
-        /* Alt UI Paneli */
-        .ui-panel {
-            background: rgba(13, 22, 31, 0.95);
-            backdrop-filter: blur(10px);
-            border-top: 1px solid #1a2a3a;
-            padding: 15px;
-            display: flex;
-            flex-direction: column;
-            gap: 10px;
-        }
-
-        #chat-messages {
-            height: 120px;
-            overflow-y: auto;
-            font-size: 14px;
-            background: rgba(0,0,0,0.2);
-            padding: 10px;
-            border-radius: 8px;
-        }
-
-        .chat-row { margin-bottom: 6px; line-height: 1.4; border-bottom: 1px solid rgba(255,255,255,0.05); }
-        .chat-nick { color: var(--neon); font-weight: bold; margin-right: 5px; }
-
+        body { background: var(--bg); color: white; font-family: sans-serif; margin: 0; display: flex; flex-direction: column; height: 100vh; overflow: hidden; }
+        #video-grid { flex: 1; display: grid; grid-template-columns: repeat(auto-fit, minmax(300px, 1fr)); gap: 15px; padding: 15px; overflow-y: auto; }
+        .video-container { position: relative; background: var(--card); border: 2px solid #1a2a3a; border-radius: 12px; overflow: hidden; aspect-ratio: 16/9; }
+        video { width: 100%; height: 100%; object-fit: cover; }
+        .user-label { position: absolute; bottom: 10px; left: 10px; background: rgba(0,0,0,0.7); padding: 5px 10px; border-radius: 5px; font-size: 12px; border-left: 3px solid var(--neon); }
+        .ui-panel { background: #0d161f; border-top: 1px solid #1a2a3a; padding: 15px; }
+        #chat-messages { height: 100px; overflow-y: auto; margin-bottom: 10px; border-radius: 5px; background: rgba(0,0,0,0.3); padding: 5px; }
         .controls { display: flex; gap: 10px; }
-
-        input {
-            flex: 1;
-            background: #1a2a3a;
-            border: 1px solid #333;
-            color: white;
-            padding: 12px;
-            border-radius: 8px;
-            outline: none;
-        }
-
-        button {
-            background: var(--neon);
-            color: black;
-            border: none;
-            padding: 0 25px;
-            border-radius: 8px;
-            font-weight: bold;
-            cursor: pointer;
-        }
-
-        @media (max-width: 600px) {
-            #video-grid { grid-template-columns: 1fr; }
-            .video-container { aspect-ratio: 4/3; }
-        }
+        input { flex: 1; background: #1a2a3a; border: 1px solid #333; color: white; padding: 10px; border-radius: 5px; }
+        button { background: var(--neon); color: black; border: none; padding: 10px 20px; border-radius: 5px; font-weight: bold; cursor: pointer; }
     </style>
 </head>
 <body>
-
     <div id="video-grid"></div>
-
     <div class="ui-panel">
         <div id="chat-messages"></div>
         <div class="controls">
-            <input type="text" id="chat-input" placeholder="Operasyon merkezine yaz..." onkeypress="if(event.key==='Enter') sendMessage()">
-            <button onclick="sendMessage()">GÖNDER</button>
+            <input type="text" id="chat-input" placeholder="Mesaj yaz...">
+            <button id="send-btn">GÖNDER</button>
         </div>
     </div>
 
     <script>
-        const socket = io();
-        const videoGrid = document.getElementById('video-grid');
-        const urlParams = new URLSearchParams(window.location.search);
-        const ROOM_ID = urlParams.get('room') || 'global';
-        const peers = {};
+        // Hata korumalı başlatma
+        document.addEventListener('DOMContentLoaded', () => {
+            const socket = io(); // Soket burada tanımlandı
+            const videoGrid = document.getElementById('video-grid');
+            const ROOM_ID = new URLSearchParams(window.location.search).get('room') || 'global';
+            const peers = {};
 
-        // PeerJS Bağlantısı
-        const myPeer = new Peer(undefined, {
-            host: '/',
-            port: '443',
-            secure: true,
-            path: '/peerjs' // Peer server path'ini kontrol et
-        });
+            const myPeer = new Peer(undefined, { host: '/', port: '443', secure: true });
+            let myStream;
 
-        let myStream;
+            async function start() {
+                try {
+                    myStream = await navigator.mediaDevices.getUserMedia({ video: true, audio: true });
+                    addVideoStream(document.createElement('video'), myStream, "SİZ (KOMUTAN)");
 
-        async function init() {
-            try {
-                myStream = await navigator.mediaDevices.getUserMedia({
-                    video: true,
-                    audio: true
-                });
-                
-                // 1. Kendi görüntünü ekle
-                addVideoStream(document.createElement('video'), myStream, "SİZ (KOMUTAN)");
-
-                // 2. Gelen aramaları karşıla
-                myPeer.on('call', call => {
-                    call.answer(myStream);
-                    const video = document.createElement('video');
-                    call.on('stream', userVideoStream => {
-                        addVideoStream(video, userVideoStream, "BİRLİK ÜYESİ");
+                    myPeer.on('call', call => {
+                        call.answer(myStream);
+                        const video = document.createElement('video');
+                        call.on('stream', userStream => addVideoStream(video, userStream, "BİRLİK ÜYESİ"));
                     });
-                });
 
-                // 3. Yeni bir kullanıcı bağlandığında socket üzerinden haber al
-                socket.on('user-connected', data => {
-                    // Kısa bir bekleme (PeerJS'in hazır olması için)
-                    setTimeout(() => {
-                        connectToNewUser(data.peerId, myStream, data.nickname);
-                    }, 1000);
-                });
+                    socket.on('user-connected', data => {
+                        setTimeout(() => {
+                            const call = myPeer.call(data.peerId, myStream);
+                            const video = document.createElement('video');
+                            call.on('stream', userStream => addVideoStream(video, userStream, data.nickname));
+                            peers[data.peerId] = call;
+                        }, 1000);
+                    });
 
-                // 4. Peer bağlandığında odaya gir
-                myPeer.on('open', id => {
-                    socket.emit('join-meeting', { roomId: ROOM_ID, peerId: id });
-                });
+                    myPeer.on('open', id => {
+                        socket.emit('join-meeting', { roomId: ROOM_ID, peerId: id });
+                    });
 
-            } catch (err) {
-                console.error("Medya Erişim Hatası:", err);
-                alert("Kamera/Mikrofon erişimi sağlanamadı. Lütfen izinleri kontrol edin.");
+                } catch (err) {
+                    console.error("Kamera hatası:", err);
+                    alert("Kamera bulunamadı veya izin reddedildi.");
+                }
             }
-        }
 
-        // Yeni kullanıcıya bağlanma fonksiyonu (Hataların çözümü burada)
-        function connectToNewUser(peerId, stream, nickname) {
-            const call = myPeer.call(peerId, stream);
-            const video = document.createElement('video');
-            
-            call.on('stream', userVideoStream => {
-                addVideoStream(video, userVideoStream, nickname || "BİRLİK ÜYESİ");
-            });
-
-            call.on('close', () => {
-                video.closest('.video-container').remove();
-            });
-
-            peers[peerId] = call;
-        }
-
-        function addVideoStream(video, stream, label) {
-            video.srcObject = stream;
-            video.addEventListener('loadedmetadata', () => {
-                video.play();
-            });
-
-            const container = document.createElement('div');
-            container.className = 'video-container';
-            const nameTag = document.createElement('div');
-            nameTag.className = 'user-label';
-            nameTag.innerText = label;
-
-            container.append(video);
-            container.append(nameTag);
-            videoGrid.append(container);
-        }
-
-        // Chat Fonksiyonları
-        function sendMessage() {
-            const input = document.getElementById('chat-input');
-            const message = input.value.trim();
-            if (message) {
-                socket.emit('meeting-message', { roomId: ROOM_ID, text: message });
-                input.value = '';
+            function addVideoStream(video, stream, label) {
+                video.srcObject = stream;
+                video.addEventListener('loadedmetadata', () => video.play());
+                const container = document.createElement('div');
+                container.className = 'video-container';
+                const tag = document.createElement('div');
+                tag.className = 'user-label';
+                tag.innerText = label;
+                container.append(video, tag);
+                videoGrid.append(container);
             }
-        }
 
-        socket.on('new-meeting-message', data => {
-            const messages = document.getElementById('chat-messages');
-            const div = document.createElement('div');
-            div.className = 'chat-row';
-            div.innerHTML = `<span class="chat-nick">${data.sender}:</span> ${data.text}`;
-            messages.append(div);
-            messages.scrollTop = messages.scrollHeight;
+            document.getElementById('send-btn').onclick = () => {
+                const input = document.getElementById('chat-input');
+                if (input.value) {
+                    socket.emit('meeting-message', { roomId: ROOM_ID, text: input.value });
+                    input.value = '';
+                }
+            };
+
+            socket.on('new-meeting-message', data => {
+                const msg = document.createElement('div');
+                msg.innerHTML = `<b>${data.sender}:</b> ${data.text}`;
+                document.getElementById('chat-messages').append(msg);
+                document.getElementById('chat-messages').scrollTop = document.getElementById('chat-messages').scrollHeight;
+            });
+
+            socket.on('user-disconnected', id => { if (peers[id]) peers[id].close(); });
+
+            start();
         });
-
-        socket.on('user-disconnected', peerId => {
-            if (peers[peerId]) {
-                peers[peerId].close();
-                delete peers[peerId];
-            }
-            // Sayfayı yenilemek yerine sadece o videoyu kaldırmak daha profesyoneldir
-            // Ancak Render/Peer stabilite sorunları için opsiyonel kalsın.
-        });
-
-        // Başlat
-        init();
     </script>
 </body>
 </html>
