@@ -83,56 +83,108 @@
     <div id="battle-status" class="p-3 text-uppercase text-center" style="color: var(--neon-green)">BAĞLANTI KURULUYOR...</div>
 </div>
 
-<script>
-    const socket = io();
+const socket = io();
     const video = document.getElementById('arena-video');
     const overlay = document.getElementById('video-overlay');
     const winText = document.getElementById('win-text');
+    
+    let selectedMult = 1;
+    let selectedCost = 25;
+    const myNick = "<%= user.nickname %>";
+    const myAnimal = "<%= user.selectedAnimal %>";
 
+    function selectBet(mult, cost, el) {
+        selectedMult = mult;
+        selectedCost = cost;
+        document.querySelectorAll('.bet-item').forEach(i => i.classList.remove('active'));
+        el.classList.add('active');
+    }
+
+    function readyToFight() {
+        if(<%= user.bpl %> < selectedCost) {
+            alert("Yetersiz BPL!"); return;
+        }
+        document.getElementById('selection-area').style.display = 'none';
+        document.getElementById('matching-area').style.display = 'block';
+
+        socket.emit('arena-ready', { 
+            mult: selectedMult, 
+            nick: myNick, 
+            animal: myAnimal 
+        });
+        startTimer();
+    }
+
+    function startTimer() {
+        let timeLeft = 13;
+        const timerObj = setInterval(() => {
+            timeLeft--;
+            document.getElementById('timer-box').innerText = timeLeft;
+            if(timeLeft <= 0) clearInterval(timerObj);
+        }, 1000);
+    }
+
+    // --- SAVAŞ AKIŞI ---
     socket.on('match-started', async (data) => {
-        const opponent = data.players.find(p => p.nick !== "<%= user.nickname %>");
+        const opponent = data.players.find(p => p.nick !== myNick);
         overlay.style.display = 'flex';
         
-        // RAKİP BİLGİLERİ (.jpg)
+        // Rakip bilgilerini yaz (JPG olarak)
         document.getElementById('opp-name').innerText = opponent.nick;
         document.getElementById('opp-img').src = `/caracter/profile/${opponent.animal}.jpg`;
 
-        // 1. SEKANS: SENİN ATAĞIN (Animal1.mp4)
-        await playVideo(`/caracter/move/<%= user.selectedAnimal %>/<%= user.selectedAnimal %>1.mp4`, "SENİN HAMLEN!");
-
-        // 2. SEKANS: RAKİBİN ATAĞI (Animal1.mp4)
-        await playVideo(`/caracter/move/${opponent.animal}/${opponent.animal}1.mp4`, "RAKİP HAMLESİ!");
-
-        // 3. SEKANS: ZAFER FİNALİ (Animal.mp4)
-        const winner = data.winner;
-        const amIWinner = (winner.nick === "<%= user.nickname %>");
+        // 1. AŞAMA: Senin Saldırın
+        await playMove(myAnimal, "1", `${myNick.toUpperCase()} SALDIRIYOR!`);
         
+        // 2. AŞAMA: Rakibin Saldırısı
+        await playMove(opponent.animal, "1", `${opponent.nick.toUpperCase()} SALDIRIYOR!`);
+        
+        // 3. AŞAMA: ZAFER FİNALİ
+        const winner = data.winner;
+        const amIWinner = (winner.nick === myNick);
         await playFinal(winner.animal, amIWinner);
     });
 
-    function playVideo(src, status) {
+    // VİDEO OYNATMA FONKSİYONU (TEK VE SAĞLAM)
+    function playMove(animal, suffix, statusText) {
         return new Promise(res => {
-            document.getElementById('battle-status').innerText = status;
-            video.src = src;
-            video.onended = res;
-            video.onerror = () => { console.error("Video bulunamadı:", src); res(); };
-            video.play().catch(e => res());
+            document.getElementById('battle-status').innerText = statusText;
+            video.src = `/caracter/move/${animal}/${animal}${suffix}.mp4`;
+            
+            video.onended = () => {
+                video.onended = null;
+                res();
+            };
+
+            video.onerror = () => {
+                console.error("Video hatası:", video.src);
+                res(); // Hata olsa da akış bozulmasın, sonrakine geçsin
+            };
+
+            video.play().catch(e => {
+                console.log("Oynatma engellendi, manuel devam:", e);
+                res();
+            });
         });
     }
 
-    async function playFinal(animal, amIWinner) {
-        document.getElementById('battle-status').innerText = "FİNAL!";
-        video.src = `/caracter/move/${animal}/${animal}.mp4`;
-        video.onended = null;
-        video.play();
+    function playFinal(animal, amIWinner) {
+        return new Promise(res => {
+            document.getElementById('battle-status').innerText = "SAVAŞ SONUÇLANDI!";
+            video.src = `/caracter/move/${animal}/${animal}.mp4`;
+            
+            video.onended = () => {
+                setTimeout(() => window.location.href = "/profil", 2000);
+                res();
+            };
 
-        setTimeout(() => {
-            winText.innerText = amIWinner ? "KAZANDIN!" : "KAYBETTİN!";
-            winText.style.color = amIWinner ? "var(--neon-green)" : "var(--neon-red)";
-            winText.style.display = "block";
-        }, 2000);
+            video.play().catch(e => res());
 
-        // 6 saniye sonra profile at
-        setTimeout(() => { window.location.href = "/profil"; }, 6000);
+            // Yazıyı video oynarken göster
+            setTimeout(() => {
+                winText.innerText = amIWinner ? "ZAFER SENİN!" : "BOZGUNA UĞRADIN!";
+                winText.style.color = amIWinner ? "var(--neon-green)" : "var(--neon-red)";
+                winText.style.display = "block";
+            }, 2000);
+        });
     }
-</script>
