@@ -64,188 +64,75 @@
 <body>
 
     <div id="video-overlay">
-        <div class="hud-top">
-            <div class="hud-card">
-                <img src="/caracter/profile/<%= user.selectedAnimal %>.jpg">
-                <div class="small mt-1 text-truncate"><%= user.nickname %></div>
-            </div>
-            <div class="vs-box">VS</div>
-            <div class="hud-card">
-                <img id="opp-img" src="/img/searching.png">
-                <div id="opp-name" class="small mt-1 text-truncate">...</div>
-            </div>
+    <div class="hud-top">
+        <div class="hud-card">
+            <img src="/caracter/profile/<%= user.selectedAnimal %>.jpg">
+            <div class="small mt-1"><%= user.nickname %></div>
         </div>
-
-        <div class="battle-container">
-            <h1 id="win-text" class="win-message"></h1>
-            <video id="arena-video" playsinline muted></video>
-        </div>
-        <div id="battle-status" class="p-3 text-uppercase text-center" style="color: var(--neon-green); font-size: 0.8rem;">SİSTEM HAZIRLANIYOR...</div>
-    </div>
-
-    <div class="lobby-box" id="lobby-ui">
-        <h2 class="mb-4 text-center" style="color:var(--neon-green)">BPL ARENA SEKTÖRÜ</h2>
-        
-        <div id="selection-area">
-            <div class="bet-grid">
-                <div class="bet-item active" onclick="selectBet(1, 25, this)">
-                    <h4 class="mb-0">X1</h4>
-                    <span class="small text-success">25 BPL</span>
-                </div>
-                <div class="bet-item" onclick="selectBet(2, 50, this)">
-                    <h4 class="mb-0">X2</h4>
-                    <span class="small text-info">50 BPL</span>
-                </div>
-                <div class="bet-item" onclick="selectBet(5, 125, this)">
-                    <h4 class="mb-0">X5</h4>
-                    <span class="small text-warning">125 BPL</span>
-                </div>
-                <div class="bet-item" onclick="selectBet(10, 250, this)">
-                    <h4 class="mb-0">X10</h4>
-                    <span class="small text-danger">250 BPL</span>
-                </div>
-            </div>
-            <button onclick="readyToFight()" class="btn btn-danger btn-lg w-100 py-3 fw-bold">SALDIRIYA BAŞLA</button>
-        </div>
-
-        <div id="matching-area" style="display:none;" class="text-center">
-            <div id="timer-box">13</div>
-            <p class="mt-3 text-info">RAKİP ARANIYOR...</p>
-            <div class="spinner-border text-danger"></div>
+        <div class="vs-box">VS</div>
+        <div class="hud-card">
+            <img id="opp-img" src="/caracter/profile/Gorilla.jpg"> 
+            <div id="opp-name" class="small mt-1">...</div>
         </div>
     </div>
 
-    <script src="/socket.io/socket.io.js"></script>
-    <script>
-        const socket = io();
-        const video = document.getElementById('arena-video');
-        const overlay = document.getElementById('video-overlay');
-        const winText = document.getElementById('win-text');
+    <div class="battle-container">
+        <h1 id="win-text" class="win-message"></h1>
+        <video id="arena-video" playsinline muted></video>
+    </div>
+    <div id="battle-status" class="p-3 text-uppercase text-center" style="color: var(--neon-green)">BAĞLANTI KURULUYOR...</div>
+</div>
+
+<script>
+    const socket = io();
+    const video = document.getElementById('arena-video');
+    const overlay = document.getElementById('video-overlay');
+    const winText = document.getElementById('win-text');
+
+    socket.on('match-started', async (data) => {
+        const opponent = data.players.find(p => p.nick !== "<%= user.nickname %>");
+        overlay.style.display = 'flex';
         
-        let selectedMult = 1;
-        let selectedCost = 25;
-        const myNick = "<%= user.nickname %>";
-        const myAnimal = "<%= user.selectedAnimal %>";
+        // RAKİP BİLGİLERİ (.jpg)
+        document.getElementById('opp-name').innerText = opponent.nick;
+        document.getElementById('opp-img').src = `/caracter/profile/${opponent.animal}.jpg`;
 
-        function selectBet(mult, cost, el) {
-            selectedMult = mult;
-            selectedCost = cost;
-            document.querySelectorAll('.bet-item').forEach(i => i.classList.remove('active'));
-            el.classList.add('active');
-        }
+        // 1. SEKANS: SENİN ATAĞIN (Animal1.mp4)
+        await playVideo(`/caracter/move/<%= user.selectedAnimal %>/<%= user.selectedAnimal %>1.mp4`, "SENİN HAMLEN!");
 
-        function readyToFight() {
-            if(<%= user.bpl %> < selectedCost) {
-                alert("Yetersiz BPL!"); return;
-            }
-            document.getElementById('selection-area').style.display = 'none';
-            document.getElementById('matching-area').style.display = 'block';
+        // 2. SEKANS: RAKİBİN ATAĞI (Animal1.mp4)
+        await playVideo(`/caracter/move/${opponent.animal}/${opponent.animal}1.mp4`, "RAKİP HAMLESİ!");
 
-            socket.emit('arena-ready', { 
-                mult: selectedMult, 
-                nick: myNick, 
-                animal: myAnimal 
-            });
-            startTimer();
-        }
-
-        function startTimer() {
-            let timeLeft = 13;
-            const timerObj = setInterval(() => {
-                timeLeft--;
-                document.getElementById('timer-box').innerText = timeLeft;
-                if(timeLeft <= 0) clearInterval(timerObj);
-            }, 1000);
-        }
-
-        // SAVAŞ BAŞLADIĞINDA TETİKLENİR
- socket.on('match-started', async (data) => {
-    const opponent = data.players.find(p => p.nick !== myNick);
-    overlay.style.display = 'flex';
-    
-    // 1. AŞAMA: Profilleri Yaz
-    document.getElementById('opp-name').innerText = opponent.nick;
-    document.getElementById('opp-img').src = `/caracter/profile/${opponent.animal}.jpg`;
-
-    // 2. AŞAMA: Senin Saldırın (Animal1.mp4)
-    await playMove(myAnimal, "1", `${myNick.toUpperCase()} SALDIRIYOR!`);
-    
-    // 3. AŞAMA: Rakibin Saldırısı (Animal1.mp4)
-    await playMove(opponent.animal, "1", `${opponent.nick.toUpperCase()} SALDIRIYOR!`);
-    
-    // 4. AŞAMA: FİNAL (ZAFER VİDEOSU - Animal.mp4)
-    // Server'dan gelen winner bilgisini kullanıyoruz
-    const winner = data.winner;
-    const amIWinner = (winner.nick === myNick);
-    
-    await playFinal(winner.animal, amIWinner);
-});
-
-// Video Oynatma Fonksiyonu (Daha sağlam hali)
-async function playMove(animal, suffix, statusText) {
-    return new Promise(res => {
-        document.getElementById('battle-status').innerText = statusText;
-        video.src = `/caracter/move/${animal}/${animal}${suffix}.mp4`;
-        video.onended = () => {
-            video.onended = null; // Hafızayı temizle
-            res();
-        };
-        video.play().catch(e => { console.log("Video hatası, geçiliyor..."); res(); });
+        // 3. SEKANS: ZAFER FİNALİ (Animal.mp4)
+        const winner = data.winner;
+        const amIWinner = (winner.nick === "<%= user.nickname %>");
+        
+        await playFinal(winner.animal, amIWinner);
     });
-}
 
-async function playFinal(animal, amIWinner) {
-    document.getElementById('battle-status').innerText = "SAVAŞ SONUÇLANDI!";
-    video.src = `/caracter/move/${animal}/${animal}.mp4`; // Zafer videosu (Suffixsiz)
-    
-    video.play();
+    function playVideo(src, status) {
+        return new Promise(res => {
+            document.getElementById('battle-status').innerText = status;
+            video.src = src;
+            video.onended = res;
+            video.onerror = () => { console.error("Video bulunamadı:", src); res(); };
+            video.play().catch(e => res());
+        });
+    }
 
-    // Video oynarken yazıyı çıkar
-    setTimeout(() => {
-        winText.innerText = amIWinner ? "KAZANDIN!" : "KAYBETTİN!";
-        winText.style.color = amIWinner ? "var(--neon-green)" : "var(--neon-red)";
-        winText.style.display = "block";
-    }, 2000);
+    async function playFinal(animal, amIWinner) {
+        document.getElementById('battle-status').innerText = "FİNAL!";
+        video.src = `/caracter/move/${animal}/${animal}.mp4`;
+        video.onended = null;
+        video.play();
 
-    video.onended = () => {
-        setTimeout(() => window.location.href = "/profil", 4000);
-    };
-}
+        setTimeout(() => {
+            winText.innerText = amIWinner ? "KAZANDIN!" : "KAYBETTİN!";
+            winText.style.color = amIWinner ? "var(--neon-green)" : "var(--neon-red)";
+            winText.style.display = "block";
+        }, 2000);
 
-        // HAMLE VİDEOSU FONKSİYONU
-        async function playMove(animal, suffix) {
-            return new Promise(res => {
-                document.getElementById('battle-status').innerText = `${animal.toUpperCase()} ATAĞA GEÇTİ!`;
-                // Yol yapısı: /caracter/move/Gorilla/Gorilla1.mp4
-                video.src = `/caracter/move/${animal}/${animal}${suffix}.mp4`;
-                video.onended = res;
-                video.onerror = () => { console.error("Video Bulunamadı:", video.src); res(); };
-                video.play().catch(e => { console.log("Oynatma hatası:", e); res(); });
-            });
-        }
-
-        // FİNAL VİDEOSU FONKSİYONU
-        async function playFinal(animal, amIWinner) {
-            return new Promise(res => {
-                document.getElementById('battle-status').innerText = "SAVAŞ SONUCU!";
-                // Yol yapısı: /caracter/move/Gorilla/Gorilla.mp4
-                video.src = `/caracter/move/${animal}/${animal}.mp4`;
-                
-                // Sonucu 3 saniye sonra ekrana bas
-                setTimeout(() => {
-                    winText.innerText = amIWinner ? "ZAFER SENİN!" : "BOZGUNA UĞRADIN!";
-                    winText.style.color = amIWinner ? "var(--neon-green)" : "var(--neon-red)";
-                    winText.style.display = "block";
-                }, 3000);
-
-                video.onended = () => {
-                    setTimeout(() => window.location.href = "/profil", 3000);
-                };
-                video.onerror = () => { window.location.href = "/profil"; };
-                video.play().catch(e => { res(); });
-            });
-        }
-    </script>
-</body>
-</html>
-
+        // 6 saniye sonra profile at
+        setTimeout(() => { window.location.href = "/profil"; }, 6000);
+    }
+</script>
