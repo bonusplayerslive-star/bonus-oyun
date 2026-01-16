@@ -1,158 +1,339 @@
-require('dotenv').config();
+// Path: app.js
+
+// --- 1. MODÜLLER ---
 const express = require('express');
+const { createServer } = require('http');
+const { Server } = require('socket.io');
 const mongoose = require('mongoose');
 const session = require('express-session');
-const MongoStore = require('connect-mongo').default;
-const http = require('http');
-const socketIo = require('socket.io');
+const MongoStore = require('connect-mongo').default; // Modern sürüm uyumu
 const path = require('path');
-const bcrypt = require('bcryptjs');
-const axios = require('axios');
+require('dotenv').config();
+
 const User = require('./models/User');
 
 const app = express();
-const server = http.createServer(app);
-const io = socketIo(server);
+const httpServer = createServer(app);
+const io = new Server(httpServer, { 
+    cors: { origin: "*" },
+    allowEIO3: true 
+});
 
-// --- GLOBAL DEĞİŞKENLER VE PORT ---
-const PORT = process.env.PORT || 10000; // Render için hayati önemde
-const onlineUsers = new Map();
-let arenaQueue = [];
+// --- 2. VERİTABANI BAĞLANTISI ---
+const MONGO_URI = process.env.MONGO_URI || "mongodb+srv://bonusplayerslive_db_user:1nB1QyAsh3qVafpE@bonus.x39zlzq.mongodb.net/?appName=Bonus";
 
-// --- 1. VERİTABANI VE SESSION ---
-mongoose.connect(process.env.MONGO_URI)
-    .then(() => console.log('✅ BPL ULTIMATE: MongoDB Bağlantısı Başarılı'))
+mongoose.connect(MONGO_URI)
+    .then(() => console.log('✅ MongoDB Bağlantısı Başarılı'))
     .catch(err => console.error('❌ MongoDB Hatası:', err));
 
+// --- 3. MIDDLEWARE & SESSION ---
 app.set('view engine', 'ejs');
+app.set('views', path.join(__dirname, 'views'));
 app.use(express.static(path.join(__dirname, 'public')));
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
 
 const sessionMiddleware = session({
-    secret: process.env.SESSION_SECRET || 'bpl_ultimate_2026',
+    secret: process.env.SESSION_SECRET || 'bpl_cyber_secret_2025',
     resave: false,
     saveUninitialized: false,
     store: MongoStore.create({ 
-        mongoUrl: process.env.MONGO_URI,
+        mongoUrl: MONGO_URI,
         collectionName: 'sessions'
     }),
     cookie: { 
-        secure: false, // Render HTTP kullandığı için false kalmalı
-        maxAge: 24 * 60 * 60 * 1000 
+        secure: false, 
+        maxAge: 1000 * 60 * 60 * 24 
     }
 });
 
 app.use(sessionMiddleware);
+io.engine.use(sessionMiddleware);
 
-io.use((socket, next) => {
-    sessionMiddleware(socket.request, {}, next);
-});
-
-// --- 2. KULLANICI KONTROLÜ ---
-app.use(async (req, res, next) => {
-    res.locals.user = null;
+// Güvenlik Kapısı
+async function isLoggedIn(req, res, next) {
     if (req.session && req.session.userId) {
-        try {
-            const user = await User.findById(req.session.userId);
-            if (user) res.locals.user = user;
-        } catch (e) { console.error("Session Hatası:", e); }
+        const user = await User.findById(req.session.userId);
+        if (user) {
+            req.user = user;
+            res.locals.user = user; // Global erişim için eklendi
+            return next();
+        }
     }
+    res.redirect('/login');
+}
+
+// Global Değişkenler
+app.use((req, res, next) => {
+    res.locals.user = req.session.user || null;
     next();
 });
 
-const authRequired = (req, res, next) => {
-    if (req.session && req.session.userId) return next();
-    res.redirect('/');
-};
+// --- 4. ROTALAR (ROUTES) ---
 
-// --- 3. ROTALAR (LOGIN/REGISTER/PROFIL) ---
 app.get('/', (req, res) => {
     if (req.session.userId) return res.redirect('/profil');
-    res.render('index');
+    res.render('index'); 
 });
 
-// --- 2. AUTH ROTLARI (NICKNAME ODAKLI) ---
+app.get('/login', (req, res) => { 
+    res.render('index'); 
+});
 
 // Kayıt İşlemi
 app.post('/register', async (req, res) => {
     try {
-        const { nickname, password } = req.body;
-        // Kullanıcı var mı kontrol et
-        const existingUser = await User.findOne({ nickname });
-        if (existingUser) return res.redirect('/?error=exists');
+        const { nickname, email, password } = req.body;
+        const existingUser = await User.findOne({ email });
+        if (existingUser) return res.send("<script>alert('E-posta kayıtlı!'); window.location='/';</script>");
 
-        const hashedPassword = await bcrypt.hash(password, 10);
         const newUser = new User({ 
-            nickname, 
-            password: hashedPassword,
-            balance: 0 
+            nickname, email, password, 
+            bpl: 2500, inventory: [] 
         });
         await newUser.save();
-        res.redirect('/');
+        
+        req.session.userId = newUser._id;
+        req.session.user = newUser;
+        res.redirect('/profil');
     } catch (err) {
-        console.error(err);
-        res.redirect('/?error=server');
+        res.status(500).send("Hata: " + err.message);
     }
 });
 
 // Giriş İşlemi
 app.post('/login', async (req, res) => {
     try {
-        const { nickname, password } = req.body;
-        const user = await User.findOne({ nickname });
-        
-        if (user && await bcrypt.compare(password, user.password)) {
+        const { email, password } = req.body;
+        const user = await User.findOne({ email, password });
+        if (user) {
             req.session.userId = user._id;
-            req.session.nickname = user.nickname;
-            return res.redirect('/dashboard'); // Başarılıysa dashboard'a
+            req.session.user = user;
+            res.redirect('/profil');
+        } else {
+            res.send("<script>alert('Hatalı giriş!'); window.location='/';</script>");
         }
-        res.redirect('/?error=1');
     } catch (err) {
-        res.redirect('/?error=1');
+        res.status(500).send("Giriş başarısız.");
     }
 });
 
-app.get('/profil', authRequired, (req, res) => res.render('profil'));
-app.get('/market', authRequired, (req, res) => res.render('market'));
-app.get('/arena', authRequired, (req, res) => res.render('arena'));
-app.get('/chat', authRequired, (req, res) => res.render('chat'));
+// Sayfalar (Hepsini tek blokta topladım, karışıklık olmasın)
+app.get('/profil', isLoggedIn, async (req, res) => {
+    const user = await User.findById(req.user._id); // Hayvanın görünmesi için DB'den taze veri çekiyoruz
+    res.render('profil', { user });
+});
+
+app.get('/market', isLoggedIn, (req, res) => res.render('market', { user: req.user }));
+app.get('/chat', isLoggedIn, (req, res) => res.render('chat', { user: req.user }));
+app.get('/arena', isLoggedIn, (req, res) => res.render('arena', { user: req.user, opponentNick: req.query.opponent || null }));
+app.get('/meeting', isLoggedIn, (req, res) => res.render('meeting', { user: req.user, roomId: "GENEL_KONSEY" }));
+app.get('/development', isLoggedIn, async (req, res) => {
+    const user = await User.findById(req.user._id); // Geliştirme için taze veri
+    res.render('development', { user });
+});
+app.get('/wallet', isLoggedIn, (req, res) => res.render('wallet', { user: req.user }));
+app.get('/payment', isLoggedIn, (req, res) => res.render('payment', { user: req.user }));
 
 app.get('/logout', (req, res) => {
     req.session.destroy();
     res.redirect('/');
 });
 
-// --- 4. SOCKET.IO (ARENA & CHAT) ---
+// --- API İŞLEMLERİ (Market & Geliştirme) ---
+
+app.post('/api/buy-item', isLoggedIn, async (req, res) => {
+    try {
+        const { itemName, price } = req.body;
+        const user = await User.findById(req.user._id);
+        if (user.bpl < price) return res.json({ success: false, error: "Yetersiz BPL!" });
+
+        const statsMap = {
+            'Tiger': { hp: 100, atk: 20, def: 15 },
+            'Lion': { hp: 110, atk: 18, def: 18 },
+            'Crocodile': { hp: 150, atk: 15, def: 25 }
+        };
+        const itemStats = statsMap[itemName] || { hp: 50, atk: 10, def: 10 };
+
+        user.bpl -= price;
+        user.inventory.push({
+            name: itemName,
+            hp: itemStats.hp,
+            maxHp: itemStats.hp,
+            atk: itemStats.atk,
+            def: itemStats.def,
+            level: 1
+        });
+
+        await user.save();
+        res.json({ success: true, newBalance: user.bpl });
+    } catch (err) { res.json({ success: false, error: "Sunucu hatası!" }); }
+});
+
+app.post('/api/upgrade-stat', isLoggedIn, async (req, res) => {
+    try {
+        const { animalName, statType } = req.body;
+        const user = await User.findById(req.user._id);
+        const cost = (statType === 'def') ? 10 : 15;
+
+        if (user.bpl < cost) return res.json({ success: false, error: "Yetersiz BPL!" });
+
+        const animal = user.inventory.find(a => a.name === animalName);
+        if (!animal) return res.json({ success: false, error: "Karakter bulunamadı!" });
+
+        animal[statType] = (animal[statType] || 0) + 10;
+        user.bpl -= cost;
+
+        user.markModified('inventory');
+        await user.save();
+        res.json({ success: true, newBalance: user.bpl, newValue: animal[statType] });
+    } catch (err) { res.status(500).json({ success: false, error: "Geliştirme hatası!" }); }
+});
+
+// --- 5. SOCKET.IO İŞLEMLERİ (Chat Bozmadan) ---
 io.on('connection', async (socket) => {
-    const uId = socket.request.session?.userId;
-    if (!uId) return;
-    const user = await User.findById(uId);
-    if (!user) return;
+    const session = socket.request.session;
+    
+    if (session && session.userId) {
+        const user = await User.findById(session.userId);
+        if (user) {
+            socket.userId = user._id;
+            socket.nickname = user.nickname;
+            console.log(`✅ Bağlantı onaylandı: ${socket.nickname}`);
+        }
 
-    socket.userId = uId;
-    socket.nickname = user.nickname;
-    onlineUsers.set(user.nickname, socket.id);
+// app.js içindeki io.on('connection') bloğunun içine ekle
+socket.on('join-meeting', (data) => {
+    const roomId = data.roomId || "GENEL_KONSEY";
+    socket.join(roomId); // Kullanıcıyı odaya sokar
+    socket.currentRoom = roomId;
+    
+    console.log(`👥 ${socket.nickname} şu odaya katıldı: ${roomId}`);
+    
+    // Odadaki diğerlerine haber ver
+    socket.to(roomId).emit('user-connected', {
+        nickname: socket.nickname,
+        id: socket.id
+    });
+});
 
-    // Online Listesi
-    const usersArray = Array.from(onlineUsers.keys()).map(nick => ({ nickname: nick }));
-    io.emit('update-user-list', usersArray);
+// Mesaj gönderirken sadece o odadakilere gitsin
+socket.on('send-meeting-message', (data) => {
+    if (socket.currentRoom) {
+        io.to(socket.currentRoom).emit('new-meeting-message', {
+            sender: socket.nickname,
+            text: data.text
+        });
+
+// Oda daveti kabul edildiğinde çalışan socket bloğu
+socket.on('accept-private-invitation', (data) => {
+    const roomId = data.roomId; // Örneğin: "ROOM_12345"
+    const senderId = data.senderId; // Daveti atan kişinin socket ID'si
+    const receiverId = socket.id;   // Daveti kabul eden (şu anki kullanıcı)
+
+    // 1. Daveti kabul edeni (kendini) odaya gönder
+    socket.emit('redirect-to-meeting', { roomId: roomId });
+
+    // 2. Daveti gönderen oda sahibini de odaya gönder
+    io.to(senderId).emit('redirect-to-meeting', { roomId: roomId });
+});
+
+    }
+});
+
+
+
+
+    }
 
     socket.on('chat-message', (data) => {
-        io.emit('new-chat-message', { sender: socket.nickname, text: data.text });
+        const sender = socket.nickname || "Bilinmeyen";
+        io.emit('new-message', {
+            sender: sender,
+            text: data.text,
+            time: new Date().toLocaleTimeString('tr-TR', { hour: '2-digit', minute: '2-digit' })
+        });
+    });
+
+    socket.on('transfer-bpl', async (data) => {
+        try {
+            if (!socket.userId) return;
+            const sender = await User.findById(socket.userId);
+            const receiver = await User.findOne({ nickname: data.to });
+            const amount = parseInt(data.amount);
+
+            if (receiver && sender.bpl >= amount + 500 && amount >= 50) {
+                sender.bpl -= amount;
+                receiver.bpl += (amount * 0.8);
+                await sender.save();
+                await receiver.save();
+                socket.emit('gift-result', { message: "Başarılı!", newBalance: sender.bpl });
+            } else {
+                socket.emit('gift-result', { message: "Limit yetersiz veya alıcı yok!" });
+            }
+        } catch (e) { console.log(e); }
     });
 
     socket.on('disconnect', () => {
-        onlineUsers.delete(socket.nickname);
-        io.emit('update-user-list', Array.from(onlineUsers.keys()).map(nick => ({ nickname: nick })));
+        if (socket.nickname) console.log(`🔌 ${socket.nickname} ayrıldı.`);
     });
+
+// --- app.js içine eklenecek Socket Dinleyicileri ---
+
+socket.on('send-challenge', async (data) => {
+    try {
+        const sender = await User.findById(socket.userId);
+        if (sender && sender.bpl >= 5505) {
+            sender.bpl -= 5; // Davet bilet ücreti
+            await sender.save();
+
+            // Gönderene yeni bakiyesini bildir ve paneli kapatması için onay ver
+            socket.emit('gift-result', { 
+                success: true, 
+                message: "Düello bileti kesildi (-5 BPL). Davet iletiliyor...", 
+                newBalance: sender.bpl 
+            });
+
+            // Herkese duyur (veya sadece hedefe io.to(targetSocketId) ile gönderilebilir)
+            // Şimdilik basitlik adına tüm globale yayınlıyoruz, client kendi kontrol edecek
+            io.emit('challenge-received', { 
+                from: socket.nickname, 
+                target: data.target,
+                ticket: Math.random().toString(36).substring(7) 
+            });
+        }
+    } catch (e) { console.log(e); }
 });
 
-// SUNUCUYU BAŞLAT
-server.listen(PORT, () => {
-    console.log(`🚀 BPL ULTIMATE AKTİF: Port ${PORT}`);
+socket.on('invite-meeting', async (data) => {
+    try {
+        const sender = await User.findById(socket.userId);
+        if (sender && sender.bpl >= 10) { // Toplantı daveti 10 BPL olsun
+            sender.bpl -= 10;
+            await sender.save();
+
+            socket.emit('gift-result', { 
+                success: true, 
+                message: "Toplantı daveti gönderildi (-10 BPL).", 
+                newBalance: sender.bpl 
+            });
+
+            io.emit('meeting-request', { 
+                from: socket.nickname, 
+                target: data.target, 
+                roomId: "GENEL_KONSEY" 
+            });
+        }
+    } catch (e) { console.log(e); }
 });
 
 
 
 
+});
+
+// --- 6. BAŞLAT ---
+const PORT = process.env.PORT || 3000;
+httpServer.listen(PORT, () => {
+    console.log(`🌍 Sunucu Yayında: http://localhost:${PORT}`);
+});
