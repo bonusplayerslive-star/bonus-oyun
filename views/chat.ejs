@@ -2,202 +2,84 @@
 <html lang="tr">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
-    <title>BPL - Chat & Operasyon</title>
-    
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>BPL CHAT</title>
     <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
-    <link href="https://fonts.googleapis.com/css2?family=Orbitron:wght@400;700&family=Rajdhani:wght@500;700&display=swap" rel="stylesheet">
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
-    
     <style>
-        :root { 
-            --neon-turq: #00f2ff; --neon-red: #ff004c; --neon-yellow: #ffcc00; --bg-dark: #050a0f; 
-        }
-
-        body { 
-            background-color: var(--bg-dark); color: #fff; font-family: 'Rajdhani', sans-serif;
-            height: 100dvh; display: flex; flex-direction: column; overflow: hidden;
-            padding: env(safe-area-inset-top) 5px env(safe-area-inset-bottom) 5px;
-        }
-
-        /* Mobil Uyumlu Grid Yapısı */
-        .main-container { 
-            display: grid; grid-template-columns: 1fr 300px; gap: 10px; flex: 1; overflow: hidden; margin-top: 10px;
-        }
-
-        @media (max-width: 992px) {
-            .main-container { grid-template-columns: 1fr; }
-            .users-sidebar { display: none; } /* Mobilde yan paneli toggle yapacağız */
-            .users-sidebar.active { display: flex; position: absolute; z-index: 100; right: 0; top: 0; bottom: 0; width: 80%; }
-        }
-
-        /* Sohbet Alanı */
-        .chat-box { 
-            display: flex; flex-direction: column; background: rgba(0,0,0,0.8);
-            border: 2px solid var(--neon-turq); border-radius: 15px; box-shadow: 0 0 20px rgba(0,242,255,0.1);
-        }
-
-        #messages { flex: 1; overflow-y: auto; padding: 15px; scroll-behavior: smooth; }
-        .msg-item { 
-            margin-bottom: 12px; animation: slideIn 0.3s ease-out; 
-            background: rgba(255,255,255,0.03); padding: 8px 12px; border-radius: 10px; border-left: 2px solid var(--neon-turq);
-        }
-
-        /* Kullanıcı Listesi */
-        .users-sidebar { 
-            background: rgba(10,20,30,0.95); border-left: 1px solid var(--neon-turq); 
-            display: flex; flex-direction: column; padding: 15px; border-radius: 15px;
-        }
-
-        .user-card { 
-            background: rgba(255,255,255,0.05); border-radius: 8px; padding: 10px; margin-bottom: 10px;
-            border: 1px solid rgba(0,242,255,0.1);
-        }
-
-        .action-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 5px; margin-top: 8px; }
-        .btn-op { font-size: 10px; font-family: 'Orbitron'; padding: 5px; border: none; border-radius: 4px; color: #fff; }
-
-        @keyframes slideIn { from { opacity: 0; transform: translateX(-10px); } to { opacity: 1; transform: translateX(0); } }
+        body { background: #050a0f; color: #fff; height: 100vh; display: flex; flex-direction: column; }
+        .chat-box { flex: 1; border: 1px solid #00f2ff; margin: 10px; border-radius: 10px; display: flex; flex-direction: column; overflow: hidden; }
+        #messages { flex: 1; padding: 15px; overflow-y: auto; }
+        .user-sidebar { width: 250px; background: rgba(0,0,0,0.5); border-left: 1px solid #00f2ff; padding: 15px; }
+        .msg { background: rgba(255,255,255,0.05); padding: 8px; border-radius: 5px; margin-bottom: 5px; }
     </style>
 </head>
 <body>
-
-<div class="d-flex justify-content-between align-items-center p-2" style="border-bottom: 1px solid var(--neon-turq)">
-    <div class="d-flex align-items-center">
-        <img src="/logo.png" height="30" class="me-2">
-        <span style="font-family: 'Orbitron'; color: var(--neon-turq)">STRATEGY CHAT</span>
+    <div class="d-flex justify-content-between p-3 border-bottom border-info">
+        <span>BPL STRATEGY</span>
+        <span class="text-warning"><%= user.bpl %> BPL</span>
     </div>
-    <div id="balance-area" class="badge bg-dark border border-warning text-warning p-2">
-        <i class="fas fa-coins me-1"></i> <span id="my-bpl"><%= user.bpl %></span> BPL
-    </div>
-    <button class="btn btn-sm btn-outline-info d-lg-none" onclick="document.querySelector('.users-sidebar').classList.toggle('active')">
-        <i class="fas fa-users"></i>
-    </button>
-</div>
 
-<div class="main-container">
-    <div class="chat-box">
-        <div id="messages"></div>
-        <div class="p-3 border-top border-secondary d-flex gap-2 bg-black bg-opacity-50">
-            <input type="text" id="m-input" class="form-control bg-transparent text-white border-info" placeholder="Mesajınızı yazın..." autocomplete="off">
-            <button onclick="sendMsg()" class="btn btn-info px-4"><i class="fas fa-paper-plane"></i></button>
+    <div class="d-flex flex-grow-1 overflow-hidden">
+        <div class="chat-box">
+            <div id="messages"></div>
+            <div class="p-3 bg-black d-flex gap-2">
+                <input type="text" id="m-input" class="form-control bg-transparent text-white" placeholder="Mesaj...">
+                <button onclick="send()" class="btn btn-info">GÖNDER</button>
+            </div>
+        </div>
+        <div class="user-sidebar">
+            <h6 class="text-info text-center">AKTİF KOMUTANLAR</h6>
+            <div id="user-list"></div>
         </div>
     </div>
 
-    <div class="users-sidebar">
-        <h6 class="text-center mb-3 text-info" style="font-family: 'Orbitron'">KOMUTANLAR</h6>
-        <div id="user-list" class="overflow-auto"></div>
-    </div>
-</div>
+    <script src="/socket.io/socket.io.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
+    <script>
+        const socket = io();
+        const myNick = "<%= user.nickname %>";
 
-<script src="/socket.io/socket.io.js"></script>
-<script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
-
-<script>
-    const socket = io();
-    const myNick = "<%= user.nickname %>";
-    let currentBPL = parseInt("<%= user.bpl %>");
-
-    // Giriş yapınca durumu bildir
-    socket.emit('update-online-status', { nickname: myNick });
-
-    // Mesajlaşma
-    function sendMsg() {
-        const input = document.getElementById('m-input');
-        if (input.value.trim()) {
-            socket.emit('chat-message', { sender: myNick, text: input.value });
-            input.value = '';
-        }
-    }
-
-    socket.on('new-chat-message', (data) => {
-        const div = document.createElement('div');
-        div.className = 'msg-item';
-        div.innerHTML = `<b class="text-info" style="font-size:12px">${data.sender}:</b> <span style="font-size:14px">${data.text}</span>`;
-        const container = document.getElementById('messages');
-        container.appendChild(div);
-        container.scrollTop = container.scrollHeight;
-    });
-
-    // Kullanıcı Listesi Güncelleme
-    socket.on('online-list', (users) => {
-        const list = document.getElementById('user-list');
-        list.innerHTML = '';
-        users.forEach(u => {
-            if(u === myNick) return;
-            const div = document.createElement('div');
-            div.className = 'user-card';
-            div.innerHTML = `
-                <div style="font-weight:bold; font-size:13px">${u}</div>
-                <div class="action-grid">
-                    <button class="btn-op bg-danger" onclick="arenaInvite('${u}')">ARENA</button>
-                    <button class="btn-op bg-warning text-dark" onclick="meetInvite('${u}')">MEET(50)</button>
-                    <button class="btn-op bg-primary col-span-2" style="grid-column: span 2" onclick="sendGift('${u}')">HEDİYE GÖNDER</button>
-                </div>
-            `;
-            list.appendChild(div);
-        });
-    });
-
-    // Hediye Gönderimi (%30 Kesinti Logici)
-    function sendGift(target) {
-        if (currentBPL < 5500) {
-            return Swal.fire({ icon: 'error', title: 'Yetersiz BPL', text: 'Hediye için en az 5500 BPL gerekir.', background: '#050a0f', color: '#fff' });
-        }
-        Swal.fire({
-            title: 'BPL Hediye Gönder',
-            text: `${target} kişisine gönderilecek tutar (%30 vergi kesilir)`,
-            input: 'number',
-            showCancelButton: true,
-            confirmButtonText: 'GÖNDER',
-            background: '#050a0f', color: '#fff'
-        }).then((result) => {
-            if (result.isConfirmed && result.value > 0) {
-                socket.emit('send-gift', { receiver: target, amount: parseInt(result.value) });
+        function send() {
+            const input = document.getElementById('m-input');
+            if (input.value) {
+                socket.emit('chat-message', { text: input.value });
+                input.value = '';
             }
+        }
+
+        socket.on('new-chat-message', (data) => {
+            const div = document.createElement('div');
+            div.className = 'msg';
+            div.innerHTML = `<b>${data.sender}:</b> ${data.text}`;
+            document.getElementById('messages').appendChild(div);
         });
-    }
 
-    // Arena ve Meeting Davetleri
-    function arenaInvite(target) {
-        socket.emit('invite-to-arena', target);
-        Swal.fire({ title: 'Talep Gönderildi', text: 'Arena daveti iletildi.', timer: 2000, showConfirmButton: false });
-    }
-
-    function meetInvite(target) {
-        if (currentBPL < 50) return Swal.fire('Hata', 'Oda açmak için 50 BPL gerekir.', 'error');
-        socket.emit('create-meeting');
-    }
-
-    // Socket Yanıtları
-    socket.on('gift-received', (data) => {
-        Swal.fire({ icon: 'success', title: 'HEDİYE ALINDI!', text: `${data.from} size ${data.amount} BPL gönderdi!`, background: '#050a0f', color: '#fff' });
-    });
-
-    socket.on('arena-invitation', (data) => {
-        Swal.fire({
-            title: 'ARENA DAVETİ!',
-            text: `${data.from} seni düelloya davet ediyor!`,
-            showCancelButton: true,
-            confirmButtonText: 'KABUL ET',
-            cancelButtonText: 'REDDET',
-            background: '#050a0f', color: '#fff'
-        }).then(res => {
-            if(res.isConfirmed) window.location.href = `/arena?room=${data.roomId}&fast=true`;
+        socket.on('online-list', (users) => {
+            const list = document.getElementById('user-list');
+            list.innerHTML = '';
+            users.forEach(u => {
+                if(u === myNick) return;
+                list.innerHTML += `<div class="p-2 border-bottom border-secondary d-flex justify-content-between">
+                    ${u} <button class="btn btn-sm btn-danger" onclick="invite('${u}')">ARENA</button>
+                </div>`;
+            });
         });
-    });
 
-    socket.on('meeting-created', (data) => {
-        window.location.href = `/meeting?room=${data.roomId}&role=host`;
-    });
+        function invite(target) {
+            socket.emit('invite-to-arena', target);
+            Swal.fire('Bilgi', 'Davet gönderildi.', 'info');
+        }
 
-    socket.on('update-balance', (newBpl) => {
-        currentBPL = newBpl;
-        document.getElementById('my-bpl').innerText = newBpl;
-    });
-
-    socket.on('error-msg', (msg) => Swal.fire('Hata', msg, 'error'));
-
-</script>
+        socket.on('arena-invitation', (data) => {
+            Swal.fire({
+                title: 'DÜELLO!',
+                text: `${data.from} seni düelloya davet ediyor!`,
+                showCancelButton: true, confirmButtonText: 'KABUL ET'
+            }).then(res => {
+                if(res.isConfirmed) window.location.href = `/arena?room=${data.roomId}`;
+            });
+        });
+    </script>
 </body>
 </html>
