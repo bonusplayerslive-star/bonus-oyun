@@ -700,18 +700,60 @@ io.on('connection', async (socket) => {
         socket.emit('redirect-to-room', { type: 'meeting', roomId: roomId, role: 'guest' });
     });
 
-    // 3. MEETING ODASI İÇİ (Kamera ve Peer Eşleşmesi)
+   // --- BPL MEETING FIX: KESİNTİSİZ BAĞLANTI ---
+io.on('connection', async (socket) => {
+    // 1. Kullanıcıyı Tanı ve ID Güncelle (Davet gitmeme sorununu çözer)
+    const uId = socket.request.session?.userId;
+    if (!uId) return;
+    const user = await User.findById(uId);
+    if (!user) return;
+
+    socket.userId = uId;
+    socket.nickname = user.nickname;
+    
+    // En güncel Socket ID'yi haritaya yazıyoruz
+    onlineUsers.set(user.nickname, socket.id);
+    socket.join("general-chat");
+
+    // 2. Davet Gönderimi (Meeting Odaklı)
+    socket.on('send-bpl-invite', async (data) => {
+        if (data.type !== 'meeting') return;
+        const targetSid = onlineUsers.get(data.target);
+        
+        if (targetSid) {
+            io.to(targetSid).emit('receive-bpl-invite', { 
+                from: socket.nickname, 
+                type: 'meeting' 
+            });
+        }
+    });
+
+    // 3. Davet Kabul ve Odaya Hapsetme
+    socket.on('accept-bpl-invite', async (data) => {
+        const hostNick = data.from; 
+        const hostSid = onlineUsers.get(hostNick);
+        if (!hostSid) return;
+
+        // ODA İSMİ: Davet edenin nicki (Benzersiz ve Sabit)
+        const roomId = hostNick; 
+
+        // İki tarafı da aynı isme sahip odaya fırlat
+        io.to(hostSid).emit('redirect-to-room', { type: 'meeting', roomId: roomId, role: 'host' });
+        socket.emit('redirect-to-room', { type: 'meeting', roomId: roomId, role: 'guest' });
+    });
+
+    // 4. Meeting İçi Karşılıklı Kamera (WebRTC Köprüsü)
     socket.on('join-meeting', (data) => {
         const roomId = data.roomId;
-        socket.join(roomId); // Odaya giriş yap
+        socket.join(roomId);
 
-        // Odaya girince içeridekilere "Peer ID'm bu, beni bağla" der
+        // Odaya giren kişi PeerID'sini "Ben geldim" diyerek bağırır
         socket.to(roomId).emit('user-connected', { 
             peerId: data.peerId, 
             nickname: socket.nickname 
         });
 
-        // Sohbet (Sadece bu odaya özel)
+        // Sohbet (Sadece odadakilere)
         socket.on('meeting-message', (msgData) => {
             if (msgData.text) {
                 io.to(roomId).emit('new-meeting-message', { 
@@ -723,6 +765,7 @@ io.on('connection', async (socket) => {
     });
 
     socket.on('disconnect', () => {
+        // Kullanıcı koptuğunda haritadan sil ama nickname bazlı olduğu için sorun olmaz
         onlineUsers.delete(socket.nickname);
     });
 });
@@ -838,6 +881,7 @@ app.post('/api/withdraw-request', async (req, res) => {
 
 const PORT = process.env.PORT || 3000;
 server.listen(PORT, () => console.log(`🚀 SİSTEM AKTİF: Port ${PORT}`));
+
 
 
 
