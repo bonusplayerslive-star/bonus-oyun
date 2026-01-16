@@ -75,25 +75,28 @@ app.get('/meeting', isAuth, async (req, res) => {
     res.render('meeting', { user, role: req.query.role || 'guest' });
 });
 
-// --- KAYIT OL (REGISTER) ---
 app.post('/register', async (req, res) => {
     try {
         const { nickname, password } = req.body;
-        // Basit bir kayıt mantığı
+        
+        // Şifreyi 10 tur şifrele
+        const hashedPassword = await bcrypt.hash(password, 10);
+        
         const newUser = new User({ 
             nickname, 
-            password, // Gerçek projede bcrypt ile şifrelenmeli
-            bpl: 1000, // Başlangıç bakiyesi
+            password: hashedPassword, // Şifrelenmiş hali kaydet
+            bpl: 1000,
             selectedAnimal: 'none'
         });
+        
         await newUser.save();
         res.redirect('/');
     } catch (err) {
-        res.send("Kayıt sırasında hata oluştu veya bu kullanıcı adı alınmış.");
+        res.send("Kayıt sırasında hata oluştu.");
     }
 });
 
-const bcrypt = require('bcrypt'); // En üste ekle
+
 
 // --- GİRİŞ YAP (LOGIN) ---
 app.post('/login', async (req, res) => {
@@ -208,6 +211,7 @@ io.on('connection', (socket) => {
 server.listen(PORT, () => {
     console.log(`🚀 BPL Sistemi Aktif: http://localhost:${PORT}`);
 });
+
 
 
 
