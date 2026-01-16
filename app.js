@@ -142,32 +142,52 @@ app.get('/logout', (req, res) => {
 
 // --- API İŞLEMLERİ (Market & Geliştirme) ---
 
-app.post('/api/buy-item', isLoggedIn, async (req, res) => {
-    try {
-        const { itemName, price } = req.body;
-        const user = await User.findById(req.user._id);
-        if (user.bpl < price) return res.json({ success: false, error: "Yetersiz BPL!" });
+app.post('/buy-animal', authRequired, async (req, res) => {
+    const { animalName } = req.body;
+    const user = await User.findById(req.session.userId);
 
-        const statsMap = {
-            'Tiger': { hp: 100, atk: 20, def: 15 },
-            'Lion': { hp: 110, atk: 18, def: 18 },
-            'Crocodile': { hp: 150, atk: 15, def: 25 }
-        };
-        const itemStats = statsMap[itemName] || { hp: 50, atk: 10, def: 10 };
+    // 1. Hayvan Bilgileri (Senin verdiğin liste)
+    const animalStats = {
+        'Bear': { price: 1300, atk: 25, def: 15 },
+        'Crocodile': { price: 1500, atk: 30, def: 20 },
+        'Eagle': { price: 1200, atk: 35, def: 10 },
+        'Falcon': { price: 1100, atk: 32, def: 8 },
+        'Gorilla': { price: 3500, atk: 45, def: 35 },
+        'Lion': { price: 3500, atk: 50, def: 30 },
+        'Rhino': { price: 3600, atk: 40, def: 50 },
+        'Snake': { price: 1300, atk: 28, def: 12 },
+        'Tiger': { price: 3500, atk: 52, def: 28 },
+        'Wolf': { price: 1500, atk: 30, def: 18 }
+    };
 
-        user.bpl -= price;
-        user.inventory.push({
-            name: itemName,
-            hp: itemStats.hp,
-            maxHp: itemStats.hp,
-            atk: itemStats.atk,
-            def: itemStats.def,
-            level: 1
-        });
+    const selected = animalStats[animalName];
+    if (!selected) return res.status(400).json({ error: "Geçersiz hayvan!" });
 
-        await user.save();
-        res.json({ success: true, newBalance: user.bpl });
-    } catch (err) { res.json({ success: false, error: "Sunucu hatası!" }); }
+    // 2. Kural: En fazla 3 hayvan
+    if (user.inventory.length >= 3) {
+        return res.status(400).json({ error: "Çantan dolu! En fazla 3 hayvan taşıyabilirsin." });
+    }
+
+    // 3. Kural: Bakiye kontrolü
+    if (user.bpl < selected.price) {
+        return res.status(400).json({ error: "Yetersiz BPL bakiyesi!" });
+    }
+
+    // 4. İşlem: Satın alma
+    user.bpl -= selected.price;
+    user.inventory.push({
+        name: animalName,
+        img: `/caracter/profile/${animalName}.jpg`,
+        hp: 100,
+        maxHp: 100,
+        atk: selected.atk,
+        def: selected.def,
+        level: 1,
+        stamina: 100
+    });
+
+    await user.save();
+    res.json({ success: true, message: `${animalName} başarıyla satın alındı!` });
 });
 
 app.post('/api/upgrade-stat', isLoggedIn, async (req, res) => {
@@ -337,3 +357,4 @@ const PORT = process.env.PORT || 3000;
 httpServer.listen(PORT, () => {
     console.log(`🌍 Sunucu Yayında: http://localhost:${PORT}`);
 });
+
