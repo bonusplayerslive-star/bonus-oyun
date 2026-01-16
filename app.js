@@ -33,11 +33,16 @@ const sessionMiddleware = session({
     secret: process.env.SESSION_SECRET || 'bpl_ultimate_2026',
     resave: false,
     saveUninitialized: false,
-store: MongoStore.create({ 
-    mongoUrl: process.env.MONGO_URI 
-})
-    cookie: { secure: false, maxAge: 24 * 60 * 60 * 1000 }
+    store: MongoStore.create({ 
+        mongoUrl: process.env.MONGO_URI,
+        collectionName: 'sessions'
+    }),
+    cookie: { 
+        secure: false, // Render HTTP kullandığı için false kalmalı
+        maxAge: 24 * 60 * 60 * 1000 
+    }
 });
+
 app.use(sessionMiddleware);
 
 io.use((socket, next) => {
@@ -138,4 +143,5 @@ io.on('connection', async (socket) => {
 server.listen(PORT, () => {
     console.log(`🚀 BPL ULTIMATE AKTİF: Port ${PORT}`);
 });
+
 
