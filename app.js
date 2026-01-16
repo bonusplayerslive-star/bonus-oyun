@@ -223,6 +223,15 @@ if (statType === 'stamina') {
     
 });
 
+
+
+// Arena İçin Gerekli Değişkenler
+let arenaQueue = []; // Rastgele eşleşme bekleyenler
+const botNames = ["Alpha_Commander", "Cyber_Ghost", "Shadow_Warrior", "Neon_Striker", "Elite_Guard", "Dark_Sector"];
+const animals = ["Gorilla", "Eagle", "Lion", "Wolf", "Cobra"];
+
+
+
 io.on('connection', async (socket) => {
     const session = socket.request.session;
     
@@ -317,6 +326,150 @@ io.on('connection', async (socket) => {
         });
     });
 
+// --- ARENA SİSTEMİ ---
+
+    socket.on('arena-ready', async (data) => {
+        const { mult, cost, room, nick, animal } = data;
+        const sender = await User.findById(socket.userId);
+
+        if (!sender || sender.bpl < cost) return socket.emit('error-msg', 'Yetersiz BPL!');
+
+        // Bakiyeyi baştan düş (Senaryo gereği)
+        sender.bpl -= cost;
+        await sender.save();
+        socket.emit('update-bpl', sender.bpl);
+
+        const playerData = {
+            id: socket.id,
+            userId: sender._id,
+            nick: nick,
+            animal: animal,
+            stats: {
+                power: sender.power || 10,
+                attack: sender.attack || 10,
+                defense: sender.defense || 10
+            },
+            mult: mult,
+            cost: cost
+        };
+
+        // 1. ÖZEL ODA KONTROLÜ (Chat/Meeting'den gelenler)
+        if (room) {
+            socket.join(room);
+            const clients = io.sockets.adapter.rooms.get(room);
+            if (clients.size === 2) {
+                // İki kişi odaya girdi, savaşı başlat
+                startBattle(room, cost);
+            }
+        } 
+        // 2. GENEL HAVUZ KONTROLÜ
+        else {
+            arenaQueue.push(playerData);
+            
+            // Eğer havuzda 2 kişi olduysa hemen eşleştir
+            if (arenaQueue.length >= 2) {
+                const p1 = arenaQueue.shift();
+                const p2 = arenaQueue.shift();
+                const randomRoom = "arena_" + Math.random().toString(36).substring(7);
+                
+                io.to(p1.id).socketsJoin(randomRoom);
+                io.to(p2.id).socketsJoin(randomRoom);
+                
+                startBattle(randomRoom, cost, [p1, p2]);
+            } else {
+                // 13 Saniye sonra hala yalnızsa bot ata
+                setTimeout(async () => {
+                    const stillInQueue = arenaQueue.findIndex(p => p.id === socket.id);
+                    if (stillInQueue > -1) {
+                        const player = arenaQueue.splice(stillInQueue, 1)[0];
+                        createBotMatch(player);
+                    }
+                }, 13000);
+            }
+        }
+    });
+
+    // SAVAŞ HESAPLAMA VE BAŞLATMA FONKSİYONU
+    async function startBattle(roomId, cost, manualPlayers = null) {
+        const sockets = await io.in(roomId).fetchSockets();
+        let players = [];
+
+        if (manualPlayers) {
+            players = manualPlayers;
+        } else {
+            // Odadaki gerçek kullanıcı verilerini topla (Özel odalar için)
+            for (const s of sockets) {
+                const u = await User.findById(s.userId);
+                players.push({
+                    id: s.id,
+                    userId: u._id,
+                    nick: u.nickname,
+                    animal: u.selectedAnimal,
+                    stats: { power: u.power, attack: u.attack, defense: u.defense }
+                });
+            }
+        }
+
+        // KAZANAN HESAPLAMA FORMÜLÜ: (Güç + Saldırı + Savunma) - (Savunma / 8)
+        const calculateScore = (p) => (p.stats.power + p.stats.attack + p.stats.defense) - (p.stats.defense / 8);
+        
+        const p1Score = calculateScore(players[0]);
+        const p2Score = calculateScore(players[1]);
+
+        const winnerIndex = p1Score >= p2Score ? 0 : 1;
+        const winner = players[winnerIndex];
+        const loser = players[winnerIndex === 0 ? 1 : 0];
+
+        // Kazananın Ödülü (Örn: Giriş ücretinin 1.8 katı)
+        const prize = cost * 1.8;
+        const winnerUser = await User.findById(winner.userId);
+        winnerUser.bpl += prize;
+        await winnerUser.save();
+
+        // Her iki tarafa sonuçları ve animasyon komutunu gönder
+        io.to(roomId).emit('match-started', {
+            players: players,
+            winner: { nick: winner.nick, animal: winner.animal },
+            prize: prize
+        });
+    }
+
+    // BOT EŞLEŞTİRME
+    async function createBotMatch(player) {
+        const botAnimal = animals[Math.floor(Math.random() * animals.length)];
+        const botNick = botNames[Math.floor(Math.random() * botNames.length)];
+        
+        const botData = {
+            nick: botNick,
+            animal: botAnimal,
+            stats: { power: 15, attack: 15, defense: 15 } // Standart bot gücü
+        };
+
+        // Botla olan savaşta da aynı formül geçerli
+        const pScore = (player.stats.power + player.stats.attack + player.stats.defense) - (player.stats.defense / 8);
+        const bScore = (botData.stats.power + botData.stats.attack + botData.stats.defense) - (botData.stats.defense / 8);
+
+        const isWin = pScore >= bScore;
+        const prize = player.cost * 1.8;
+
+        if(isWin) {
+            const u = await User.findById(player.userId);
+            u.bpl += prize;
+            await u.save();
+        }
+
+        io.to(player.id).emit('match-started', {
+            players: [player, botData],
+            winner: isWin ? player : botData,
+            prize: isWin ? prize : 0
+        });
+    }
+
+
+
+
+    
+
     socket.on('disconnect', () => {
         if (socket.nickname) console.log(`🔌 ${socket.nickname} ayrıldı.`);
     });
@@ -327,6 +480,7 @@ const PORT = process.env.PORT || 3000;
 httpServer.listen(PORT, () => {
     console.log(`🌍 Sunucu Yayında: http://localhost:${PORT}`);
 });
+
 
 
 
