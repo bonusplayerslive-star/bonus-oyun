@@ -6,217 +6,148 @@ const MongoStore = require('connect-mongo');
 const path = require('path');
 const helmet = require('helmet');
 const mongoSanitize = require('express-mongo-sanitize');
-// app.js veya chat-server.js içinde
-const onlineUsers = new Map(); // Nickname -> SocketId
+const http = require('http'); // Socket için gerekli
+const socketIo = require('socket.io');
+const User = require('./models/User'); // User modelinin yolu doğru olmalı
 
-io.on('connection', (socket) => {
-    socket.on('update-online-status', (data) => {
-        socket.nickname = data.nickname;
-        onlineUsers.set(data.nickname, socket.id);
-        io.emit('online-list', Array.from(onlineUsers.keys()));
-    });
-
-    // --- HEDİYE SİSTEMİ ---
-    socket.on('send-gift', async (data) => {
-        const sender = await User.findOne({ nickname: socket.nickname });
-        if (sender.bpl > 5500) {
-            const netAmount = data.amount * 0.7; // %30 kesinti
-            await User.findOneAndUpdate({ nickname: data.receiver }, { $inc: { bpl: netAmount } });
-            await User.findOneAndUpdate({ nickname: socket.nickname }, { $inc: { bpl: -data.amount } });
-            
-            io.to(onlineUsers.get(data.receiver)).emit('gift-received', { 
-                from: socket.nickname, 
-                amount: netAmount 
-            });
-        }
-    });
-
-    // --- MEETING (TOPLANTI) SİSTEMİ ---
-    socket.on('create-meeting', async () => {
-        const user = await User.findOne({ nickname: socket.nickname });
-        if (user.bpl >= 50) {
-            await User.findOneAndUpdate({ nickname: socket.nickname }, { $inc: { bpl: -50 } });
-            const roomId = `meeting_${socket.nickname}`;
-            socket.join(roomId);
-            socket.emit('meeting-created', { roomId });
-        }
-    });
-
-    // --- ARENA DAVET SİSTEMİ ---
-    socket.on('invite-to-arena', (targetNickname) => {
-        const targetSocketId = onlineUsers.get(targetNickname);
-        if (targetSocketId) {
-            io.to(targetSocketId).emit('arena-invitation', { 
-                from: socket.nickname,
-                roomId: `arena_${socket.nickname}` 
-            });
-        }
-    });
-
-    socket.on('disconnect', () => {
-        onlineUsers.delete(socket.nickname);
-        io.emit('online-list', Array.from(onlineUsers.keys()));
-    });
-});
-// Uygulama Ayarları
 const app = express();
+const server = http.createServer(app);
+const io = socketIo(server);
+
 const PORT = process.env.PORT || 3000;
 
-// Veritabanı Bağlantısı
+// --- VERİTABANI ---
 mongoose.connect(process.env.MONGO_URI)
-    .then(() => console.log('BPL Veritabanına Bağlanıldı'))
-    .catch(err => console.error('DB Bağlantı Hatası:', err));
+    .then(() => console.log('✅ BPL Veritabanına Bağlanıldı'))
+    .catch(err => console.error('❌ DB Hatası:', err));
 
-// View Engine Ayarı
+// --- SETTINGS & MIDDLEWARE ---
 app.set('view engine', 'ejs');
 app.set('views', path.join(__dirname, 'views'));
 
-// Middleware (Ara Yazılımlar)
 app.use(express.static(path.join(__dirname, 'public')));
 app.use(express.urlencoded({ extended: true }));
 app.use(express.json());
-app.use(helmet({ contentSecurityPolicy: false })); // CDN bağlantıları için CSP kapalı
+app.use(helmet({ contentSecurityPolicy: false })); 
 app.use(mongoSanitize());
 
-// Oturum Yönetimi (Session)
 app.use(session({
-    secret: process.env.SESSION_SECRET || 'bpl_secret_key_2024',
+    secret: process.env.SESSION_SECRET || 'bpl_secret_2025',
     resave: false,
     saveUninitialized: false,
     store: MongoStore.create({ mongoUrl: process.env.MONGO_URI }),
-    cookie: { maxAge: 1000 * 60 * 60 * 24 } // 24 Saat
+    cookie: { 
+        maxAge: 1000 * 60 * 60 * 24,
+        secure: false // HTTPS kullanmıyorsanız false kalmalı
+    }
 }));
 
-// --- AUTH MIDDLEWARE (Giriş Kontrolü) ---
 const isAuth = (req, res, next) => {
     if (req.session.user) return next();
     res.redirect('/');
 };
 
-// --- ROUTES (Sayfalar) ---
-
-// 1. İndex (Açılış / Login / Register)
+// --- ROUTES ---
 app.get('/', (req, res) => {
     if (req.session.user) return res.redirect('/profil');
-    res.render('index'); // index.ejs dosyanızda login/register formu olduğu varsayıldı
+    res.render('index');
 });
 
-// 2. Profil (Ana Üs)
-app.get('/profil', isAuth, (req, res) => {
-    // req.session.user verisini DB'den güncel çekmek her zaman daha güvenlidir
-    res.render('profil', { user: req.session.user });
+app.get('/profil', isAuth, async (req, res) => {
+    const user = await User.findById(req.session.user._id);
+    res.render('profil', { user });
 });
 
-// 3. Cüzdan (Wallet)
-app.get('/wallet', isAuth, (req, res) => {
-    res.render('wallet', { user: req.session.user });
+app.get('/chat', isAuth, async (req, res) => {
+    const user = await User.findById(req.session.user._id);
+    res.render('chat', { user });
 });
 
-// 4. Arena (Battle)
-app.get('/arena', isAuth, (req, res) => {
-    if (!req.session.user.selectedAnimal) {
-        // Eğer karakter seçilmediyse profile yönlendir
-        return res.redirect('/profil'); 
-    }
-    res.render('arena', { user: req.session.user });
+app.get('/arena', isAuth, async (req, res) => {
+    const user = await User.findById(req.session.user._id);
+    res.render('arena', { user });
 });
 
-// 5. Chat & Meeting
-app.get('/chat', isAuth, (req, res) => {
-    res.render('chat', { user: req.session.user });
+app.get('/meeting', isAuth, async (req, res) => {
+    const user = await User.findById(req.session.user._id);
+    res.render('meeting', { user, role: req.query.role || 'guest' });
 });
 
-app.get('/meeting', isAuth, (req, res) => {
-    res.render('meeting', { user: req.session.user });
-});
+// --- SOCKET LOGIC (Online/Hediye/Meeting/Arena) ---
+const onlineUsers = new Map(); // Nickname -> SocketId
 
-// 6. Market & Development
-app.get('/market', isAuth, (req, res) => {
-    res.render('market', { user: req.session.user });
-});
-
-app.get('/development', isAuth, (req, res) => {
-    res.render('development', { user: req.session.user });
-});
-
-// --- API ROUTES (Örnek Giriş ve İşlemler) ---
-
-app.post('/api/login', async (req, res) => {
-    const { email, password } = req.body;
-    // Burada DB kontrolü ve bcrypt.compare yapılacak
-    // Başarılı ise:
-    // req.session.user = user;
-    // res.json({ success: true });
-});
-
-app.get('/logout', (req, res) => {
-    req.session.destroy();
-    res.redirect('/');
-});
-
-
-// Tüm sayfalarda çalışan ortak script
-const socket = io();
-socket.emit('update-online-status', { 
-    nickname: '<%= user.nickname %>', 
-    avatar: '<%= user.profileImage %>' 
-});
-o.on('connection', (socket) => {
+io.on('connection', (socket) => {
+    
     socket.on('update-online-status', (data) => {
         socket.nickname = data.nickname;
         onlineUsers.set(data.nickname, socket.id);
         io.emit('online-list', Array.from(onlineUsers.keys()));
     });
 
-    // --- HEDİYE SİSTEMİ ---
+    // 1. Hediye Sistemi (%30 Kesinti)
     socket.on('send-gift', async (data) => {
         const sender = await User.findOne({ nickname: socket.nickname });
-        if (sender.bpl > 5500) {
-            const netAmount = data.amount * 0.7; // %30 kesinti
-            await User.findOneAndUpdate({ nickname: data.receiver }, { $inc: { bpl: netAmount } });
-            await User.findOneAndUpdate({ nickname: socket.nickname }, { $inc: { bpl: -data.amount } });
+        const receiver = await User.findOne({ nickname: data.receiver });
+
+        if (sender && sender.bpl >= 5500 && data.amount > 0) {
+            const netAmount = Math.floor(data.amount * 0.7); 
             
-            io.to(onlineUsers.get(data.receiver)).emit('gift-received', { 
-                from: socket.nickname, 
-                amount: netAmount 
-            });
+            await User.findOneAndUpdate({ nickname: socket.nickname }, { $inc: { bpl: -data.amount } });
+            await User.findOneAndUpdate({ nickname: data.receiver }, { $inc: { bpl: netAmount } });
+
+            // Alıcıya bildirim
+            if (onlineUsers.has(data.receiver)) {
+                io.to(onlineUsers.get(data.receiver)).emit('gift-received', { 
+                    from: socket.nickname, 
+                    amount: netAmount 
+                });
+                // Bakiyeyi anlık güncellemesi için tetik gönder
+                const updatedReceiver = await User.findOne({ nickname: data.receiver });
+                io.to(onlineUsers.get(data.receiver)).emit('update-balance', updatedReceiver.bpl);
+            }
+            // Gönderene yeni bakiyesini yolla
+            socket.emit('update-balance', sender.bpl - data.amount);
         }
     });
 
-    // --- MEETING (TOPLANTI) SİSTEMİ ---
+    // 2. Meeting Sistemi (Oda Açma 50 BPL)
     socket.on('create-meeting', async () => {
         const user = await User.findOne({ nickname: socket.nickname });
-        if (user.bpl >= 50) {
+        if (user && user.bpl >= 50) {
             await User.findOneAndUpdate({ nickname: socket.nickname }, { $inc: { bpl: -50 } });
-            const roomId = `meeting_${socket.nickname}`;
-            socket.join(roomId);
+            const roomId = `room_${socket.nickname}`;
             socket.emit('meeting-created', { roomId });
+            socket.emit('update-balance', user.bpl - 50);
+        } else {
+            socket.emit('error-msg', 'Yetersiz bakiye (50 BPL gerekli)');
         }
     });
 
-    // --- ARENA DAVET SİSTEMİ ---
+    // 3. Arena Davet Sistemi
     socket.on('invite-to-arena', (targetNickname) => {
-        const targetSocketId = onlineUsers.get(targetNickname);
-        if (targetSocketId) {
-            io.to(targetSocketId).emit('arena-invitation', { 
+        if (onlineUsers.has(targetNickname)) {
+            io.to(onlineUsers.get(targetNickname)).emit('arena-invitation', { 
                 from: socket.nickname,
                 roomId: `arena_${socket.nickname}` 
             });
         }
     });
 
+    // 4. Meeting Mikrofon Kontrolü (Host yetkisi)
+    socket.on('mute-all-mics', (data) => {
+        // Sadece oda sahibi (host) ise odaya 'mute' komutu gönderir
+        io.to(data.roomId).emit('silence-mics');
+    });
+
     socket.on('disconnect', () => {
-        onlineUsers.delete(socket.nickname);
-        io.emit('online-list', Array.from(onlineUsers.keys()));
+        if (socket.nickname) {
+            onlineUsers.delete(socket.nickname);
+            io.emit('online-list', Array.from(onlineUsers.keys()));
+        }
     });
 });
 
-
-
-
-// Sunucuyu Başlat
-app.listen(PORT, () => {
-    console.log(`BPL Ana Sunucu aktif: http://localhost:${PORT}`);
+// Sunucuyu server üzerinden başlat
+server.listen(PORT, () => {
+    console.log(`🚀 BPL Ekosistemi ${PORT} portunda yayında...`);
 });
-
-
