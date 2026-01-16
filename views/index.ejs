@@ -3,156 +3,82 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>BPL EKOSİSTEMİ | VR ve Bio-Teknoloji</title>
-    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
-    <link href="https://fonts.googleapis.com/css2?family=Orbitron:wght@400;700&family=Rajdhani:wght@500;700&display=swap" rel="stylesheet">
-    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
-    
+    <title>BPL EKOSİSTEM | Ultimate Edition</title>
+    <link rel="stylesheet" href="/css/style.css">
+    <script src="https://cdn.socket.io/4.7.2/socket.io.min.js"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Orbitron:wght@400;700&family=Roboto:wght@300;500&display=swap" rel="stylesheet">
     <style>
-        :root { --neon-green: #39FF14; --neon-blue: #00f3ff; --dark-bg: #050a0f; }
-        
-        body { 
-            background: var(--dark-bg); 
-            color: white; 
-            font-family: 'Rajdhani', sans-serif;
-            background: url('/caracter/page/welcome.jpg') no-repeat center center fixed;
-            background-size: cover;
-        }
-
-        /* Arka plan karartma perdesi */
-        .overlay { position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.85); z-index: -1; }
-
-        .navbar-brand img { border: 1px solid var(--neon-green); border-radius: 5px; }
-
-        /* Neon Kartlar */
-        .scifi-card {
-            background: rgba(10, 15, 20, 0.9);
-            border: 1px solid rgba(0, 243, 255, 0.3);
-            border-left: 4px solid var(--neon-blue);
-            padding: 20px;
-            margin-bottom: 25px;
-            border-radius: 0 10px 10px 0;
-            transition: 0.3s;
-        }
-        .scifi-card:hover { border-color: var(--neon-blue); box-shadow: 0 0 15px rgba(0, 243, 255, 0.2); }
-
-        .scifi-card.green { border-left-color: var(--neon-green); border-color: rgba(57, 255, 20, 0.3); }
-
-        /* Destek Merkezi Formu */
-        .support-box {
-            border: 1px solid var(--neon-green);
-            background: rgba(0, 0, 0, 0.9);
-            padding: 30px;
-            border-radius: 5px;
-            box-shadow: inset 0 0 20px rgba(57, 255, 20, 0.1);
-        }
-        .form-control { 
-            background: rgba(255,255,255,0.05); border: 1px solid #333; color: white;
-            font-family: 'Orbitron'; font-size: 0.9rem;
-        }
-        .form-control:focus { background: rgba(255,255,255,0.1); border-color: var(--neon-green); color: white; box-shadow: none; }
-
-        .btn-neon-green { 
-            background: transparent; border: 1px solid var(--neon-green); color: var(--neon-green);
-            font-family: 'Orbitron'; font-weight: bold; transition: 0.4s;
-        }
-        .btn-neon-green:hover { background: var(--neon-green); color: black; box-shadow: 0 0 20px var(--neon-green); }
-
-        /* Modal Stilleri (Giriş ve Üye Ol) */
-        .modal-content { background: #0a0a0a; border: 1px solid var(--neon-blue); color: white; }
+        :root { --neon-blue: #00f2ff; --neon-purple: #bc13fe; --dark-bg: #0a0b10; }
+        body { font-family: 'Roboto', sans-serif; background: var(--dark-bg); color: white; margin: 0; overflow-x: hidden; }
+        .hero-section { height: 100vh; display: flex; flex-direction: column; align-items: center; justify-content: center; background: radial-gradient(circle, #1a1b26 0%, #0a0b10 100%); }
+        .main-title { font-family: 'Orbitron', sans-serif; font-size: 3.5rem; text-transform: uppercase; letter-spacing: 5px; color: var(--neon-blue); text-shadow: 0 0 20px var(--neon-blue); margin-bottom: 20px; }
+        .auth-container { background: rgba(255, 255, 255, 0.05); padding: 40px; border-radius: 15px; border: 1px solid var(--neon-purple); box-shadow: 0 0 30px rgba(188, 19, 254, 0.2); width: 350px; text-align: center; }
+        .input-group { margin-bottom: 20px; text-align: left; }
+        .input-group label { display: block; margin-bottom: 8px; color: var(--neon-blue); font-size: 0.9rem; }
+        .input-group input { width: 100%; padding: 12px; border-radius: 5px; border: none; background: rgba(0, 0, 0, 0.5); color: white; border-bottom: 2px solid var(--neon-purple); }
+        .btn-glow { width: 100%; padding: 15px; border: none; border-radius: 5px; background: var(--neon-purple); color: white; font-weight: bold; cursor: pointer; transition: 0.3s; text-transform: uppercase; }
+        .btn-glow:hover { background: var(--neon-blue); box-shadow: 0 0 20px var(--neon-blue); color: #000; }
+        .switch-link { margin-top: 15px; font-size: 0.8rem; color: #888; cursor: pointer; display: block; }
+        .error-msg { color: #ff4d4d; margin-bottom: 15px; font-size: 0.9rem; display: none; }
     </style>
 </head>
 <body>
-    <div class="overlay"></div>
 
-    <nav class="navbar navbar-dark p-3">
-        <div class="container">
-            <a class="navbar-brand" href="#">
-                <img src="/caracter/page/Logo.jpeg" width="45" height="45" alt="BPL Logo">
-            </a>
-            <div>
-                <button class="btn btn-sm btn-outline-info me-2" data-bs-toggle="modal" data-bs-target="#loginModal">GİRİŞ YAP</button>
-                <button class="btn btn-sm btn-neon-green" data-bs-toggle="modal" data-bs-target="#registerModal">ÜYE OL</button>
-            </div>
+    <div class="hero-section">
+        <h1 class="main-title">BPL ECOSYSTEM</h1>
+        
+        <div class="auth-container" id="loginBox">
+            <h2 style="margin-bottom: 25px;">Giriş Yap</h2>
+            <div id="loginError" class="error-msg">Hatalı Nickname veya Şifre!</div>
+            <form action="/login" method="POST">
+                <div class="input-group">
+                    <label>Nickname</label>
+                    <input type="text" name="nickname" placeholder="Kullanıcı adın..." required>
+                </div>
+                <div class="input-group">
+                    <label>Şifre</label>
+                    <input type="password" name="password" placeholder="******" required>
+                </div>
+                <button type="submit" class="btn-glow">Sisteme Bağlan</button>
+            </form>
+            <span class="switch-link" onclick="toggleAuth()">Hesabın yok mu? Kayıt Ol</span>
         </div>
-    </nav>
 
-    <div class="container mt-5">
-        <div class="text-center mb-5">
-            <h1 style="font-family: 'Orbitron'; color: var(--neon-green); font-size: 3.5rem; text-shadow: 0 0 20px rgba(57, 255, 20, 0.5);">BPL EKOSİSTEMİ</h1>
-            <p class="lead text-uppercase tracking-widest">Oyuncuların Efsaneye Dönüştüğü Yer</p>
-        </div>
-
-        <div class="row">
-            <div class="col-md-8 mx-auto">
-                <div class="scifi-card">
-                    <span class="badge bg-info mb-2">SİSTEM</span>
-                    <h3 style="color: var(--neon-blue);">BAŞLIK 1</h3>
-                    <p>Buraya açıklama metni gelecek. Turkuaz ve beyazın uyumu neon efektleriyle birleşti.</p>
+        <div class="auth-container" id="registerBox" style="display: none;">
+            <h2 style="margin-bottom: 25px;">Kayıt Ol</h2>
+            <form action="/register" method="POST">
+                <div class="input-group">
+                    <label>Nickname</label>
+                    <input type="text" name="nickname" placeholder="Harika bir isim seç..." required>
                 </div>
-
-                <div class="scifi-card green">
-                    <span class="badge bg-success mb-2">STRATEJİ</span>
-                    <h3 style="color: var(--neon-green);">BAŞLIK 2</h3>
-                    <p>İkinci kutu içeriği buraya gelecek. Neon detaylar kutu kenarlarında kendini gösteriyor.</p>
+                <div class="input-group">
+                    <label>Şifre</label>
+                    <input type="password" name="password" placeholder="En az 6 karakter" required>
                 </div>
-
-                <div class="support-box mt-5">
-                    <h2 class="text-center mb-4" style="font-family: 'Orbitron'; color: var(--neon-green);">BPL DESTEK MERKEZİ</h2>
-                    <form id="supportForm">
-                        <div class="row g-3">
-                            <div class="col-md-6">
-                                <input type="text" class="form-control" placeholder="Adınız">
-                            </div>
-                            <div class="col-md-6">
-                                <select class="form-control">
-                                    <option>Genel Destek</option>
-                                    <option>Bakiye Sorunu</option>
-                                    <option>Hesap Kurtarma</option>
-                                </select>
-                            </div>
-                            <div class="col-12">
-                                <textarea class="form-control" rows="5" placeholder="Lütfen bu alanı doldurun."></textarea>
-                            </div>
-                            <div class="col-12">
-                                <button type="submit" class="btn btn-neon-green w-100">MESAJI MERKEZE GÖNDER</button>
-                            </div>
-                        </div>
-                    </form>
-                </div>
-            </div>
+                <button type="submit" class="btn-glow">Ekosisteme Katıl</button>
+            </form>
+            <span class="switch-link" onclick="toggleAuth()">Zaten üye misin? Giriş Yap</span>
         </div>
     </div>
 
-    <div class="modal fade" id="registerModal" tabindex="-1">
-        <div class="modal-dialog">
-            <div class="modal-content">
-                <div class="modal-header border-0"><h5 class="modal-title">HESAP OLUŞTUR (2500 BPL BONUS)</h5><button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button></div>
-                <div class="modal-body p-4">
-                    <form action="/register" method="POST">
-                        <input type="text" name="nickname" class="form-control mb-3" placeholder="Nickname" required>
-                        <input type="email" name="email" class="form-control mb-3" placeholder="E-posta" required>
-                        <input type="password" name="password" class="form-control mb-3" placeholder="Şifre" required>
-                        <button type="submit" class="btn btn-neon-green w-100">KAYDI TAMAMLA</button>
-                    </form>
-                </div>
-            </div>
-        </div>
-    </div>
-
-    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
-    <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
     <script>
-        // Form gönderimi sonrası uyarılar
-        document.getElementById('supportForm').addEventListener('submit', (e) => {
-            e.preventDefault();
-            Swal.fire({
-                title: 'İLETİLDİ!',
-                text: 'Mesajın BPL merkezine ulaştı.',
-                icon: 'success',
-                background: '#0a0a0a', color: '#fff'
-            });
-        });
+        function toggleAuth() {
+            const loginBox = document.getElementById('loginBox');
+            const registerBox = document.getElementById('registerBox');
+            if (loginBox.style.display === 'none') {
+                loginBox.style.display = 'block';
+                registerBox.style.display = 'none';
+            } else {
+                loginBox.style.display = 'none';
+                registerBox.style.display = 'block';
+            }
+        }
+
+        // Render'dan dönen hata mesajlarını yakalamak için (Eğer URL'de error varsa)
+        const urlParams = new URLSearchParams(window.location.search);
+        if (urlParams.has('error')) {
+            document.getElementById('loginError').style.display = 'block';
+        }
     </script>
 </body>
 </html>
