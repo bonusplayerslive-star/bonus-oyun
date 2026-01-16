@@ -93,6 +93,29 @@ app.post('/login', async (req, res) => {
     } catch (err) { res.status(500).send("Sunucu hatası!"); }
 });
 
+
+// --- YENİ KAYIT ROTASI ---
+app.get('/register', (req, res) => {
+    res.render('register'); // register.ejs dosyanın olduğunu varsayıyorum
+});
+
+app.post('/register', async (req, res) => {
+    try {
+        const { nickname, password } = req.body;
+        const hashedPassword = await require('bcrypt').hash(password, 10);
+        const newUser = new User({ 
+            nickname, 
+            password: hashedPassword, 
+            bpl: 2500, 
+            selectedAnimal: 'none' 
+        });
+        await newUser.save();
+        res.redirect('/');
+    } catch (err) {
+        res.status(500).send("Kayıt sırasında hata oluştu: " + err.message);
+    }
+});
+
 app.get('/logout', (req, res) => {
     req.session.destroy();
     res.redirect('/');
@@ -124,5 +147,6 @@ io.on('connection', (socket) => {
 server.listen(PORT, () => {
     console.log(`🚀 BPL Sistemi Aktif: http://localhost:${PORT}`);
 });
+
 
 
