@@ -1,85 +1,64 @@
-const User = require('../models/User');
+const User = require('../models/User'); // Model yolun doğru
 const bcrypt = require('bcryptjs');
 
-// KAYIT İŞLEMİ (POST /register)
+// KAYIT İŞLEMİ
 exports.register = async (req, res) => {
     try {
         const { nickname, email, password } = req.body;
 
-        // authController.js - Kayıt Kısmı Revizesi
-const newUser = new User({
-    nickname,
-    email,
-    password: hashedPassword,
-    bpl: 2500,
-    selectedAnimal: 'Tiger', // İlk hayvanı seçili yapıyoruz
-    inventory: [{ 
-        name: 'Tiger',
-        img: '/caracter/profile/Tiger.jpg', // Modelindeki img alanına uygun
-        hp: 100, 
-        maxHp: 100, 
-        atk: 25, 
-        def: 15,
-        stamina: 100
-    }]
-});
-        
-        // 1. Kullanıcı var mı kontrolü
+        // 1. Kullanıcı kontrolü
         const existingUser = await User.findOne({ $or: [{ email }, { nickname }] });
         if (existingUser) {
-            return res.send('<script>alert("Email veya Nickname zaten kullanımda!"); window.location="/";</script>');
+            return res.send('<script>alert("Email veya Nickname kullanımda!"); window.location="/";</script>');
         }
 
-        // 2. Şifre şifreleme
+        // 2. ÖNCE Şifreyi şifrele (Hata buradaydı)
         const hashedPassword = await bcrypt.hash(password, 10);
 
-        // 3. Yeni Kullanıcı Oluşturma (EJS dosyalarınla %100 uyumlu statlar)
+        // 3. TEK BİR newUser oluştur (Çift tanımlama temizlendi)
         const newUser = new User({
             nickname,
             email,
             password: hashedPassword,
-            bpl: 2500, // Başlangıç parası
-            selectedAnimal: 'Tiger', // Varsayılan seçili hayvan
+            bpl: 2500,
+            selectedAnimal: 'Tiger',
             inventory: [{ 
                 name: 'Tiger',
+                img: '/caracter/profile/Tiger.jpg',
                 level: 1,
                 hp: 100, 
                 maxHp: 100, 
                 stamina: 100,
-                atk: 20, 
-                def: 10 
+                atk: 25, 
+                def: 15 
             }]
         });
 
         await newUser.save();
-        res.send('<script>alert("BPL Sistemine Hoş Geldin! Kayıt başarılı."); window.location="/";</script>');
+        res.send('<script>alert("Kayıt başarılı! Giriş yapabilirsiniz."); window.location="/";</script>');
     } catch (err) {
-        res.status(500).send("Kayıt sırasında teknik bir arıza oluştu: " + err.message);
+        res.status(500).send("Kayıt hatası: " + err.message);
     }
 };
 
-// GİRİŞ İŞLEMİ (POST /login)
+// GİRİŞ İŞLEMİ
 exports.login = async (req, res) => {
     try {
         const { email, password } = req.body;
         const user = await User.findOne({ email });
 
-        // Şifre ve kullanıcı kontrolü
         if (!user || !(await bcrypt.compare(password, user.password))) {
-            return res.send('<script>alert("E-posta veya şifre hatalı!"); window.location="/";</script>');
+            return res.send('<script>alert("Hatalı bilgiler!"); window.location="/";</script>');
         }
 
-        // Session kaydı (Tüm sistemin tanıması için)
         req.session.userId = user._id;
         req.session.nickname = user.nickname;
-        
         res.redirect('/profil');
     } catch (err) {
-        res.status(500).send("Giriş işlemi başarısız oldu.");
+        res.status(500).send("Giriş hatası");
     }
 };
 
-// ÇIKIŞ İŞLEMİ (Opsiyonel ama gerekli)
 exports.logout = (req, res) => {
     req.session.destroy();
     res.redirect('/');
