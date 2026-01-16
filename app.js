@@ -69,6 +69,12 @@ const authRequired = (req, res, next) => {
     if (req.session && req.session.userId) return next();
     res.redirect('/');
 };
+
+const isAuth = (req, res, next) => {
+    if (req.session.user) return next();
+    res.redirect('/');
+};
+
 // --- ROTALAR (ROUTES) ---
 app.get('/', (req, res) => {
     if (req.session.user) return res.redirect('/profil');
@@ -189,5 +195,6 @@ io.on('connection', (socket) => {
 server.listen(PORT, () => {
     console.log(`🚀 BPL Sistemi Aktif: http://localhost:${PORT}`);
 });
+
 
 
