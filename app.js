@@ -226,107 +226,99 @@ if (statType === 'stamina') {
 io.on('connection', async (socket) => {
     const session = socket.request.session;
     
+    // 1. KULLANICI KİMLİK DOĞRULAMA
     if (session && session.userId) {
         const user = await User.findById(session.userId);
         if (user) {
             socket.userId = user._id;
             socket.nickname = user.nickname;
-            socket.join(user.nickname); // Her kullanıcıyı kendi nickiyle bir odaya sokuyoruz (Özel mesaj için)
-            console.log(`✅ Komuta Merkezi Bağlantısı: ${socket.nickname}`);
+            // Kullanıcıyı kendi adına sahip bir odaya al (Özel bildirimler için)
+            socket.join(user.nickname); 
+            console.log(`✅ ${socket.nickname} bağlandı.`);
         }
     }
 
-    // --- 1. GELİŞMİŞ HEDİYE SİSTEMİ (%25 Vergi & 24s Limit) ---
-    socket.on('gift-bpl', async (data) => {
-        try {
-            const sender = await User.findById(socket.userId);
-            const receiver = await User.findOne({ nickname: data.to });
-            const amount = parseInt(data.amount);
-
-            if (!receiver) return socket.emit('gift-result', { success: false, message: "Hedef komutan bulunamadı!" });
-            if (amount <= 0) return;
-
-            // KURAL 1: 5500 BPL Altına Düşemez
-            if (sender.bpl - amount < 5500) {
-                return socket.emit('gift-result', { success: false, message: "Bakiye 5500 BPL altına düşemez!" });
-            }
-
-            // KURAL 2: 24 Saatte En Fazla 3000 BPL
-            const dailyLimit = 3000;
-            const now = new Date();
-            const last24h = new Date(now.getTime() - (24 * 60 * 60 * 1000));
-
-            // Not: Veritabanında 'transfers' koleksiyonu olduğunu varsayıyoruz. 
-            // Eğer yoksa basitçe kullanıcı modelinde 'dailySpent' tutulabilir.
-            if (sender.dailyGiftAmount + amount > dailyLimit) {
-                 return socket.emit('gift-result', { success: false, message: "24 saatlik gönderim limitiniz (3000 BPL) dolu!" });
-            }
-
-            // KURAL 3: %25 Transfer Ücreti (Vergi)
-            const tax = amount * 0.25;
-            const netAmount = amount - tax;
-
-            sender.bpl -= amount;
-            sender.dailyGiftAmount = (sender.dailyGiftAmount || 0) + amount; // Günlük harcamaya ekle
-            receiver.bpl += netAmount;
-
-            await sender.save();
-            await receiver.save();
-
-            // Gönderene Bilgi
-            socket.emit('update-bpl', sender.bpl);
-            socket.emit('gift-result', { success: true, message: `${amount} BPL gönderildi. Kesinti: ${tax} BPL` });
-
-            // Alıcıya Bilgi
-            io.to(receiver.nickname).emit('update-bpl', receiver.bpl);
-            io.to(receiver.nickname).emit('new-message', { 
-                sender: "[SİSTEM]", 
-                text: `${sender.nickname} size ${netAmount} BPL lojistik destek gönderdi!` 
-            });
-
-        } catch (e) { console.log("Hediye Hatası:", e); }
-    });
-
-    // --- 2. DAVET SİSTEMİ (Arena -50 / Meeting -30) ---
+    // 2. DAVET SİSTEMİ (Arena & Meeting)
     socket.on('send-invite', async (data) => {
         try {
-            const { to, type, cost } = data; // cost: 50 veya 30
+            const { to, type, cost } = data;
             const sender = await User.findById(socket.userId);
 
-            if (sender.bpl < cost + 5500) { // Bakiyesini 5500'ün altına düşürmesini engelliyoruz (opsiyonel)
-                return socket.emit('gift-result', { success: false, message: "İşlem için yetersiz bakiye!" });
+            // Bakiye kontrolü (5500 limitini koruyarak)
+            if (!sender || sender.bpl < (cost + 5500)) {
+                return socket.emit('gift-result', { success: false, message: "Yetersiz bakiye veya limit (Min: 5500)!" });
             }
 
             sender.bpl -= cost;
             await sender.save();
 
+            // Davet edene yeni bakiyesini yolla
+            socket.emit('update-bpl', sender.bpl);
+
             const targetRoomId = `${sender.nickname}_Room`;
 
-            // Hedef kişiye (to) özel davet gönder
+            // HEDEFE DAVET GÖNDER (Sadece hedefe gider)
             io.to(to).emit('receive-invite', {
                 from: sender.nickname,
                 type: type,
                 roomId: targetRoomId
             });
 
-            // Davet edeni hemen odaya yönlendir
-            socket.emit('update-bpl', sender.bpl);
+            // GÖNDERENİ ODAYA YÖNLENDİR
             const redirectUrl = type === 'arena' ? `/arena?room=${targetRoomId}` : `/meeting?room=${targetRoomId}`;
             socket.emit('redirect-to-room', redirectUrl);
 
-        } catch (e) { console.log("Davet Hatası:", e); }
+        } catch (e) { console.error("Davet Hatası:", e); }
     });
 
-    // --- 3. GENEL CHAT ---
+    // 3. LOJİSTİK DESTEK (Hediye/Transfer)
+    socket.on('gift-bpl', async (data) => {
+        try {
+            const sender = await User.findById(socket.userId);
+            const receiver = await User.findOne({ nickname: data.to });
+            const amount = parseInt(data.amount);
+
+            if (!receiver || isNaN(amount) || amount <= 0) return;
+
+            // 5500 BPL Limit Kontrolü
+            if (sender.bpl - amount < 5500) {
+                return socket.emit('gift-result', { success: false, message: "Bakiyeniz 5500 altına düşemez!" });
+            }
+
+            // %25 Vergi Hesabı
+            const tax = amount * 0.25;
+            const netAmount = amount - tax;
+
+            sender.bpl -= amount;
+            receiver.bpl += netAmount;
+
+            await sender.save();
+            await receiver.save();
+
+            // Güncel bakiyeleri taraflara bildir
+            socket.emit('update-bpl', sender.bpl);
+            socket.emit('gift-result', { success: true, message: `Transfer başarılı! Kesinti: ${tax} BPL` });
+            
+            io.to(receiver.nickname).emit('update-bpl', receiver.bpl);
+            io.to(receiver.nickname).emit('new-message', { 
+                sender: "[SİSTEM]", 
+                text: `${sender.nickname} size ${netAmount} BPL lojistik destek gönderdi!` 
+            });
+
+        } catch (e) { console.error("Transfer Hatası:", e); }
+    });
+
+    // 4. CHAT MESAJLARI
     socket.on('chat-message', (data) => {
+        if (!data.text || data.text.trim() === "") return;
         io.emit('new-message', {
-            sender: socket.nickname,
+            sender: socket.nickname || "Anonim",
             text: data.text
         });
     });
 
     socket.on('disconnect', () => {
-        if (socket.nickname) console.log(`🔌 ${socket.nickname} hattan ayrıldı.`);
+        if (socket.nickname) console.log(`🔌 ${socket.nickname} ayrıldı.`);
     });
 });
 
@@ -335,6 +327,7 @@ const PORT = process.env.PORT || 3000;
 httpServer.listen(PORT, () => {
     console.log(`🌍 Sunucu Yayında: http://localhost:${PORT}`);
 });
+
 
 
 
