@@ -342,14 +342,25 @@ io.on('connection', async (socket) => {
 async function startBattle(roomId, cost, manualPlayers = null) {
     try {
         let players = manualPlayers;
-        // ... (Oyuncu çekme mantığı aynı kalacak)
-
-        const calc = (p) => (p.stats.power + p.stats.attack + p.stats.defense);
-        const p1Score = calc(players[0]);
-        const p2Score = calc(players[1]);
+        if (!players) {
+            const sockets = await io.in(roomId).fetchSockets();
+            players = [];
+            for (const s of sockets) {
+                const u = await User.findById(s.userId);
+                if(u) {
+                    players.push({ 
+                        id: s.id, userId: u._id, nick: u.nickname, animal: u.selectedAnimal,
+                        stats: { power: u.power || 10, attack: u.attack || 10, defense: u.defense || 10 } 
+                    });
+                }
+            }
+        }
         
-        // Kazananı net belirle
-        const winnerIdx = p1Score >= p2Score ? 0 : 1;
+        if (!players || players.length < 2) return;
+
+        // GÜÇ HESABI
+        const calc = (p) => (p.stats.power + p.stats.attack + p.stats.defense);
+        const winnerIdx = calc(players[0]) >= calc(players[1]) ? 0 : 1;
         const winner = players[winnerIdx];
         const prize = Math.floor(cost * 1.8);
 
@@ -358,16 +369,13 @@ async function startBattle(roomId, cost, manualPlayers = null) {
             if (winnerUser) { winnerUser.bpl += prize; await winnerUser.save(); }
         }
 
-        // CLIENT'A GİDEN VERİ (Çok önemli)
+        // TAM VERİ GÖNDERİMİ
         io.to(roomId).emit('match-started', { 
             players: players, 
-            winner: { 
-                nick: winner.nick, 
-                animal: winner.animal // Arena.ejs buradaki animal ismine göre video açacak
-            }, 
+            winner: { nick: winner.nick, animal: winner.animal }, 
             prize: prize 
         });
-    } catch (err) { console.log("Savaş Motoru Hatası:", err); }
+    } catch (err) { console.log("Savaş Hatası:", err); }
 }
     socket.on('disconnect', () => {
         if (socket.nickname) console.log(`🔌 ${socket.nickname} ayrıldı.`);
@@ -421,4 +429,5 @@ const PORT = process.env.PORT || 10000;
 httpServer.listen(PORT, () => {
     console.log(`🌍 Sunucu Yayında: http://localhost:${PORT}`);
 });
+
 
