@@ -26,14 +26,16 @@ app.use(express.static(path.join(__dirname, 'public')));
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
 
-// Session Ayarları (Kullanıcının login kalması için)
+// Session Ayarları (Hatayı gideren güncel versiyon)
 app.use(session({
     secret: process.env.SESSION_SECRET || 'bpl_secret_2025',
     resave: false,
     saveUninitialized: false,
-    store: MongoStore.create({ mongoUrl: process.env.MONGO_URI })
+    store: MongoStore.create({
+        mongoUrl: process.env.MONGO_URI,
+        ttl: 14 * 24 * 60 * 60 // 14 gün boyunca oturum açık kalır
+    })
 }));
-
 // --- YOLLAR (ROUTES) ---
 
 // Giriş ve Kayıt (authController üzerinden)
@@ -95,3 +97,4 @@ io.on('connection', (socket) => {
 
 const PORT = process.env.PORT || 3000;
 server.listen(PORT, () => console.log(`BPL Sistemi ${PORT} portunda aktif.`));
+
