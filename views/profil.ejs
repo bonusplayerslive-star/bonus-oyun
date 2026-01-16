@@ -1,3 +1,4 @@
+// Path: views\profil.ejs
 <!DOCTYPE html>
 <html lang="tr">
 <head>
@@ -5,144 +6,155 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>BPL PROFİL | <%= user.nickname %></title>
     <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
-    <link href="https://fonts.googleapis.com/css2?family=Orbitron:wght@400;700&family=Rajdhani:wght@500;700&display=swap" rel="stylesheet">
-    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <link href="https://fonts.googleapis.com/css2?family=Orbitron:wght@400;700&family=Rajdhani:wght@300;500;700&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css">
     <style>
-        :root { --neon-green: #39FF14; --dark-bg: #050505; --glass: rgba(0, 0, 0, 0.85); --gold: #ffc107; --neon-blue: #00d4ff; }
+        :root { --neon-green: #39FF14; --dark-bg: #050505; --glass: rgba(0, 0, 0, 0.85); --gold: #ffc107; }
         body { background: var(--dark-bg); color: white; font-family: 'Rajdhani', sans-serif; overflow-x: hidden; }
         
-        /* Arkaplan Atmosferi */
         body::before {
             content: ""; position: fixed; top: 0; left: 0; width: 100%; height: 100%;
-            background: radial-gradient(circle at center, #112211 0%, #050505 100%);
-            z-index: -1;
+            background: url('/caracter/page/welcome.jpg') no-repeat center center fixed;
+            background-size: cover; opacity: 0.15; z-index: -1;
         }
 
-        /* Header Üst Panel */
         .header-section { 
-            background: rgba(0,0,0,0.95); border-bottom: 2px solid var(--neon-green);
-            padding: 15px 0; box-shadow: 0 0 20px rgba(57, 255, 20, 0.2);
+            background: rgba(0,0,0,0.9); border-bottom: 2px solid var(--neon-green);
+            padding: 15px 0; margin-bottom: 30px; backdrop-filter: blur(10px);
         }
+        .logo-img { height: 50px; filter: drop-shadow(0 0 5px var(--neon-green)); }
         
         .glass-panel {
-            background: var(--glass); border: 1px solid rgba(57, 255, 20, 0.15);
-            border-radius: 20px; padding: 25px; height: 100%; box-shadow: 0 10px 30px rgba(0,0,0,0.5);
+            background: var(--glass); border: 1px solid rgba(57, 255, 20, 0.2);
+            border-radius: 15px; padding: 20px; height: 100%;
         }
         
-        /* Karakter Kartları */
         .stat-card {
-            background: rgba(20, 20, 20, 0.8); border: 1px solid rgba(255,255,255,0.05);
-            border-radius: 15px; padding: 15px; transition: all 0.4s cubic-bezier(0.175, 0.885, 0.32, 1.275);
-            position: relative; overflow: hidden;
+            background: rgba(0,0,0,0.7); border: 1px solid rgba(255,255,255,0.1);
+            border-radius: 12px; padding: 15px; transition: 0.3s; margin-bottom: 20px;
         }
-        .stat-card:hover { border-color: var(--neon-green); transform: translateY(-8px); box-shadow: 0 0 25px rgba(57, 255, 20, 0.2); }
+        .stat-card:hover { border-color: var(--neon-green); transform: translateY(-5px); }
         
         .inventory-img { 
             width: 100%; aspect-ratio: 1/1; object-fit: cover; 
-            border-radius: 12px; border: 2px solid rgba(255,255,255,0.1); transition: 0.3s;
+            border-radius: 10px; border: 2px solid var(--neon-green); margin-bottom: 10px;
         }
-        .selected-animal-card { border: 2px solid var(--gold) !important; background: rgba(255, 193, 7, 0.05) !important; }
-        .selected-animal-card .inventory-img { border-color: var(--gold); box-shadow: 0 0 15px var(--gold); }
+        
+        .bpl-badge { color: var(--neon-green); font-family: 'Orbitron'; font-weight: bold; font-size: 1.3rem; }
+        .nav-btn { width: 100%; margin-bottom: 12px; font-weight: bold; font-family: 'Orbitron'; font-size: 0.8rem; letter-spacing: 1px; transition: 0.3s; }
+        
+        .progress { background: #1a1a1a; border-radius: 10px; border: 1px solid #333; height: 8px; }
+        .stat-label { font-size: 0.7rem; color: #aaa; font-family: 'Orbitron'; text-transform: uppercase; }
 
-        /* Neon Butonlar */
-        .nav-btn { 
-            width: 100%; margin-bottom: 15px; font-family: 'Orbitron'; font-size: 0.75rem; 
-            letter-spacing: 1px; padding: 12px; border-radius: 10px; text-transform: uppercase;
-        }
         .btn-market-special {
-            background: var(--neon-green); color: black; border: none; font-weight: 900;
+            background: var(--neon-green); color: black; border: none;
             box-shadow: 0 0 15px var(--neon-green); animation: pulse 2s infinite;
         }
-
-        /* Stat Barları */
-        .progress { background: #111; height: 6px; border-radius: 10px; overflow: visible; margin-top: 5px; }
-        .stat-label { font-size: 0.65rem; color: #888; font-family: 'Orbitron'; display: flex; justify-content: space-between; }
-
         @keyframes pulse {
-            0% { transform: scale(1); box-shadow: 0 0 10px var(--neon-green); }
-            50% { transform: scale(1.02); box-shadow: 0 0 25px var(--neon-green); }
-            100% { transform: scale(1); box-shadow: 0 0 10px var(--neon-green); }
+            0% { box-shadow: 0 0 5px var(--neon-green); }
+            50% { box-shadow: 0 0 20px var(--neon-green); }
+            100% { box-shadow: 0 0 5px var(--neon-green); }
         }
+
+        .action-container {
+            background: rgba(0,0,0,0.5); border-radius: 8px;
+            padding: 12px; margin-top: 15px; border: 1px solid rgba(255,255,255,0.05);
+        }
+        
+        .btn-arena-select { background: var(--gold); color: #000; font-weight: bold; border: none; }
+        .btn-dev-select { background: transparent; border: 1px solid #0dcaf0; color: #0dcaf0; margin-top: 8px; }
+        .btn-dev-select:hover { background: #0dcaf0; color: black; }
+
+        .font-orbitron { font-family: 'Orbitron'; }
     </style>
 </head>
 <body>
 
-    <div class="header-section mb-4">
+    <div class="header-section">
         <div class="container d-flex justify-content-between align-items-center">
-            <div class="d-flex align-items-center">
-                <img src="/caracter/page/logo.jpeg" height="45" class="me-3 rounded border border-success">
-                <h4 class="font-orbitron mb-0 d-none d-md-block" style="color: var(--neon-green); letter-spacing: 2px;">BPL COMMAND CENTER</h4>
-            </div>
+            <a href="/profil"><img src="/caracter/page/logo.jpeg" alt="BPL LOGO" class="logo-img"></a>
             <div class="text-end">
-                <div class="text-muted small font-orbitron">OPERATÖR</div>
-                <div class="h5 mb-0 text-white"><%= user.nickname %> <span class="ms-2 text-warning" style="font-family: 'Orbitron';"><i class="fas fa-coins"></i> <%= user.bpl.toLocaleString() %></span></div>
+                <h5 class="mb-0 text-uppercase font-orbitron" style="color: var(--neon-green);"><%= user.nickname %></h5>
+                <span class="bpl-badge"><i class="fas fa-coins me-1"></i><%= user.bpl.toLocaleString() %> BPL</span>
             </div>
         </div>
     </div>
 
     <div class="container">
         <div class="row">
-            <div class="col-lg-3 mb-4">
-                <div class="glass-panel">
-                    <h6 class="text-muted border-bottom border-secondary pb-2 mb-4 font-orbitron text-center">NAVİGASYON</h6>
+            <div class="col-md-3 mb-4">
+                <div class="glass-panel text-center">
+                    <h6 class="text-muted border-bottom border-secondary pb-2 mb-3 font-orbitron">SİSTEM MENÜSÜ</h6>
+                    <a href="/market" class="btn btn-market-special nav-btn mb-4"><i class="fas fa-shopping-cart me-2"></i>BPL MARKET</a>
                     
-                    <% if (user.inventory && user.inventory.length >= 3) { %>
-                        <button class="btn btn-secondary nav-btn opacity-50 cursor-not-allowed">
-                            <i class="fas fa-lock me-2"></i>ENVANTER DOLU
-                        </button>
-                    <% } else { %>
-                        <a href="/market" class="btn btn-market-special nav-btn"><i class="fas fa-shopping-cart me-2"></i>MARKET</a>
-                    <% } %>
-
-                    <a href="/arena" class="btn btn-outline-danger nav-btn"><i class="fas fa-skull-crossbones me-2"></i>ARENA SAVAŞI</a>
-                    <a href="/chat" class="btn btn-outline-info nav-btn"><i class="fas fa-satellite-dish me-2"></i>STRATEJİ ODASI</a>
-                    <a href="/meeting" class="btn btn-outline-warning nav-btn"><i class="fas fa-users-cog me-2"></i>BEŞGEN MASA</a>
-                    <hr class="border-secondary my-4">
-                    <a href="/logout" class="btn btn-link text-danger nav-btn text-decoration-none"><i class="fas fa-power-off me-2"></i>SİSTEMDEN ÇIK</a>
+                    <a href="/development" class="btn btn-outline-warning nav-btn"><i class="fas fa-tools me-2"></i>GELİŞTİRME</a>
+                    <a href="/arena" class="btn btn-outline-danger nav-btn"><i class="fas fa-crosshairs me-2"></i>ARENA (BATTLE)</a>
+                    <a href="/chat" class="btn btn-outline-info nav-btn"><i class="fas fa-comments me-2"></i>GLOBAL CHAT</a>
+                    <a href="/meeting" class="btn btn-outline-primary nav-btn" style="border-color: #ffc107; color: #ffc107;">
+                        <i class="fas fa-video me-2"></i>BEŞGEN MASA
+                    </a>
+                    <a href="/wallet" class="btn btn-outline-light nav-btn"><i class="fas fa-wallet me-2"></i>CÜZDAN</a>
+                    <hr class="border-secondary">
+                    <a href="/logout" class="btn btn-dark nav-btn text-danger border-danger"><i class="fas fa-power-off me-2"></i>ÇIKIŞ YAP</a>
                 </div>
             </div>
 
-            <div class="col-lg-9">
+            <div class="col-md-9">
                 <div class="glass-panel">
                     <div class="d-flex justify-content-between align-items-center mb-4">
-                        <h4 class="font-orbitron mb-0"><i class="fas fa-dna text-success me-2"></i>BİYOLOJİK VARLIKLARINIZ</h4>
-                        <span class="badge bg-dark border border-success text-success px-3 py-2 font-orbitron">
-                            <%= user.inventory.length %> / 3 KAPASİTE
-                        </span>
+                        <h4 class="font-orbitron mb-0 text-uppercase"><i class="fas fa-boxes me-2 text-success"></i>ENVANTER</h4>
+                        <span class="badge rounded-pill bg-dark border border-secondary p-2">Varlık: <%= user.inventory.length %></span>
                     </div>
 
                     <div class="row">
                         <% if(!user.inventory || user.inventory.length === 0) { %>
                             <div class="col-12 text-center py-5">
-                                <div class="mb-4 opacity-25"><i class="fas fa-box-open fa-5x"></i></div>
-                                <h5 class="font-orbitron text-muted">VARLIK TESPİT EDİLEMEDİ</h5>
-                                <p class="text-muted small">Arenada savaşmak için marketten bir karakter edinmelisin.</p>
-                                <a href="/market" class="btn btn-success px-5 mt-2 font-orbitron">MARKETE GİT</a>
+                                <i class="fas fa-dragon fa-4x mb-3 text-secondary" style="opacity: 0.2;"></i>
+                                <h3 class="font-orbitron">ENVANTER BOŞ</h3>
+                                <a href="/market" class="btn btn-outline-success mt-3">KARAKTER SATIN AL</a>
                             </div>
                         <% } else { %>
                             <% user.inventory.forEach((item) => { %>
                                 <div class="col-md-4 mb-4">
-                                    <div class="stat-card <%= user.selectedAnimal === item.name ? 'selected-animal-card' : '' %>">
-                                        <div class="position-relative">
+                                    <div class="stat-card text-center">
+                                        <div style="position: relative;">
                                             <img src="/caracter/profile/<%= item.name %>.jpg" onerror="this.src='/caracter/page/logo.jpeg'" class="inventory-img">
-                                            <div class="position-absolute bottom-0 end-0 bg-black bg-opacity-75 px-2 py-1 m-2 rounded border border-info font-orbitron" style="font-size: 0.7rem;">
+                                            <span style="position: absolute; top: 10px; right: 10px; background: var(--neon-green); color: black; padding: 2px 8px; border-radius: 5px; font-weight: bold; font-family: 'Orbitron'; font-size: 0.7rem;">
                                                 LVL <%= item.level || 1 %>
-                                            </div>
+                                            </span>
                                         </div>
 
-                                        <h5 class="text-uppercase text-center my-3 font-orbitron text-info"><%= item.name %></h5>
+                                        <h5 class="text-uppercase my-2 font-orbitron" style="color: var(--neon-green);"><%= item.name %></h5>
                                         
-                                        <div class="stat-label"><span>HP</span><span><%= item.hp %> / <%= item.maxHp %></span></div>
-                                        <div class="progress mb-2"><div class="progress-bar bg-danger" style="width: <%= (item.hp/item.maxHp)*100 %>%"></div></div>
+                                        <div class="px-2">
+                                            <div class="d-flex justify-content-between stat-label mb-1">
+                                                <span>HP</span>
+                                                <span><%= (item.stats && item.stats.hp) ? item.stats.hp : 100 %> / 100</span>
+                                            </div>
+                                            <div class="progress mb-2">
+                                                <div class="progress-bar bg-danger" style="width: <%= (item.stats && item.stats.hp) ? item.stats.hp : 100 %>%"></div>
+                                            </div>
 
-                                        <div class="stat-label"><span>ENERJİ</span><span>%<%= item.stamina %></span></div>
-                                        <div class="progress mb-4"><div class="progress-bar bg-warning" style="width: <%= item.stamina %>%"></div></div>
+                                            <div class="d-flex justify-content-between stat-label mb-1">
+                                                <span>GÜÇ</span>
+                                                <span>%<%= item.stamina || 0 %></span>
+                                            </div>
+                                            <div class="progress mb-3">
+                                                <div class="progress-bar bg-warning" style="width: <%= item.stamina %>%"></div>
+                                            </div>
 
-                                        <button onclick="selectForArena('<%= item.name %>')" 
-                                            class="btn w-100 font-orbitron py-2 <%= user.selectedAnimal === item.name ? 'btn-success' : 'btn-outline-warning' %>" 
-                                            style="font-size: 0.7rem;">
-                                            <%= user.selectedAnimal === item.name ? 'SAVAŞA HAZIR' : 'SAVAŞÇI OLARAK SEÇ' %>
-                                        </button>
+                                            <div class="action-container">
+                                                <button onclick="selectForArena('<%= item.name %>')" class="btn btn-arena-select btn-sm w-100 font-orbitron">
+                                                    ARENA İÇİN SEÇ
+                                                </button>
+                                                <button onclick="window.location.href='/development'" class="btn btn-dev-select btn-sm w-100 font-orbitron">
+                                                    GELİŞTİRME YAP
+                                                </button>
+                                                <button onclick="refillStamina('<%= item.name %>')" class="btn btn-link btn-sm text-success mt-2 p-0" style="text-decoration: none; font-size: 0.7rem;">
+                                                    <i class="fas fa-bolt"></i> ENERJİ VER (10 BPL)
+                                                </button>
+                                            </div>
+                                        </div>
                                     </div>
                                 </div>
                             <% }) %>
@@ -153,31 +165,30 @@
         </div>
     </div>
 
-    <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
+    <script src="/socket.io/socket.io.js"></script>
     <script>
+        const socket = io();
+        socket.emit('register-user', { id: "<%= user._id %>", nickname: "<%= user.nickname %>" });
+
         async function selectForArena(name) {
-            Swal.fire({ title: 'İşleniyor...', allowOutsideClick: false, didOpen: () => Swal.showLoading() });
-            
             try {
-                const res = await fetch('/api/select-animal', {
+                const res = await fetch('/select-animal', {
                     method: 'POST',
                     headers: {'Content-Type': 'application/json'},
                     body: JSON.stringify({ animalName: name })
                 });
                 const data = await res.json();
-                
-                if(data.success) {
-                    Swal.fire({
-                        icon: 'success', title: 'ONAYLANDI',
-                        text: name + ' bir sonraki savaş için seçildi.',
-                        background: '#050505', color: '#fff', confirmButtonColor: '#39FF14'
-                    }).then(() => location.reload());
-                } else {
-                    Swal.fire('HATA', data.error, 'error');
+                if(data.status === 'success') {
+                    alert(name + " savaşa hazır!");
                 }
             } catch (err) {
-                Swal.fire('HATA', 'Sunucu bağlantısı sağlanamadı.', 'error');
+                console.error("Hata:", err);
             }
+        }
+
+        async function refillStamina(name) {
+            // Buraya stamina yenileme fetch isteğini ekleyebilirsin
+            alert(name + " enerjisi yenileniyor...");
         }
     </script>
 </body>
