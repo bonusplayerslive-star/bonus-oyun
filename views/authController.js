@@ -6,29 +6,37 @@ exports.register = async (req, res) => {
     try {
         const { nickname, email, password } = req.body;
         
-        // Kullanıcı var mı kontrolü
+        // 1. Kullanıcı var mı kontrolü
         const existingUser = await User.findOne({ $or: [{ email }, { nickname }] });
-        if (existingUser) return res.send('<script>alert("Email veya Nickname zaten kullanımda!"); window.location="/";</script>');
+        if (existingUser) {
+            return res.send('<script>alert("Email veya Nickname zaten kullanımda!"); window.location="/";</script>');
+        }
 
-        // Şifre şifreleme
+        // 2. Şifre şifreleme
         const hashedPassword = await bcrypt.hash(password, 10);
 
+        // 3. Yeni Kullanıcı Oluşturma (EJS dosyalarınla %100 uyumlu statlar)
         const newUser = new User({
             nickname,
             email,
             password: hashedPassword,
-            bpl: 2500, // Başlangıç bonusu
-            inventory: [{ // İlk hayvan: Tiger (Varsayılan)
+            bpl: 2500, // Başlangıç parası
+            selectedAnimal: 'Tiger', // Varsayılan seçili hayvan
+            inventory: [{ 
                 name: 'Tiger',
-                img: '/caracter/profile/Tiger.jpg',
-                stats: { hp: 100, atk: 20, def: 10 }
+                level: 1,
+                hp: 100, 
+                maxHp: 100, 
+                stamina: 100,
+                atk: 20, 
+                def: 10 
             }]
         });
 
         await newUser.save();
-        res.send('<script>alert("Kayıt başarılı! Şimdi giriş yapabilirsiniz."); window.location="/";</script>');
+        res.send('<script>alert("BPL Sistemine Hoş Geldin! Kayıt başarılı."); window.location="/";</script>');
     } catch (err) {
-        res.status(500).send("Kayıt hatası: " + err.message);
+        res.status(500).send("Kayıt sırasında teknik bir arıza oluştu: " + err.message);
     }
 };
 
@@ -38,16 +46,23 @@ exports.login = async (req, res) => {
         const { email, password } = req.body;
         const user = await User.findOne({ email });
 
+        // Şifre ve kullanıcı kontrolü
         if (!user || !(await bcrypt.compare(password, user.password))) {
-            return res.send('<script>alert("Hatalı giriş bilgileri!"); window.location="/";</script>');
+            return res.send('<script>alert("E-posta veya şifre hatalı!"); window.location="/";</script>');
         }
 
-        // Session kaydı
+        // Session kaydı (Tüm sistemin tanıması için)
         req.session.userId = user._id;
         req.session.nickname = user.nickname;
         
         res.redirect('/profil');
     } catch (err) {
-        res.status(500).send("Giriş hatası");
+        res.status(500).send("Giriş işlemi başarısız oldu.");
     }
+};
+
+// ÇIKIŞ İŞLEMİ (Opsiyonel ama gerekli)
+exports.logout = (req, res) => {
+    req.session.destroy();
+    res.redirect('/');
 };
