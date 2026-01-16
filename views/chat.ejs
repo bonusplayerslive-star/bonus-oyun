@@ -187,22 +187,28 @@
     }
 
     // 5. DAVET ALMA (SOCKET)
-    socket.on('receive-invite', (data) => {
-        Swal.fire({
-            title: data.type === 'arena' ? '⚔️ DÜELLO DAVETİ!' : '🏛️ ÖZEL ODA DAVETİ!',
-            text: `${data.from} seni çağırıyor.`,
-            showCancelButton: true,
-            confirmButtonText: 'KABUL ET',
-            background: '#0a0a0a', color: '#fff'
-        }).then((res) => {
-            if(res.isConfirmed) {
-                // Oda ismi davet edenin nickname'i olur
-                const targetUrl = data.type === 'arena' ? `/arena?room=${data.from}` : `/meeting?room=${data.from}`;
-                window.location.href = targetUrl;
-            }
-        });
+   // 5. DAVET ALMA (SOCKET) - Chat.ejs içindeki kısım
+socket.on('receive-invite', (data) => {
+    Swal.fire({
+        title: data.type === 'arena' ? '⚔️ DÜELLO DAVETİ!' : '🏛️ ÖZEL ODA DAVETİ!',
+        text: `${data.from} seni çağırıyor.`,
+        showCancelButton: true,
+        confirmButtonText: 'KABUL ET',
+        cancelButtonText: 'REDDET',
+        background: '#0a0a0a', color: '#fff'
+    }).then((res) => {
+        if(res.isConfirmed) {
+            // Davet edenin gönderdiği roomId ile aynı odaya gidiyoruz
+            const targetUrl = data.type === 'arena' ? `/arena?room=${data.roomId}` : `/meeting?room=${data.roomId}`;
+            window.location.href = targetUrl;
+        }
     });
+});
 
+// Davet edenin kendi sayfasına yönlendirilmesi için
+socket.on('redirect-to-room', (url) => {
+    window.location.href = url;
+});
     // 6. CHAT FONKSİYONLARI
     function sendMessage() {
         const input = document.getElementById('messageInput');
@@ -236,3 +242,4 @@
 </script>
 </body>
 </html>
+
