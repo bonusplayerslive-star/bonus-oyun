@@ -1,7 +1,21 @@
 const express = require('express');
 const mongoose = require('mongoose');
+// ... diğer requirelar
 const session = require('express-session');
-const MongoStore = require('connect-mongo'); 
+// BURAYI BÖYLE YAP: Bazı versiyonlarda .default gerekebilir
+let MongoStore = require('connect-mongo').default;
+if (MongoStore.default) {
+    MongoStore = MongoStore.default;
+}
+// ...
+// Session kısmında kullanımı:
+app.use(session({
+    secret: process.env.SESSION_SECRET || 'bpl_ultimate_secret',
+    resave: false,
+    saveUninitialized: false,
+    store: MongoStore.create({ mongoUrl: process.env.MONGO_URI }),
+    cookie: { secure: false, maxAge: 24 * 60 * 60 * 1000 }
+}));
 const http = require('http');
 const socketIo = require('socket.io');
 const path = require('path');
@@ -100,3 +114,4 @@ app.get('/meeting', (req, res) => {
 
 const PORT = process.env.PORT || 3000;
 server.listen(PORT, () => console.log(`🚀 Sistem Aktif: ${PORT}`));
+
