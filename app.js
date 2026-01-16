@@ -86,7 +86,42 @@ app.get('/logout', (req, res) => { req.session.destroy(); res.redirect('/'); });
 
 
 
+// SATIN ALMA API'Sİ
+app.post('/api/buy-item', authRequired, async (req, res) => {
+    const { itemName, price } = req.body;
+    try {
+        const user = await User.findById(req.session.userId);
+        
+        if (user.bpl < price) return res.json({ success: false, error: "Bakiye yetersiz!" });
+        if (user.inventory.length >= 3) return res.json({ success: false, error: "Envanter dolu (Maks 3)!" });
 
+        // Hayvanı envantere ekle
+        user.inventory.push({
+            name: itemName,
+            hp: 100, maxHp: 100,
+            level: 1,
+            stamina: 100
+        });
+
+        user.bpl -= price;
+        await user.save();
+        res.json({ success: true });
+    } catch (err) {
+        res.status(500).json({ success: false, error: "İşlem sırasında hata oluştu." });
+    }
+});
+
+// MEETING SOCKET MANTIĞI
+io.on('connection', (socket) => {
+    socket.on('join-meeting', ({ roomId, peerId, nickname }) => {
+        socket.join(roomId);
+        socket.to(roomId).emit('user-connected', { peerId, nickname });
+
+        socket.on('disconnect', () => {
+            socket.to(roomId).emit('user-disconnected', peerId);
+        });
+    });
+});
 
 
 
@@ -142,4 +177,5 @@ io.on('connection', async (socket) => {
 });
 
 server.listen(PORT, () => console.log(`🚀 BPL ULTIMATE AKTİF: ${PORT}`));
+
 
