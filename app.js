@@ -1,7 +1,7 @@
 const express = require('express');
 const mongoose = require('mongoose');
 const session = require('express-session');
-const MongoStore = require('connect-mongo'); 
+const MongoStore = require('connect-mongo').default; 
 const http = require('http');
 const socketIo = require('socket.io');
 const path = require('path');
@@ -125,3 +125,4 @@ app.get('/profil', async (req, res) => {
 app.get('/meeting', (req, res) => res.render('meeting', { roomId: req.query.room || 'global' }));
 
 server.listen(process.env.PORT || 3000, () => console.log('🚀 BPL ONLINE'));
+
