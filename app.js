@@ -197,32 +197,47 @@ app.post('/api/upgrade-stat', isLoggedIn, async (req, res) => {
     try {
         const { animalName, statType } = req.body;
         const user = await User.findById(req.user._id);
-        const cost = (statType === 'def') ? 10 : 15;
-
-        if (user.bpl < cost) return res.json({ success: false, error: "Yetersiz BPL!" });
-
+        
+        // 1. Karakter Kontrolü
         const animal = user.inventory.find(a => a.name === animalName);
         if (!animal) return res.json({ success: false, error: "Karakter bulunamadı!" });
 
-        animal[statType] = (animal[statType] || 0) + 10;
+        // 2. Ücret Belirleme
+        let cost = 0;
+        if (statType === 'def') cost = 10;
+        else if (statType === 'stamina') cost = 10;
+        else cost = 15; // attack ve power için
+
+        // 3. Bakiye Kontrolü
+        if (user.bpl < cost) {
+            return res.json({ success: false, error: "Yetersiz BPL!" });
+        }
+
+        // 4. Geliştirme İşlemi
+        if (statType === 'stamina') {
+            animal.stamina = 100; // Enerjiyi fulle
+        } else {
+            // attack, power veya def için +10 ekle
+            animal[statType] = (animal[statType] || 0) + 10;
+        }
+
+        // 5. Kayıt ve Yanıt
         user.bpl -= cost;
-
-        user.markModified('inventory');
+        user.markModified('inventory'); // MongoDB'ye array içindeki değişikliği bildir
         await user.save();
-        res.json({ success: true, newBalance: user.bpl, newValue: animal[statType] });
-    } catch (err) { res.status(500).json({ success: false, error: "Geliştirme hatası!" }); }
 
-// app.js içindeki örnek mantık
-if (statType === 'stamina') {
-    if (user.bpl < 10) return res.status(400).json({ error: "Yetersiz BPL!" });
-    animal.stamina = 100; // Enerjiyi fulle
-    user.bpl -= 10;
-}
+        return res.json({ 
+            success: true, 
+            newBalance: user.bpl, 
+            newValue: animal[statType],
+            statType: statType 
+        });
 
-
-    
+    } catch (err) {
+        console.error("Geliştirme Hatası:", err);
+        return res.status(500).json({ success: false, error: "Sunucu hatası oluştu!" });
+    }
 });
-
 // --- 1. DEĞİŞKENLER ---
 let arenaQueue = []; 
 const botNames = ["Alpha_Commander", "Cyber_Ghost", "Shadow_Warrior", "Neon_Striker", "Elite_Guard"];
@@ -324,17 +339,36 @@ io.on('connection', async (socket) => {
                     if(s1) s1.join(aRoom);
                     if(s2) s2.join(aRoom);
                     
-                    startBattle(aRoom, entryFee, [p1, p2]);
-                } else {
-                    setTimeout(() => {
-                        const idx = arenaQueue.findIndex(p => p.id === socket.id);
-                        if (idx > -1) createBotMatch(arenaQueue.splice(idx, 1)[0]);
-                    }, 13000);
-                }
-            }
-        } catch (e) { console.error(e); }
-    });
+async function startBattle(roomId, cost, manualPlayers = null) {
+    try {
+        let players = manualPlayers;
+        // ... (Oyuncu çekme mantığı aynı kalacak)
 
+        const calc = (p) => (p.stats.power + p.stats.attack + p.stats.defense);
+        const p1Score = calc(players[0]);
+        const p2Score = calc(players[1]);
+        
+        // Kazananı net belirle
+        const winnerIdx = p1Score >= p2Score ? 0 : 1;
+        const winner = players[winnerIdx];
+        const prize = Math.floor(cost * 1.8);
+
+        if (winner.userId) { 
+            const winnerUser = await User.findById(winner.userId);
+            if (winnerUser) { winnerUser.bpl += prize; await winnerUser.save(); }
+        }
+
+        // CLIENT'A GİDEN VERİ (Çok önemli)
+        io.to(roomId).emit('match-started', { 
+            players: players, 
+            winner: { 
+                nick: winner.nick, 
+                animal: winner.animal // Arena.ejs buradaki animal ismine göre video açacak
+            }, 
+            prize: prize 
+        });
+    } catch (err) { console.log("Savaş Motoru Hatası:", err); }
+}
     socket.on('disconnect', () => {
         if (socket.nickname) console.log(`🔌 ${socket.nickname} ayrıldı.`);
         // Kuyruktan temizle
@@ -387,3 +421,4 @@ const PORT = process.env.PORT || 10000;
 httpServer.listen(PORT, () => {
     console.log(`🌍 Sunucu Yayında: http://localhost:${PORT}`);
 });
+
