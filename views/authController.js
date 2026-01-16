@@ -5,6 +5,24 @@ const bcrypt = require('bcryptjs');
 exports.register = async (req, res) => {
     try {
         const { nickname, email, password } = req.body;
+
+        // authController.js - Kayıt Kısmı Revizesi
+const newUser = new User({
+    nickname,
+    email,
+    password: hashedPassword,
+    bpl: 2500,
+    selectedAnimal: 'Tiger', // İlk hayvanı seçili yapıyoruz
+    inventory: [{ 
+        name: 'Tiger',
+        img: '/caracter/profile/Tiger.jpg', // Modelindeki img alanına uygun
+        hp: 100, 
+        maxHp: 100, 
+        atk: 25, 
+        def: 15,
+        stamina: 100
+    }]
+});
         
         // 1. Kullanıcı var mı kontrolü
         const existingUser = await User.findOne({ $or: [{ email }, { nickname }] });
