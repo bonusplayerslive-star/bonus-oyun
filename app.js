@@ -223,7 +223,7 @@ if (statType === 'stamina') {
     
 });
 
-// --- 1. DEĞİŞKENLER (En üstte kalsın) ---
+// --- 1. DEĞİŞKENLER ---
 let arenaQueue = []; 
 const botNames = ["Alpha_Commander", "Cyber_Ghost", "Shadow_Warrior", "Neon_Striker", "Elite_Guard"];
 const botAnimalsList = ["Gorilla", "Eagle", "Lion", "Wolf", "Cobra"];
@@ -241,7 +241,7 @@ io.on('connection', async (socket) => {
         }
     }
 
-    // --- 2. CHAT & MESAJLAŞMA (KORUNDU) ---
+    // --- 2. CHAT & MESAJLAŞMA ---
     socket.on('chat-message', (data) => {
         io.emit('new-message', {
             sender: socket.nickname || "Bilinmeyen",
@@ -250,7 +250,7 @@ io.on('connection', async (socket) => {
         });
     });
 
-    // --- 3. LOJİSTİK DESTEK / HEDİYE (KORUNDU - 5500 Limitli) ---
+    // --- 3. LOJİSTİK DESTEK ---
     socket.on('transfer-bpl', async (data) => {
         try {
             if (!socket.userId) return;
@@ -260,7 +260,7 @@ io.on('connection', async (socket) => {
 
             if (receiver && sender.bpl >= amount + 5500 && amount >= 50) {
                 sender.bpl -= amount;
-                receiver.bpl += (amount * 0.75); // %25 vergi
+                receiver.bpl += (amount * 0.75);
                 await sender.save();
                 await receiver.save();
                 socket.emit('gift-result', { message: "Başarılı!", newBalance: sender.bpl });
@@ -271,22 +271,24 @@ io.on('connection', async (socket) => {
         } catch (e) { console.log(e); }
     });
 
-    // --- 4. ÖZEL DAVETLER (KORUNDU) ---
+    // --- 4. ÖZEL DAVETLER ---
     socket.on('send-invite', async (data) => {
-        const { to, type, cost } = data;
-        const sender = await User.findById(socket.userId);
-        if (sender.bpl < cost + 5500) return socket.emit('error-msg', 'Yetersiz bakiye!');
+        try {
+            const { to, type, cost } = data;
+            const sender = await User.findById(socket.userId);
+            if (!sender || sender.bpl < cost + 5500) return socket.emit('error-msg', 'Yetersiz bakiye!');
 
-        sender.bpl -= cost;
-        await sender.save();
-        socket.emit('update-bpl', sender.bpl);
+            sender.bpl -= cost;
+            await sender.save();
+            socket.emit('update-bpl', sender.bpl);
 
-        const targetRoomId = `${socket.nickname}_Room`;
-        io.to(to).emit('receive-invite', { from: socket.nickname, type, roomId: targetRoomId });
-        socket.emit('redirect-to-room', type === 'arena' ? `/arena?room=${targetRoomId}` : `/meeting?room=${targetRoomId}`);
+            const targetRoomId = `${socket.nickname}_Room`;
+            io.to(to).emit('receive-invite', { from: socket.nickname, type, roomId: targetRoomId });
+            socket.emit('redirect-to-room', type === 'arena' ? `/arena?room=${targetRoomId}` : `/meeting?room=${targetRoomId}`);
+        } catch (e) { console.log(e); }
     });
 
-    // --- 5. ARENA MOTORU (YENİ EKLENDİ) ---
+    // --- 5. ARENA MOTORU ---
     socket.on('arena-ready', async (data) => {
         try {
             const { mult, room, nick, animal } = data;
@@ -316,7 +318,12 @@ io.on('connection', async (socket) => {
                     const p1 = arenaQueue.shift();
                     const p2 = arenaQueue.shift();
                     const aRoom = "arena_" + Date.now();
-                    [p1, p2].forEach(p => { if(io.sockets.sockets.get(p.id)) io.sockets.sockets.get(p.id).join(aRoom); });
+                    
+                    const s1 = io.sockets.sockets.get(p1.id);
+                    const s2 = io.sockets.sockets.get(p2.id);
+                    if(s1) s1.join(aRoom);
+                    if(s2) s2.join(aRoom);
+                    
                     startBattle(aRoom, entryFee, [p1, p2]);
                 } else {
                     setTimeout(() => {
@@ -330,10 +337,12 @@ io.on('connection', async (socket) => {
 
     socket.on('disconnect', () => {
         if (socket.nickname) console.log(`🔌 ${socket.nickname} ayrıldı.`);
+        // Kuyruktan temizle
+        arenaQueue = arenaQueue.filter(p => p.id !== socket.id);
     });
-});
+}); // <--- io.on('connection') BURADA BİTİYOR
 
-// --- 6. SAVAŞ FONKSİYONLARI (En Altta - io.on Dışında) ---
+// --- 6. SAVAŞ FONKSİYONLARI (DIŞARIDA) ---
 async function startBattle(roomId, cost, manualPlayers = null) {
     try {
         let players = manualPlayers;
@@ -342,10 +351,15 @@ async function startBattle(roomId, cost, manualPlayers = null) {
             players = [];
             for (const s of sockets) {
                 const u = await User.findById(s.userId);
-                players.push({ id: s.id, userId: u._id, nick: u.nickname, animal: u.selectedAnimal,
-                    stats: { power: u.power, attack: u.attack, defense: u.defense } });
+                if(u) {
+                    players.push({ id: s.id, userId: u._id, nick: u.nickname, animal: u.selectedAnimal,
+                        stats: { power: u.power, attack: u.attack, defense: u.defense } });
+                }
             }
         }
+        
+        if (!players || players.length < 2) return;
+
         const calc = (p) => (p.stats.power + p.stats.attack + p.stats.defense) - (p.stats.defense / 8);
         const winnerIdx = calc(players[0]) >= calc(players[1]) ? 0 : 1;
         const winner = players[winnerIdx];
@@ -355,27 +369,21 @@ async function startBattle(roomId, cost, manualPlayers = null) {
         if (winnerUser) { winnerUser.bpl += prize; await winnerUser.save(); }
 
         io.to(roomId).emit('match-started', { players, winner: { nick: winner.nick, animal: winner.animal }, prize });
-    } catch (err) { console.log(err); }
+    } catch (err) { console.log("Savaş Hatası:", err); }
 }
 
 async function createBotMatch(player) {
     const botData = {
         nick: botNames[Math.floor(Math.random() * botNames.length)],
         animal: botAnimalsList[Math.floor(Math.random() * botAnimalsList.length)],
-        stats: { power: 12, attack: 12, defense: 12 }
+        stats: { power: 12, attack: 12, defense: 12 },
+        userId: null
     };
     startBattle(player.id, player.cost, [player, botData]);
 }
 
-    socket.on('disconnect', () => {
-        if (socket.nickname) console.log(`🔌 ${socket.nickname} ayrıldı.`);
-    });
-});
-
-// --- 6. BAŞLAT ---
-const PORT = process.env.PORT || 3000;
+// --- 7. BAŞLAT ---
+const PORT = process.env.PORT || 10000;
 httpServer.listen(PORT, () => {
     console.log(`🌍 Sunucu Yayında: http://localhost:${PORT}`);
 });
-
-
