@@ -223,7 +223,6 @@ if (statType === 'stamina') {
     
 });
 
-// --- 5. SOCKET.IO İŞLEMLERİ (Chat Bozmadan) ---
 io.on('connection', async (socket) => {
     const session = socket.request.session;
     
@@ -232,181 +231,103 @@ io.on('connection', async (socket) => {
         if (user) {
             socket.userId = user._id;
             socket.nickname = user.nickname;
-            console.log(`✅ Bağlantı onaylandı: ${socket.nickname}`);
+            socket.join(user.nickname); // Her kullanıcıyı kendi nickiyle bir odaya sokuyoruz (Özel mesaj için)
+            console.log(`✅ Komuta Merkezi Bağlantısı: ${socket.nickname}`);
         }
-
-// app.js içindeki io.on('connection') bloğunun içine ekle
-socket.on('join-meeting', (data) => {
-    const roomId = data.roomId || "GENEL_KONSEY";
-    socket.join(roomId); // Kullanıcıyı odaya sokar
-    socket.currentRoom = roomId;
-    
-    console.log(`👥 ${socket.nickname} şu odaya katıldı: ${roomId}`);
-    
-    // Odadaki diğerlerine haber ver
-    socket.to(roomId).emit('user-connected', {
-        nickname: socket.nickname,
-        id: socket.id
-    });
-});
-
-// Mesaj gönderirken sadece o odadakilere gitsin
-socket.on('send-meeting-message', (data) => {
-    if (socket.currentRoom) {
-        io.to(socket.currentRoom).emit('new-meeting-message', {
-            sender: socket.nickname,
-            text: data.text
-        });
-
-// Oda daveti kabul edildiğinde çalışan socket bloğu
-socket.on('accept-private-invitation', (data) => {
-    const roomId = data.roomId; // Örneğin: "ROOM_12345"
-    const senderId = data.senderId; // Daveti atan kişinin socket ID'si
-    const receiverId = socket.id;   // Daveti kabul eden (şu anki kullanıcı)
-
-    // 1. Daveti kabul edeni (kendini) odaya gönder
-    socket.emit('redirect-to-meeting', { roomId: roomId });
-
-    // 2. Daveti gönderen oda sahibini de odaya gönder
-    io.to(senderId).emit('redirect-to-meeting', { roomId: roomId });
-});
-
-    }
-});
-
-
-
-
     }
 
-    socket.on('chat-message', (data) => {
-        const sender = socket.nickname || "Bilinmeyen";
-        io.emit('new-message', {
-            sender: sender,
-            text: data.text,
-            time: new Date().toLocaleTimeString('tr-TR', { hour: '2-digit', minute: '2-digit' })
-        });
-    });
-
-    socket.on('transfer-bpl', async (data) => {
+    // --- 1. GELİŞMİŞ HEDİYE SİSTEMİ (%25 Vergi & 24s Limit) ---
+    socket.on('gift-bpl', async (data) => {
         try {
-            if (!socket.userId) return;
             const sender = await User.findById(socket.userId);
             const receiver = await User.findOne({ nickname: data.to });
             const amount = parseInt(data.amount);
 
-            if (receiver && sender.bpl >= amount + 500 && amount >= 50) {
-                sender.bpl -= amount;
-                receiver.bpl += (amount * 0.8);
-                await sender.save();
-                await receiver.save();
-                socket.emit('gift-result', { message: "Başarılı!", newBalance: sender.bpl });
-            } else {
-                socket.emit('gift-result', { message: "Limit yetersiz veya alıcı yok!" });
+            if (!receiver) return socket.emit('gift-result', { success: false, message: "Hedef komutan bulunamadı!" });
+            if (amount <= 0) return;
+
+            // KURAL 1: 5500 BPL Altına Düşemez
+            if (sender.bpl - amount < 5500) {
+                return socket.emit('gift-result', { success: false, message: "Bakiye 5500 BPL altına düşemez!" });
             }
-        } catch (e) { console.log(e); }
+
+            // KURAL 2: 24 Saatte En Fazla 3000 BPL
+            const dailyLimit = 3000;
+            const now = new Date();
+            const last24h = new Date(now.getTime() - (24 * 60 * 60 * 1000));
+
+            // Not: Veritabanında 'transfers' koleksiyonu olduğunu varsayıyoruz. 
+            // Eğer yoksa basitçe kullanıcı modelinde 'dailySpent' tutulabilir.
+            if (sender.dailyGiftAmount + amount > dailyLimit) {
+                 return socket.emit('gift-result', { success: false, message: "24 saatlik gönderim limitiniz (3000 BPL) dolu!" });
+            }
+
+            // KURAL 3: %25 Transfer Ücreti (Vergi)
+            const tax = amount * 0.25;
+            const netAmount = amount - tax;
+
+            sender.bpl -= amount;
+            sender.dailyGiftAmount = (sender.dailyGiftAmount || 0) + amount; // Günlük harcamaya ekle
+            receiver.bpl += netAmount;
+
+            await sender.save();
+            await receiver.save();
+
+            // Gönderene Bilgi
+            socket.emit('update-bpl', sender.bpl);
+            socket.emit('gift-result', { success: true, message: `${amount} BPL gönderildi. Kesinti: ${tax} BPL` });
+
+            // Alıcıya Bilgi
+            io.to(receiver.nickname).emit('update-bpl', receiver.bpl);
+            io.to(receiver.nickname).emit('new-message', { 
+                sender: "[SİSTEM]", 
+                text: `${sender.nickname} size ${netAmount} BPL lojistik destek gönderdi!` 
+            });
+
+        } catch (e) { console.log("Hediye Hatası:", e); }
+    });
+
+    // --- 2. DAVET SİSTEMİ (Arena -50 / Meeting -30) ---
+    socket.on('send-invite', async (data) => {
+        try {
+            const { to, type, cost } = data; // cost: 50 veya 30
+            const sender = await User.findById(socket.userId);
+
+            if (sender.bpl < cost + 5500) { // Bakiyesini 5500'ün altına düşürmesini engelliyoruz (opsiyonel)
+                return socket.emit('gift-result', { success: false, message: "İşlem için yetersiz bakiye!" });
+            }
+
+            sender.bpl -= cost;
+            await sender.save();
+
+            const targetRoomId = `${sender.nickname}_Room`;
+
+            // Hedef kişiye (to) özel davet gönder
+            io.to(to).emit('receive-invite', {
+                from: sender.nickname,
+                type: type,
+                roomId: targetRoomId
+            });
+
+            // Davet edeni hemen odaya yönlendir
+            socket.emit('update-bpl', sender.bpl);
+            const redirectUrl = type === 'arena' ? `/arena?room=${targetRoomId}` : `/meeting?room=${targetRoomId}`;
+            socket.emit('redirect-to-room', redirectUrl);
+
+        } catch (e) { console.log("Davet Hatası:", e); }
+    });
+
+    // --- 3. GENEL CHAT ---
+    socket.on('chat-message', (data) => {
+        io.emit('new-message', {
+            sender: socket.nickname,
+            text: data.text
+        });
     });
 
     socket.on('disconnect', () => {
-        if (socket.nickname) console.log(`🔌 ${socket.nickname} ayrıldı.`);
+        if (socket.nickname) console.log(`🔌 ${socket.nickname} hattan ayrıldı.`);
     });
-
-// --- app.js içine eklenecek Socket Dinleyicileri ---
-
-socket.on('send-challenge', async (data) => {
-    try {
-        const sender = await User.findById(socket.userId);
-        if (sender && sender.bpl >= 5505) {
-            sender.bpl -= 5; // Davet bilet ücreti
-            await sender.save();
-
-            // Gönderene yeni bakiyesini bildir ve paneli kapatması için onay ver
-            socket.emit('gift-result', { 
-                success: true, 
-                message: "Düello bileti kesildi (-5 BPL). Davet iletiliyor...", 
-                newBalance: sender.bpl 
-            });
-
-            // Herkese duyur (veya sadece hedefe io.to(targetSocketId) ile gönderilebilir)
-            // Şimdilik basitlik adına tüm globale yayınlıyoruz, client kendi kontrol edecek
-            io.emit('challenge-received', { 
-                from: socket.nickname, 
-                target: data.target,
-                ticket: Math.random().toString(36).substring(7) 
-            });
-        }
-    } catch (e) { console.log(e); }
-});
-
-
-
-
-
-
-// Davet Gönderme Mantığı
-socket.on('send-invite', async (data) => {
-    const { to, type, cost } = data;
-    const senderNick = socket.handshake.session.nickname; // Davet edenin nicki
-    
-    // 1. Veritabanından bakiyeyi düş
-    const user = await User.findOne({ nickname: senderNick });
-    if (user.bpl < cost) {
-        return socket.emit('update-bpl-error', 'Yetersiz bakiye!');
-    }
-    
-    user.bpl -= cost;
-    await user.save();
-
-    // 2. Yeni bakiyeyi davet edene bildir
-    socket.emit('update-bpl', user.bpl);
-
-    // 3. Hedef kullanıcıya daveti gönder
-    // Oda ismi: Davet edenin nicki (Benzersiz olması için sonuna 'Room' ekleyebiliriz)
-    const targetRoomId = `${senderNick}_Room`;
-
-    socket.to(to).emit('receive-invite', {
-        from: senderNick,
-        type: type,
-        roomId: targetRoomId
-    });
-
-    // 4. Davet edeni kendi açtığı odaya hemen yönlendir
-    const redirectUrl = type === 'arena' ? `/arena?room=${targetRoomId}` : `/meeting?room=${targetRoomId}`;
-    socket.emit('redirect-to-room', redirectUrl);
-});
-
-
-
-
-
-
-
-    
-socket.on('invite-meeting', async (data) => {
-    try {
-        const sender = await User.findById(socket.userId);
-        if (sender && sender.bpl >= 10) { // Toplantı daveti 10 BPL olsun
-            sender.bpl -= 10;
-            await sender.save();
-
-            socket.emit('gift-result', { 
-                success: true, 
-                message: "Toplantı daveti gönderildi (-10 BPL).", 
-                newBalance: sender.bpl 
-            });
-
-            io.emit('meeting-request', { 
-                from: socket.nickname, 
-                target: data.target, 
-                roomId: "GENEL_KONSEY" 
-            });
-        }
-    } catch (e) { console.log(e); }
-});
-
-
-
-
 });
 
 // --- 6. BAŞLAT ---
@@ -414,6 +335,7 @@ const PORT = process.env.PORT || 3000;
 httpServer.listen(PORT, () => {
     console.log(`🌍 Sunucu Yayında: http://localhost:${PORT}`);
 });
+
 
 
 
