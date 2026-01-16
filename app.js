@@ -38,7 +38,17 @@ app.use(session({
     secret: process.env.SESSION_SECRET || 'bpl_super_secret_2026',
     resave: false,
     saveUninitialized: false,
-    store: MongoStore.create({ mongoUrl: process.env.MONGO_URI }),
+   // --- SESSION YÖNETİMİ ---
+app.use(session({
+    secret: process.env.SESSION_SECRET || 'bpl_super_secret_2026',
+    resave: false,
+    saveUninitialized: false,
+    store: MongoStore.create({ 
+        mongoUrl: process.env.MONGO_URI,
+        ttl: 14 * 24 * 60 * 60 // Oturum süresi (isteğe bağlı)
+    }),
+    cookie: { maxAge: 1000 * 60 * 60 * 24 } 
+}));
     cookie: { maxAge: 1000 * 60 * 60 * 24 } // 24 Saat
 }));
 
@@ -168,3 +178,4 @@ io.on('connection', (socket) => {
 server.listen(PORT, () => {
     console.log(`🚀 BPL Sistemi Aktif: http://localhost:${PORT}`);
 });
+
