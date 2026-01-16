@@ -1,121 +1,22 @@
-<!DOCTYPE html>
-<html lang="tr">
-<head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
-    <title>BPL | STRATEJİK KOMUTA MERKEZİ</title>
-    
-    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
-    <link href="https://fonts.googleapis.com/css2?family=Orbitron:wght@400;700&family=Rajdhani:wght@500;700&display=swap" rel="stylesheet">
-    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
-    
-    <script src="/socket.io/socket.io.js"></script>
-    <script src="https://unpkg.com/peerjs@1.5.2/dist/peerjs.min.js"></script>
-    <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
-
-    <style>
-        :root { --neon: #00ffcc; --neon-red: #ff004c; --bg: #050a0f; --card: #0d161f; }
-        
-        body { 
-            background: var(--bg); color: white; font-family: 'Rajdhani', sans-serif; 
-            margin: 0; display: flex; flex-direction: column; height: 100dvh; overflow: hidden;
-            padding: env(safe-area-inset-top) 0 env(safe-area-inset-bottom) 0;
-        }
-
-        /* Video Grid - Dinamik Düzen */
-        #video-grid { 
-            flex: 1; display: grid; grid-template-columns: repeat(auto-fit, minmax(280px, 1fr)); 
-            gap: 10px; padding: 10px; overflow-y: auto; background: radial-gradient(circle at center, #102030 0%, #050a0f 100%);
-        }
-
-        .video-container { 
-            position: relative; background: #000; border: 1px solid rgba(0,255,204,0.3); 
-            border-radius: 15px; overflow: hidden; aspect-ratio: 16/9; box-shadow: 0 0 15px rgba(0,0,0,0.5);
-        }
-
-        video { width: 100%; height: 100%; object-fit: cover; transform: scaleX(-1); }
-
-        .user-overlay {
-            position: absolute; top: 0; left: 0; right: 0; bottom: 0;
-            display: flex; flex-direction: column; justify-content: space-between; padding: 10px;
-            background: linear-gradient(0deg, rgba(0,0,0,0.7) 0%, transparent 40%);
-            pointer-events: none;
-        }
-
-        .user-label { 
-            align-self: flex-start; background: rgba(0,255,204,0.2); backdrop-filter: blur(5px);
-            padding: 4px 12px; border-radius: 20px; font-family: 'Orbitron'; font-size: 10px;
-            border: 1px solid var(--neon); color: var(--neon);
-        }
-
-        /* Operasyon Paneli (Sağ/Alt) */
-        .op-panel { 
-            width: 100%; background: var(--card); border-top: 2px solid var(--neon); 
-            padding: 10px; display: flex; gap: 10px; align-items: center;
-        }
-
-        .action-btn {
-            background: rgba(255,255,255,0.05); border: 1px solid var(--neon); color: var(--neon);
-            border-radius: 10px; padding: 10px; font-size: 18px; transition: 0.3s;
-        }
-
-        .action-btn:hover { background: var(--neon); color: #000; }
-        .btn-kick { color: var(--neon-red); border-color: var(--neon-red); }
-
-        /* Mobil Düzenleme */
-        @media (max-width: 768px) {
-            #video-grid { grid-template-columns: 1fr; }
-            .op-panel { flex-wrap: wrap; justify-content: center; }
-        }
-    </style>
-</head>
-<body>
-
-    <div class="p-2 d-flex justify-content-between align-items-center bg-black">
-        <div style="font-family: 'Orbitron'; color: var(--neon); font-size: 14px;">
-            <i class="fas fa-shield-halved me-2"></i>ROOM: <span id="room-name">...</span>
-        </div>
-        <div class="text-warning">
-            <i class="fas fa-coins me-1"></i><span id="bpl-display"><%= user.bpl %></span> BPL
-        </div>
-    </div>
-
-    <div id="video-grid">
-        </div>
-
-    <div class="op-panel">
-        <button class="action-btn" onclick="toggleAudio()" id="mic-btn"><i class="fas fa-microphone"></i></button>
-        <button class="action-btn" onclick="toggleVideo()" id="cam-btn"><i class="fas fa-video"></i></button>
-        
-        <input type="text" id="chat-input" class="form-control bg-dark text-white border-secondary" placeholder="Tüm birliğe mesaj gönder...">
-        
-        <button class="action-btn" onclick="openWarMenu()"><i class="fas fa-bolt text-warning"></i> ARENA</button>
-        <button class="action-btn" onclick="openGiftMenu()"><i class="fas fa-gift text-info"></i></button>
-        
-        <button class="action-btn btn-kick" onclick="leaveRoom()"><i class="fas fa-door-open"></i></button>
-    </div>
-
 <script>
     const socket = io();
     const videoGrid = document.getElementById('video-grid');
     const myNick = "<%= user.nickname %>";
-    const myRole = new URLSearchParams(window.location.search).get('role') || 'guest';
-    const ROOM_ID = new URLSearchParams(window.location.search).get('room') || 'global';
     
-    document.getElementById('room-name').innerText = ROOM_ID;
-
+    // PeerJS Yapılandırması - Render/HTTPS uyumlu
     const myPeer = new Peer(undefined, {
-        host: '/', port: '443', secure: true, path: '/peerjs' 
+        secure: true,
+        host: '0.peerjs.com', // Kendi server'ın yoksa public server en sağlıklısıdır
+        port: 443
     });
 
     let myStream;
     const peers = {};
 
-    // 1. Kamera ve Mikrofon Başlatma
     async function init() {
         try {
             myStream = await navigator.mediaDevices.getUserMedia({ video: true, audio: true });
-            addVideoStream(document.createElement('video'), myStream, `SİZ: ${myNick}`, socket.id, true);
+            addVideoStream(document.createElement('video'), myStream, `SİZ: ${myNick}`, 'me', true);
 
             myPeer.on('call', call => {
                 call.answer(myStream);
@@ -126,99 +27,39 @@
             });
 
             socket.on('user-connected', data => {
+                // Yeni kullanıcı bağlandığında 1sn bekle (PeerJS el sıkışması için)
                 setTimeout(() => connectToNewUser(data.peerId, myStream, data.nickname), 1000);
             });
 
             myPeer.on('open', id => {
-                socket.emit('join-meeting', { roomId: ROOM_ID, peerId: id, nickname: myNick });
+                socket.emit('join-meeting', { 
+                    roomId: new URLSearchParams(window.location.search).get('room') || 'global', 
+                    peerId: id, 
+                    nickname: myNick 
+                });
             });
-
         } catch (err) {
-            Swal.fire("Hata", "Kamera ve Mikrofon izni gereklidir!", "error");
+            Swal.fire("ERİŞİM REDDİ", "Kamera ve mikrofon izni olmadan odaya giremezsiniz.", "error")
+                .then(() => location.href = '/chat');
         }
     }
 
-    function connectToNewUser(peerId, stream, nickname) {
-        const call = myPeer.call(peerId, stream);
-        const video = document.createElement('video');
-        call.on('stream', userVideoStream => {
-            addVideoStream(video, userVideoStream, nickname, peerId);
-        });
-        peers[peerId] = call;
+    // Görüntü ve Ses Kapatma Fonksiyonları
+    function toggleAudio() {
+        const enabled = myStream.getAudioTracks()[0].enabled;
+        myStream.getAudioTracks()[0].enabled = !enabled;
+        document.getElementById('mic-btn').classList.toggle('btn-kick');
     }
 
-    function addVideoStream(video, stream, label, peerId, isMe = false) {
-        const container = document.createElement('div');
-        container.className = 'video-container';
-        container.id = `cont-${peerId}`;
-        
-        video.srcObject = stream;
-        video.addEventListener('loadedmetadata', () => video.play());
-
-        // Host Yetkileri (Eğer ben host isem ve video başkasına aitse)
-        let hostControls = '';
-        if (myRole === 'host' && !isMe) {
-            hostControls = `<button class="btn btn-danger btn-sm position-absolute top-0 end-0 m-2" 
-                            style="z-index:10; font-size:10px;" onclick="kickUser('${peerId}')">AT</button>`;
-        }
-
-        container.innerHTML = `
-            ${hostControls}
-            <div class="user-overlay">
-                <div class="user-label">${label}</div>
-            </div>
-        `;
-        container.prepend(video);
-        videoGrid.append(container);
+    function toggleVideo() {
+        const enabled = myStream.getVideoTracks()[0].enabled;
+        myStream.getVideoTracks()[0].enabled = !enabled;
+        document.getElementById('cam-btn').classList.toggle('btn-kick');
     }
 
-    // 2. Arena Düellosu (Hızlı Eşleşme)
-    function openWarMenu() {
-        Swal.fire({
-            title: 'ARENA MEYDAN OKUMA',
-            text: 'Odadaki birine 20 saniyelik hızlı düello teklif et!',
-            input: 'select',
-            inputOptions: { /* Dinamik olarak odadaki kullanıcılar buraya yüklenebilir */ },
-            background: '#0d161f', color: '#fff',
-            confirmButtonText: 'SAVAŞA GİT'
-        }).then(res => {
-            if(res.isConfirmed) {
-                // Arena'ya git ve dönmek için back-url parametresi ekle
-                const backUrl = encodeURIComponent(window.location.href);
-                window.location.href = `/arena?room=duel_${myNick}&fast=true&back=${backUrl}`;
-            }
-        });
+    function leaveRoom() {
+        location.href = '/chat';
     }
-
-    // 3. Hediye Sistemi
-    function openGiftMenu() {
-        const myBpl = parseInt("<%= user.bpl %>");
-        if(myBpl < 5500) return Swal.fire("Yetersiz", "Hediye için en az 5500 BPL gerekir.", "warning");
-        
-        Swal.fire({
-            title: 'HEDİYE YAĞMURU',
-            text: 'Odadakilere moral dağıt (%30 kesinti uygulanır)',
-            input: 'number',
-            confirmButtonText: 'GÖNDER'
-        });
-    }
-
-    // Yetki: Odadan Atma
-    function kickUser(peerId) {
-        socket.emit('kick-from-room', { roomId: ROOM_ID, targetPeer: peerId });
-    }
-
-    socket.on('user-disconnected', peerId => {
-        if (peers[peerId]) peers[peerId].close();
-        const cont = document.getElementById(`cont-${peerId}`);
-        if(cont) cont.remove();
-    });
-
-    socket.on('you-are-kicked', () => {
-        window.location.href = '/chat?msg=Odadant Kovuldun';
-    });
 
     init();
 </script>
-</body>
-</html>
