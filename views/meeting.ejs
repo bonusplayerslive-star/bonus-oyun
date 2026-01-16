@@ -156,7 +156,28 @@
     const isHost = (role === 'host');
 
     document.getElementById('room-name').innerText = roomID.toUpperCase() + " SEKTÖRÜ";
+// meeting.ejs içindeki script kısmının en başı
 
+
+socket.on('connect', () => {
+    console.log("Soket hazır, şimdi kavuşma başlıyor...");
+    
+    // PeerJS ve odaya katılma işlemlerini BURADA tetikle
+    const myPeer = new Peer(undefined, {
+        host: '/',
+        port: '443'
+    });
+
+    myPeer.on('open', id => {
+        socket.emit('join-meeting', { roomId: ROOM_ID, peerId: id });
+    });
+
+    // Soket üzerinden gelen 'user-connected' dinleyicisi de burada olsun
+    socket.on('user-connected', data => {
+        console.log("Diğer komutan geldi: " + data.nickname);
+        connectToNewUser(data.peerId, stream);
+    });
+});
     let localStream;
     let peer = new Peer();
     let selectedTarget = null;
@@ -346,3 +367,4 @@
 </script>
 </body>
 </html>
+
