@@ -618,7 +618,6 @@ io.on('connection', async (socket) => {
 
     // --- ARENA SİSTEMİ (Önce Online, Yoksa Bot) ---
     socket.on('arena-join-queue', async () => {
-        // Zaten sıradaysa tekrar ekleme
         if (arenaQueue.find(p => p.socketId === socket.id)) return;
 
         arenaQueue.push({ 
@@ -629,12 +628,10 @@ io.on('connection', async (socket) => {
         });
 
         if (arenaQueue.length >= 2) {
-            // İki gerçek oyuncu eşleşti
             const p1 = arenaQueue.shift();
             const p2 = arenaQueue.shift();
             startBattle(p1, p2, io);
         } else {
-            // 5 saniye bekle, kimse gelmezse BOT ile başlat
             setTimeout(() => {
                 const idx = arenaQueue.findIndex(p => p.socketId === socket.id);
                 if (idx !== -1) {
@@ -651,77 +648,81 @@ io.on('connection', async (socket) => {
         }
     });
 
-   // app.js içindeki join-meeting kısmı
-socket.on('join-meeting', (data) => {
-    socket.join(data.roomId);
-    socket.peerId = data.peerId; 
+    // --- MEETING & ARENA GİRİŞ SİSTEMİ (Kavuşma Noktası) ---
+    socket.on('join-meeting', (data) => {
+        const { roomId, peerId } = data;
+        if (!roomId || !peerId) return;
 
-    // 1. Yeni geleni içerdekilere haber ver
-    socket.to(data.roomId).emit('user-connected', { 
-        peerId: data.peerId, 
-        nickname: socket.nickname 
+        socket.join(roomId);
+        socket.peerId = peerId; // Peer ID'yi sokete mühürle
+        socket.currentRoom = roomId;
+
+        console.log(`[LOG] ${socket.nickname} odaya girdi: ${roomId} | Peer: ${peerId}`);
+
+        // 1. Odadaki diğer kişilere "Yeni biri geldi" haberi uçur (Kamerayı açtırır)
+        socket.to(roomId).emit('user-connected', { 
+            peerId: peerId, 
+            nickname: socket.nickname 
+        });
+
+        // 2. KRİTİK: İçeride zaten biri varsa, misafire (yeni gelene) onu tanıt
+        const clients = io.sockets.adapter.rooms.get(roomId);
+        if (clients) {
+            clients.forEach(clientId => {
+                if (clientId !== socket.id) {
+                    const otherSocket = io.sockets.sockets.get(clientId);
+                    if (otherSocket && otherSocket.peerId) {
+                        // Yeni gelene, içeride bekleyen oda sahibini tanıtıyoruz
+                        socket.emit('user-connected', { 
+                            peerId: otherSocket.peerId, 
+                            nickname: otherSocket.nickname 
+                        });
+                    }
+                }
+            });
+        }
     });
 
-    // 2. KRİTİK: İçeride zaten biri varsa, yeni gelene onu tanıt
-    const room = io.sockets.adapter.rooms.get(data.roomId);
-    if (room) {
-        room.forEach(clientId => {
-            if (clientId !== socket.id) {
-                const other = io.sockets.sockets.get(clientId);
-                if (other && other.peerId) {
-                    socket.emit('user-connected', { 
-                        peerId: other.peerId, 
-                        nickname: other.nickname 
-                    });
-                }
-            }
-        });
-    }
-});
+    // --- ODA İÇİ MESAJLAŞMA (Eksik Olan Kısım Buydu) ---
+    socket.on('meeting-message', (data) => {
+        if (data.roomId && data.text) {
+            io.to(data.roomId).emit('new-meeting-message', {
+                sender: socket.nickname,
+                text: data.text
+            });
+        }
+    });
 
-    // Davet ve Mesajlaşma
+    // --- DAVET SİSTEMİ (Benzersiz Oda İsimlendirmesiyle) ---
     socket.on('send-bpl-invite', (data) => {
         const tSid = onlineUsers.get(data.target);
-        if (tSid) io.to(tSid).emit('receive-bpl-invite', { from: socket.nickname, type: data.type });
+        if (tSid) {
+            io.to(tSid).emit('receive-bpl-invite', { from: socket.nickname, type: data.type });
+        }
     });
 
     socket.on('accept-bpl-invite', (data) => {
         const hostSid = onlineUsers.get(data.from);
         if (hostSid) {
-            const roomId = data.from;
-            io.to(hostSid).emit('redirect-to-room', { type: data.type, roomId: roomId, role: 'host' });
-            socket.emit('redirect-to-room', { type: data.type, roomId: roomId, role: 'guest' });
+            // Çakışmayı önlemek için benzersiz oda ID'si oluştur
+            const uniqueRoomId = `room_${Date.now()}_${socket.nickname}`;
+            
+            // Oda sahibini yönlendir
+            io.to(hostSid).emit('redirect-to-room', { type: data.type, roomId: uniqueRoomId, role: 'host' });
+            // Katılanı (guest) yönlendir
+            socket.emit('redirect-to-room', { type: data.type, roomId: uniqueRoomId, role: 'guest' });
         }
     });
 
     socket.on('disconnect', () => {
         onlineUsers.delete(socket.nickname);
+        // Eğer bir odadaysa diğerlerine haber ver
+        if (socket.currentRoom && socket.peerId) {
+            socket.to(socket.currentRoom).emit('user-disconnected', socket.peerId);
+        }
         broadcastOnlineList();
     });
 });
-// --- API ROTALARI (BSC YÜKLEME VE MANUEL ÇEKİM) ---
-
-// 1. Ödeme Doğrulama (BscScan)
-app.post('/verify-payment', async (req, res) => {
-    try {
-        const { txid, bpl } = req.body;
-        const user = await User.findById(req.session.userId);
-        if (!user || user.usedHashes.includes(txid)) return res.json({ status: 'error', msg: 'Geçersiz işlem veya TxID kullanılmış.' });
-
-        const bscUrl = `https://api.bscscan.com/api?module=proxy&action=eth_getTransactionReceipt&txhash=${txid}&apikey=${process.env.BSCSCAN_API_KEY}`;
-        const response = await axios.get(bscUrl);
-        const receipt = response.data.result;
-
-        if (receipt && receipt.status === "0x1") {
-            user.bpl += parseInt(bpl);
-            user.usedHashes.push(txid);
-            await user.save();
-            return res.json({ status: 'success', msg: `${bpl} BPL yüklendi!` });
-        }
-        res.json({ status: 'error', msg: 'BscScan doğrulaması başarısız.' });
-    } catch (err) { res.json({ status: 'error', msg: 'Sistem hatası.' }); }
-});
-
 // 2. Manuel Çekim Talebi (Senin istediğin sistem)
 app.post('/api/withdraw-request', async (req, res) => {
     try {
@@ -753,6 +754,7 @@ app.post('/api/withdraw-request', async (req, res) => {
 
 const PORT = process.env.PORT || 3000;
 server.listen(PORT, () => console.log(`🚀 SİSTEM AKTİF: Port ${PORT}`));
+
 
 
 
