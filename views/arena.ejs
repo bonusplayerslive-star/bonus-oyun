@@ -8,183 +8,208 @@
     <link href="https://fonts.googleapis.com/css2?family=Orbitron:wght@400;700&display=swap" rel="stylesheet">
     <style>
         :root { --neon-green: #39FF14; --neon-red: #ff003c; --neon-blue: #00f3ff; }
+        
         body { 
             background: #000; color: #fff; font-family: 'Orbitron', sans-serif; 
             overflow: hidden; height: 100vh; width: 100vw; margin:0; 
         }
 
+        /* Video Sahnesi */
         #video-overlay {
             display: none; position: fixed; inset: 0; background: #000;
-            z-index: 9999; flex-direction: column; align-items: center; justify-content: center;
+            z-index: 9999; flex-direction: column; height: 100vh; width: 100vw;
         }
+
         .battle-container {
-            width: 100%; height: 100%; display: flex; flex-direction: column;
-            align-items: center; justify-content: center; position: relative;
+            flex: 1; width: 100%; position: relative; 
+            display: flex; align-items: center; justify-content: center;
+            background: #000; overflow: hidden;
         }
+
         video { 
-            width: 100%; height: 100vh; object-fit: cover; 
+            width: 100%; height: 100%; object-fit: cover; 
             border-top: 2px solid var(--neon-green); border-bottom: 2px solid var(--neon-green);
         }
 
         .hud-top {
-            position: absolute; top: 20px; width: 90%; display: flex;
-            justify-content: space-between; z-index: 100;
+            position: absolute; top: 15px; width: 90%; 
+            display: flex; justify-content: space-between; z-index: 100;
         }
-        .hud-card { text-align: center; background: rgba(0,0,0,0.6); padding: 10px; border-radius: 10px; border: 1px solid var(--neon-blue); width: 120px; }
-        .hud-card img { width: 60px; height: 60px; border-radius: 50%; border: 2px solid var(--neon-green); object-fit: cover; }
+        
+        .hud-card { 
+            text-align: center; background: rgba(0,0,0,0.7); 
+            padding: 8px; border-radius: 10px; border: 1px solid var(--neon-blue); 
+            width: 110px; font-size: 0.75rem;
+        }
+        
+        .hud-card img { width: 50px; height: 50px; border-radius: 50%; border: 2px solid var(--neon-green); object-fit: cover; }
 
-        .vs-box { font-size: 2rem; color: var(--neon-red); text-shadow: 0 0 10px var(--neon-red); font-weight: bold; align-self: center; }
+        .vs-box { font-size: 1.5rem; color: var(--neon-red); text-shadow: 0 0 10px var(--neon-red); align-self: center; font-weight: bold; }
 
         .win-message {
-            position: absolute; top: 40%; width: 100%; text-align: center;
-            font-size: 3.5rem; font-weight: 900; z-index: 101;
-            display: none; text-shadow: 0 0 30px #000;
+            position: absolute; width: 100%; text-align: center;
+            font-size: clamp(2.5rem, 12vw, 5rem); font-weight: 900; z-index: 101;
+            display: none; text-shadow: 0 0 20px #000, 0 0 10px #000;
         }
 
+        #battle-status {
+            height: 70px; display: flex; align-items: center; justify-content: center;
+            background: #000; font-size: 0.85rem; letter-spacing: 1px;
+            border-top: 1px solid #333; width: 100%; color: var(--neon-green);
+        }
+
+        /* Lobi Ekranı */
         .lobby-box { height: 100vh; display: flex; flex-direction: column; justify-content: center; align-items: center; padding: 20px; }
-        
-        .bet-grid {
-            display: grid; grid-template-columns: repeat(2, 1fr);
-            gap: 15px; width: 100%; max-width: 450px; margin-bottom: 20px;
-        }
-
-        .bet-item {
-            background: rgba(20, 20, 20, 0.8); border: 2px solid #333;
-            padding: 15px; border-radius: 12px; cursor: pointer; transition: 0.3s;
-        }
-
-        .bet-item.active {
-            border-color: var(--neon-green); background: rgba(57, 255, 20, 0.1);
-            box-shadow: 0 0 15px rgba(57, 255, 20, 0.2);
-        }
-
+        .bet-grid { display: grid; grid-template-columns: repeat(2, 1fr); gap: 15px; width: 100%; max-width: 400px; margin-bottom: 20px; }
+        .bet-item { background: rgba(20,20,20,0.8); border: 2px solid #333; padding: 15px; border-radius: 12px; cursor: pointer; text-align: center; }
+        .bet-item.active { border-color: var(--neon-green); background: rgba(57, 255, 20, 0.1); }
         #timer-box { font-size: 5rem; color: var(--neon-red); font-weight: bold; }
     </style>
 </head>
 <body>
 
     <div id="video-overlay">
-    <div class="hud-top">
-        <div class="hud-card">
-            <img src="/caracter/profile/<%= user.selectedAnimal %>.jpg">
-            <div class="small mt-1"><%= user.nickname %></div>
+        <div class="hud-top">
+            <div class="hud-card">
+                <img src="/caracter/profile/<%= user.selectedAnimal %>.jpg">
+                <div class="text-truncate mt-1"><%= user.nickname %></div>
+            </div>
+            <div class="vs-box">VS</div>
+            <div class="hud-card">
+                <img id="opp-img" src="/caracter/profile/Gorilla.jpg"> 
+                <div id="opp-name" class="text-truncate mt-1">RAKİP...</div>
+            </div>
         </div>
-        <div class="vs-box">VS</div>
-        <div class="hud-card">
-            <img id="opp-img" src="/caracter/profile/Gorilla.jpg"> 
-            <div id="opp-name" class="small mt-1">...</div>
+
+        <div class="battle-container">
+            <h1 id="win-text" class="win-message"></h1>
+            <video id="arena-video" playsinline muted></video>
+        </div>
+        
+        <div id="battle-status">SİSTEM HAZIRLANIYOR...</div>
+    </div>
+
+    <div class="lobby-box" id="lobby-ui">
+        <h2 class="mb-4" style="color:var(--neon-green)">BPL ARENA</h2>
+        
+        <div id="selection-area" class="w-100 d-flex flex-column align-items-center">
+            <div class="bet-grid">
+                <div class="bet-item active" onclick="selectBet(1, 25, this)">
+                    <h4>X1</h4><span class="small text-success">25 BPL</span>
+                </div>
+                <div class="bet-item" onclick="selectBet(2, 50, this)">
+                    <h4>X2</h4><span class="small text-info">50 BPL</span>
+                </div>
+                <div class="bet-item" onclick="selectBet(5, 125, this)">
+                    <h4>X5</h4><span class="small text-warning">125 BPL</span>
+                </div>
+                <div class="bet-item" onclick="selectBet(10, 250, this)">
+                    <h4>X10</h4><span class="small text-danger">250 BPL</span>
+                </div>
+            </div>
+            <button onclick="readyToFight()" class="btn btn-danger btn-lg w-100 py-3 fw-bold" style="max-width:400px;">SALDIRIYA BAŞLA</button>
+        </div>
+
+        <div id="matching-area" style="display:none;" class="text-center">
+            <div id="timer-box">13</div>
+            <p class="mt-3 text-info">RAKİP ARANIYOR...</p>
+            <div class="spinner-border text-danger"></div>
         </div>
     </div>
 
-    <div class="battle-container">
-        <h1 id="win-text" class="win-message"></h1>
-        <video id="arena-video" playsinline muted></video>
-    </div>
-    <div id="battle-status" class="p-3 text-uppercase text-center" style="color: var(--neon-green)">BAĞLANTI KURULUYOR...</div>
-</div>
+    <script src="/socket.io/socket.io.js"></script>
+    <script>
+        const socket = io();
+        const video = document.getElementById('arena-video');
+        const overlay = document.getElementById('video-overlay');
+        const winText = document.getElementById('win-text');
+        
+        let selectedMult = 1;
+        let selectedCost = 25;
+        const myNick = "<%= user.nickname %>";
+        const myAnimal = "<%= user.selectedAnimal %>";
 
-const socket = io();
-    const video = document.getElementById('arena-video');
-    const overlay = document.getElementById('video-overlay');
-    const winText = document.getElementById('win-text');
-    
-    let selectedMult = 1;
-    let selectedCost = 25;
-    const myNick = "<%= user.nickname %>";
-    const myAnimal = "<%= user.selectedAnimal %>";
-
-    function selectBet(mult, cost, el) {
-        selectedMult = mult;
-        selectedCost = cost;
-        document.querySelectorAll('.bet-item').forEach(i => i.classList.remove('active'));
-        el.classList.add('active');
-    }
-
-    function readyToFight() {
-        if(<%= user.bpl %> < selectedCost) {
-            alert("Yetersiz BPL!"); return;
+        function selectBet(mult, cost, el) {
+            selectedMult = mult;
+            selectedCost = cost;
+            document.querySelectorAll('.bet-item').forEach(i => i.classList.remove('active'));
+            el.classList.add('active');
         }
-        document.getElementById('selection-area').style.display = 'none';
-        document.getElementById('matching-area').style.display = 'block';
 
-        socket.emit('arena-ready', { 
-            mult: selectedMult, 
-            nick: myNick, 
-            animal: myAnimal 
-        });
-        startTimer();
-    }
+        function readyToFight() {
+            if(<%= user.bpl %> < selectedCost) {
+                alert("Yetersiz BPL!"); return;
+            }
+            document.getElementById('selection-area').style.display = 'none';
+            document.getElementById('matching-area').style.display = 'block';
 
-    function startTimer() {
-        let timeLeft = 13;
-        const timerObj = setInterval(() => {
-            timeLeft--;
-            document.getElementById('timer-box').innerText = timeLeft;
-            if(timeLeft <= 0) clearInterval(timerObj);
-        }, 1000);
-    }
-
-    // --- SAVAŞ AKIŞI ---
-    socket.on('match-started', async (data) => {
-        const opponent = data.players.find(p => p.nick !== myNick);
-        overlay.style.display = 'flex';
-        
-        // Rakip bilgilerini yaz (JPG olarak)
-        document.getElementById('opp-name').innerText = opponent.nick;
-        document.getElementById('opp-img').src = `/caracter/profile/${opponent.animal}.jpg`;
-
-        // 1. AŞAMA: Senin Saldırın
-        await playMove(myAnimal, "1", `${myNick.toUpperCase()} SALDIRIYOR!`);
-        
-        // 2. AŞAMA: Rakibin Saldırısı
-        await playMove(opponent.animal, "1", `${opponent.nick.toUpperCase()} SALDIRIYOR!`);
-        
-        // 3. AŞAMA: ZAFER FİNALİ
-        const winner = data.winner;
-        const amIWinner = (winner.nick === myNick);
-        await playFinal(winner.animal, amIWinner);
-    });
-
-    // VİDEO OYNATMA FONKSİYONU (TEK VE SAĞLAM)
-    function playMove(animal, suffix, statusText) {
-        return new Promise(res => {
-            document.getElementById('battle-status').innerText = statusText;
-            video.src = `/caracter/move/${animal}/${animal}${suffix}.mp4`;
-            
-            video.onended = () => {
-                video.onended = null;
-                res();
-            };
-
-            video.onerror = () => {
-                console.error("Video hatası:", video.src);
-                res(); // Hata olsa da akış bozulmasın, sonrakine geçsin
-            };
-
-            video.play().catch(e => {
-                console.log("Oynatma engellendi, manuel devam:", e);
-                res();
+            socket.emit('arena-ready', { 
+                mult: selectedMult, 
+                nick: myNick, 
+                animal: myAnimal 
             });
-        });
-    }
+            startTimer();
+        }
 
-    function playFinal(animal, amIWinner) {
-        return new Promise(res => {
-            document.getElementById('battle-status').innerText = "SAVAŞ SONUÇLANDI!";
-            video.src = `/caracter/move/${animal}/${animal}.mp4`;
+        function startTimer() {
+            let timeLeft = 13;
+            const timerObj = setInterval(() => {
+                timeLeft--;
+                document.getElementById('timer-box').innerText = timeLeft;
+                if(timeLeft <= 0) clearInterval(timerObj);
+            }, 1000);
+        }
+
+        // --- SAVAŞ MOTORU ---
+        socket.on('match-started', async (data) => {
+            const opponent = data.players.find(p => p.nick !== myNick);
+            overlay.style.display = 'flex';
             
-            video.onended = () => {
-                setTimeout(() => window.location.href = "/profil", 2000);
-                res();
-            };
+            // Rakip bilgilerini güncelle
+            document.getElementById('opp-name').innerText = opponent.nick;
+            document.getElementById('opp-img').src = `/caracter/profile/${opponent.animal}.jpg`;
 
-            video.play().catch(e => res());
-
-            // Yazıyı video oynarken göster
-            setTimeout(() => {
-                winText.innerText = amIWinner ? "ZAFER SENİN!" : "BOZGUNA UĞRADIN!";
-                winText.style.color = amIWinner ? "var(--neon-green)" : "var(--neon-red)";
-                winText.style.display = "block";
-            }, 2000);
+            // 1. Hamle: Senin Saldırın
+            await playMove(myAnimal, "1", `${myNick.toUpperCase()} SALDIRIYOR!`);
+            
+            // 2. Hamle: Rakibin Saldırısı
+            await playMove(opponent.animal, "1", `${opponent.nick.toUpperCase()} SALDIRIYOR!`);
+            
+            // 3. Final: Zafer Videosu
+            const winner = data.winner;
+            const amIWinner = (winner.nick === myNick);
+            await playFinal(winner.animal, amIWinner);
         });
-    }
+
+        function playMove(animal, suffix, statusText) {
+            return new Promise(res => {
+                document.getElementById('battle-status').innerText = statusText;
+                video.src = `/caracter/move/${animal}/${animal}${suffix}.mp4`;
+                video.onended = () => { video.onended = null; res(); };
+                video.onerror = () => { console.error("Video Hatası"); res(); };
+                video.play().catch(e => res());
+            });
+        }
+
+        function playFinal(animal, amIWinner) {
+            return new Promise(res => {
+                document.getElementById('battle-status').innerText = "SAVAŞ SONUÇLANDI!";
+                video.src = `/caracter/move/${animal}/${animal}.mp4`;
+                
+                // Kazanan yazısını video başladıktan 2 saniye sonra göster
+                setTimeout(() => {
+                    winText.innerText = amIWinner ? "ZAFER SENİN!" : "BOZGUNA UĞRADIN!";
+                    winText.style.color = amIWinner ? "var(--neon-green)" : "var(--neon-red)";
+                    winText.style.display = "block";
+                }, 2000);
+
+                video.onended = () => {
+                    setTimeout(() => window.location.href = "/profil", 2000);
+                    res();
+                };
+                video.play().catch(e => res());
+            });
+        }
+    </script>
+</body>
+</html>
