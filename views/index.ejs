@@ -3,23 +3,22 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>BPL EKOSİSTEM | Ultimate Edition</title>
+    <title>BPL EKOSİSTEM | Ultimate</title>
     <link rel="stylesheet" href="/css/style.css">
-    <script src="https://cdn.socket.io/4.7.2/socket.io.min.js"></script>
-    <link href="https://fonts.googleapis.com/css2?family=Orbitron:wght@400;700&family=Roboto:wght@300;500&display=swap" rel="stylesheet">
+    <link href="https://fonts.googleapis.com/css2?family=Orbitron:wght@400;700&display=swap" rel="stylesheet">
     <style>
         :root { --neon-blue: #00f2ff; --neon-purple: #bc13fe; --dark-bg: #0a0b10; }
-        body { font-family: 'Roboto', sans-serif; background: var(--dark-bg); color: white; margin: 0; overflow-x: hidden; }
-        .hero-section { height: 100vh; display: flex; flex-direction: column; align-items: center; justify-content: center; background: radial-gradient(circle, #1a1b26 0%, #0a0b10 100%); }
-        .main-title { font-family: 'Orbitron', sans-serif; font-size: 3.5rem; text-transform: uppercase; letter-spacing: 5px; color: var(--neon-blue); text-shadow: 0 0 20px var(--neon-blue); margin-bottom: 20px; }
-        .auth-container { background: rgba(255, 255, 255, 0.05); padding: 40px; border-radius: 15px; border: 1px solid var(--neon-purple); box-shadow: 0 0 30px rgba(188, 19, 254, 0.2); width: 350px; text-align: center; }
-        .input-group { margin-bottom: 20px; text-align: left; }
-        .input-group label { display: block; margin-bottom: 8px; color: var(--neon-blue); font-size: 0.9rem; }
-        .input-group input { width: 100%; padding: 12px; border-radius: 5px; border: none; background: rgba(0, 0, 0, 0.5); color: white; border-bottom: 2px solid var(--neon-purple); }
-        .btn-glow { width: 100%; padding: 15px; border: none; border-radius: 5px; background: var(--neon-purple); color: white; font-weight: bold; cursor: pointer; transition: 0.3s; text-transform: uppercase; }
-        .btn-glow:hover { background: var(--neon-blue); box-shadow: 0 0 20px var(--neon-blue); color: #000; }
+        body { font-family: 'Roboto', sans-serif; background: var(--dark-bg); color: white; margin: 0; }
+        .hero-section { height: 100vh; display: flex; flex-direction: column; align-items: center; justify-content: center; }
+        .main-title { font-family: 'Orbitron', sans-serif; font-size: 3rem; color: var(--neon-blue); text-shadow: 0 0 15px var(--neon-blue); margin-bottom: 30px; }
+        .auth-container { background: rgba(255, 255, 255, 0.05); padding: 30px; border-radius: 15px; border: 1px solid var(--neon-purple); width: 320px; text-align: center; }
+        .error-msg { color: #ff4d4d; font-size: 0.85rem; margin-bottom: 15px; display: none; }
+        .input-group { margin-bottom: 15px; text-align: left; }
+        .input-group label { display: block; margin-bottom: 5px; color: var(--neon-blue); }
+        .input-group input { width: 100%; padding: 10px; border-radius: 5px; border: none; background: #1a1b26; color: white; border-bottom: 2px solid var(--neon-purple); box-sizing: border-box; }
+        .btn-glow { width: 100%; padding: 12px; border: none; border-radius: 5px; background: var(--neon-purple); color: white; font-weight: bold; cursor: pointer; transition: 0.3s; }
+        .btn-glow:hover { box-shadow: 0 0 15px var(--neon-purple); opacity: 0.9; }
         .switch-link { margin-top: 15px; font-size: 0.8rem; color: #888; cursor: pointer; display: block; }
-        .error-msg { color: #ff4d4d; margin-bottom: 15px; font-size: 0.9rem; display: none; }
     </style>
 </head>
 <body>
@@ -28,7 +27,7 @@
         <h1 class="main-title">BPL ECOSYSTEM</h1>
         
         <div class="auth-container" id="loginBox">
-            <h2 style="margin-bottom: 25px;">Giriş Yap</h2>
+            <h2 style="margin-bottom: 20px;">Giriş Yap</h2>
             <div id="loginError" class="error-msg">Hatalı Nickname veya Şifre!</div>
             <form action="/login" method="POST">
                 <div class="input-group">
@@ -45,7 +44,7 @@
         </div>
 
         <div class="auth-container" id="registerBox" style="display: none;">
-            <h2 style="margin-bottom: 25px;">Kayıt Ol</h2>
+            <h2 style="margin-bottom: 20px;">Kayıt Ol</h2>
             <form action="/register" method="POST">
                 <div class="input-group">
                     <label>Nickname</label>
@@ -74,9 +73,8 @@
             }
         }
 
-        // Render'dan dönen hata mesajlarını yakalamak için (Eğer URL'de error varsa)
-        const urlParams = new URLSearchParams(window.location.search);
-        if (urlParams.has('error')) {
+        // URL'de hata varsa mesajı göster
+        if (window.location.search.includes('error')) {
             document.getElementById('loginError').style.display = 'block';
         }
     </script>
