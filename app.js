@@ -72,36 +72,45 @@ app.get('/', (req, res) => {
     res.render('index');
 });
 
+// --- 2. AUTH ROTLARI (NICKNAME ODAKLI) ---
+
+// Kayıt İşlemi
 app.post('/register', async (req, res) => {
-    const { nickname, email, password } = req.body;
     try {
-        const existing = await User.findOne({ $or: [{ email: email.toLowerCase() }, { nickname: nickname.trim() }] });
-        if (existing) return res.status(400).send("Bu bilgiler kullanımda.");
+        const { nickname, password } = req.body;
+        // Kullanıcı var mı kontrol et
+        const existingUser = await User.findOne({ nickname });
+        if (existingUser) return res.redirect('/?error=exists');
+
         const hashedPassword = await bcrypt.hash(password, 10);
-        const newUser = new User({
-            nickname: nickname.trim(),
-            email: email.toLowerCase().trim(),
+        const newUser = new User({ 
+            nickname, 
             password: hashedPassword,
-            bpl: 2500,
-            inventory: [],
-            selectedAnimal: "none"
+            balance: 0 
         });
-        const savedUser = await newUser.save();
-        req.session.userId = savedUser._id;
-        res.redirect('/profil');
-    } catch (err) { res.status(500).send("Kayıt hatası."); }
+        await newUser.save();
+        res.redirect('/');
+    } catch (err) {
+        console.error(err);
+        res.redirect('/?error=server');
+    }
 });
 
+// Giriş İşlemi
 app.post('/login', async (req, res) => {
-    const { email, password } = req.body;
     try {
-        const user = await User.findOne({ email: email.toLowerCase().trim() });
+        const { nickname, password } = req.body;
+        const user = await User.findOne({ nickname });
+        
         if (user && await bcrypt.compare(password, user.password)) {
             req.session.userId = user._id;
-            return res.redirect('/profil');
+            req.session.nickname = user.nickname;
+            return res.redirect('/dashboard'); // Başarılıysa dashboard'a
         }
-        res.status(401).send("Hatalı giriş bilgileri.");
-    } catch (err) { res.status(500).send("Giriş hatası."); }
+        res.redirect('/?error=1');
+    } catch (err) {
+        res.redirect('/?error=1');
+    }
 });
 
 app.get('/profil', authRequired, (req, res) => res.render('profil'));
@@ -143,6 +152,7 @@ io.on('connection', async (socket) => {
 server.listen(PORT, () => {
     console.log(`🚀 BPL ULTIMATE AKTİF: Port ${PORT}`);
 });
+
 
 
 
