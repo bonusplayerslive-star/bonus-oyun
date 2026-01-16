@@ -2,7 +2,7 @@ require('dotenv').config();
 const express = require('express');
 const mongoose = require('mongoose');
 const session = require('express-session');
-const MongoStore = require('connect-mongo');
+const MongoStore = require('connect-mongo').default;
 const path = require('path');
 const http = require('http');
 const socketIo = require('socket.io');
@@ -178,4 +178,5 @@ io.on('connection', (socket) => {
 server.listen(PORT, () => {
     console.log(`🚀 BPL Sistemi Aktif: http://localhost:${PORT}`);
 });
+
 
