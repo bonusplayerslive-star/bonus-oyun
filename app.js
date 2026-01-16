@@ -596,7 +596,7 @@ async function startBattle(p1, p2, io, roomId = null) {
     } catch (err) { console.error("Savaş Hatası:", err); }
 }
 // --- 6. SOCKET.IO ---
-// --- BPL ULTIMATE: TEK VÜCUT SİSTEM (ARENA & MEETING FIX) ---
+// --- BPL MEETING FIX: ÇİFT YÖNLÜ EL SIKIŞMA ---
 io.on('connection', async (socket) => {
     const uId = socket.request.session?.userId;
     if (!uId) return;
@@ -608,59 +608,67 @@ io.on('connection', async (socket) => {
     onlineUsers.set(user.nickname, socket.id);
     socket.join("general-chat");
 
-    const broadcastOnlineList = () => {
-        const usersArray = Array.from(onlineUsers.keys()).map(nick => ({ nickname: nick }));
-        io.to("general-chat").emit('update-user-list', usersArray);
-    };
-    broadcastOnlineList();
-
-    // 1. CHAT
-    socket.on('chat-message', (data) => {
-        if (!data.text) return;
-        io.to("general-chat").emit('new-chat-message', { sender: socket.nickname, text: data.text });
-    });
-
-    // 2. DAVET SİSTEMİ (Nickname Üzerinden Oda Kurma)
-    socket.on('send-bpl-invite', async (data) => {
-        const sender = await User.findById(socket.userId);
-        if (!sender || sender.bpl < 50) return socket.emit('error', 'Yetersiz BPL (Gerekli: 50)');
-        
+    // 1. DAVET SİSTEMİ
+    socket.on('send-bpl-invite', (data) => {
         const targetSid = onlineUsers.get(data.target);
         if (targetSid) {
-            io.to(targetSid).emit('receive-bpl-invite', { 
-                from: socket.nickname, 
-                type: data.type 
-            });
+            io.to(targetSid).emit('receive-bpl-invite', { from: socket.nickname, type: 'meeting' });
         }
     });
 
-    socket.on('accept-bpl-invite', async (data) => {
-        const hostNick = data.from; // Oda sahibi
+    socket.on('accept-bpl-invite', (data) => {
+        const hostNick = data.from;
         const hostSid = onlineUsers.get(hostNick);
-        if (!hostSid) return socket.emit('error', 'Davet sahibi odadan ayrıldı.');
+        if (!hostSid) return;
 
-        const hostUser = await User.findOne({ nickname: hostNick });
-        if (!hostUser || hostUser.bpl < 50) return socket.emit('error', 'Oda sahibinin parası yetersiz.');
-
-        // Ücreti peşin kes
-        hostUser.bpl -= 50;
-        await hostUser.save();
-
-        // ODA İSMİ DAVET EDENİN NİCKİ OLACAK (Hata payı sıfır)
         const roomId = hostNick; 
+        io.to(hostSid).emit('redirect-to-room', { type: 'meeting', roomId: roomId, role: 'host' });
+        socket.emit('redirect-to-room', { type: 'meeting', roomId: roomId, role: 'guest' });
+    });
 
-        // İkisini de aynı anda yönlendir
-        io.to(hostSid).emit('redirect-to-room', { 
-            type: data.type, 
-            roomId: roomId, 
-            role: 'host' 
+    // 2. MEETING İÇİ (KRİTİK GÜNCELLEME)
+    socket.on('join-meeting', (data) => {
+        const roomId = data.roomId;
+        socket.join(roomId);
+        socket.peerId = data.peerId; // PeerID'yi sokete kaydet
+
+        // A. Odaya yeni gireni içerdekilere tanıt
+        socket.to(roomId).emit('user-connected', { 
+            peerId: data.peerId, 
+            nickname: socket.nickname 
         });
-        socket.emit('redirect-to-room', { 
-            type: data.type, 
-            roomId: roomId, 
-            role: 'guest' 
+
+        // B. (GÜVENLİK ÖNLEMİ) İçeride zaten biri varsa, yeni gelene onun bilgisini gönder
+        // Bu sayede "önce giren-sonra giren" karmaşası biter
+        const roomClients = io.sockets.adapter.rooms.get(roomId);
+        if (roomClients && roomClients.size > 1) {
+            for (const clientId of roomClients) {
+                if (clientId !== socket.id) {
+                    const otherClient = io.sockets.sockets.get(clientId);
+                    if (otherClient && otherClient.peerId) {
+                        socket.emit('user-connected', { 
+                            peerId: otherClient.peerId, 
+                            nickname: otherClient.nickname 
+                        });
+                    }
+                }
+            }
+        }
+
+        socket.on('meeting-message', (msgData) => {
+            if (msgData.text) {
+                io.to(roomId).emit('new-meeting-message', { 
+                    sender: socket.nickname, 
+                    text: msgData.text 
+                });
+            }
         });
     });
+
+    socket.on('disconnect', () => {
+        onlineUsers.delete(socket.nickname);
+    });
+});
 
     // --- SADECE MEETING (KAMERA & SOHBET) FIX ---
 io.on('connection', async (socket) => {
@@ -885,6 +893,7 @@ app.post('/api/withdraw-request', async (req, res) => {
 
 const PORT = process.env.PORT || 3000;
 server.listen(PORT, () => console.log(`🚀 SİSTEM AKTİF: Port ${PORT}`));
+
 
 
 
