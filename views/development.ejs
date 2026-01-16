@@ -1,4 +1,3 @@
-// Path: views\development.ejs
 <%- include('header') %>
 
 <style>
@@ -67,7 +66,7 @@
         border-width: 2px;
     }
 
-    .btn-upgrade:hover {
+    .btn-upgrade:hover:not(:disabled) {
         box-shadow: 0 0 15px currentColor;
     }
 
@@ -107,7 +106,7 @@
         <div class="wallet-banner">
             <span class="text-white-50 small d-block mb-1">STRATEJİK KAYNAK (BPL)</span>
             <span class="text-warning fw-bold h3" id="balanceDisplay">
-                <i class="fas fa-coins me-2"></i><%= user.bpl %>
+                <i class="fas fa-coins me-2"></i><%= user.bpl.toLocaleString() %>
             </span>
         </div>
     </div>
@@ -120,27 +119,27 @@
                         <div class="level-badge">LVL <%= animal.level || 1 %></div>
                         
                         <div class="text-center mb-4 mt-3">
-                            <img src="/caracter/profile/<%= animal.name.toLowerCase() %>.jpg" 
-                                 onerror="this.src='/caracter/page/logo.jpeg'"
+                            <img src="/caracter/profile/<%= animal.name %>.jpg" 
+                                 onerror="this.src='/caracter/profile/<%= animal.name %>.png'; this.onerror=function(){this.src='/caracter/page/logo.jpeg'};"
                                  class="char-img mb-3" 
                                  alt="<%= animal.name %>">
                             <h3 class="text-white text-uppercase" style="font-family: 'Orbitron'; letter-spacing: 1px;"><%= animal.name %></h3>
                         </div>
 
-                        <div class="stat-box mb-4">
+                        <div class="stat-box mb-3">
                             <div class="d-flex justify-content-between stat-label">
                                 <span><i class="fas fa-heart text-danger me-1"></i> HP</span>
-                                <span class="text-white"><%= animal.hp %> / <%= animal.maxHp || 500 %></span>
+                                <span class="text-white"><%= animal.hp %> / <%= animal.maxHp || 100 %></span>
                             </div>
                             <div class="progress">
-                                <div class="progress-bar bg-danger" style="width: <%= (animal.hp / (animal.maxHp || 500)) * 100 %>%"></div>
+                                <div class="progress-bar bg-danger" style="width: <%= (animal.hp / (animal.maxHp || 100)) * 100 %>%"></div>
                             </div>
                             <button class="btn btn-outline-danger w-100 btn-upgrade" onclick="upgradeStat('<%= animal.name %>', 'hp')">
                                 HP GÜÇLENDİR <span class="float-end">15 BPL</span>
                             </button>
                         </div>
 
-                        <div class="stat-box mb-4">
+                        <div class="stat-box mb-3">
                             <div class="d-flex justify-content-between stat-label">
                                 <span><i class="fas fa-fist-raised text-warning me-1"></i> SALDIRI (ATK)</span>
                                 <span class="text-white"><%= animal.atk %> / 200</span>
@@ -153,7 +152,7 @@
                             </button>
                         </div>
 
-                        <div class="stat-box">
+                        <div class="stat-box mb-3">
                             <div class="d-flex justify-content-between stat-label">
                                 <span><i class="fas fa-shield-alt text-info me-1"></i> SAVUNMA (DEF)</span>
                                 <span class="text-white"><%= animal.def %> / 200</span>
@@ -164,6 +163,29 @@
                             <button class="btn btn-outline-info w-100 btn-upgrade" onclick="upgradeStat('<%= animal.name %>', 'def')">
                                 DEF GÜÇLENDİR <span class="float-end">10 BPL</span>
                             </button>
+                        </div>
+
+                        <div class="stat-box">
+                            <div class="d-flex justify-content-between stat-label">
+                                <span><i class="fas fa-bolt text-success me-1"></i> ENERJİ (STAMINA)</span>
+                                <span class="text-white"><%= animal.stamina || 0 %> / 100</span>
+                            </div>
+                            <div class="progress">
+                                <div class="progress-bar bg-success" style="width: <%= (animal.stamina || 0) %>%"></div>
+                            </div>
+                            <% if (animal.stamina < 100) { %>
+                                <button class="btn btn-outline-success w-100 btn-upgrade" onclick="upgradeStat('<%= animal.name %>', 'stamina')">
+                                    ENERJİ VER <span class="float-end">10 BPL</span>
+                                </button>
+                            <% } else { %>
+                                <button class="btn btn-secondary w-100 btn-upgrade" disabled>ENERJİ DOLU</button>
+                            <% } %>
+                            
+                            <% if (animal.stamina <= 0) { %>
+                                <small class="text-center d-block mt-2 text-warning" style="font-size: 0.7rem;">
+                                    <i class="fas fa-clock me-1"></i> Yenilenme Süresi: 2 Saat
+                                </small>
+                            <% } %>
                         </div>
                     </div>
                 </div>
@@ -185,24 +207,18 @@
 <script src="/socket.io/socket.io.js"></script>
 
 <script>
-    // Socket bağlantısı (Port 3000 üzerinden)
     const socket = io();
 
-    socket.on('connect', () => {
-        console.log("Geliştirme sunucusuna güvenli bağlantı sağlandı.");
-    });
-
-    /**
-     * İstatistik geliştirme fonksiyonu
-     * @param {string} animalName - Karakterin adı
-     * @param {string} statType - Geliştirilecek özellik (hp, atk, def)
-     */
     function upgradeStat(animalName, statType) {
-        const cost = (statType === 'def') ? 10 : 15;
+        // Ücretlendirme Mantığı
+        let cost = 15;
+        if (statType === 'def' || statType === 'stamina') cost = 10;
+
+        const actionText = statType === 'stamina' ? 'ENERJİ TAKVİYESİ' : statType.toUpperCase() + ' GÜÇLENDİRMESİ';
 
         Swal.fire({
-            title: 'GELİŞTİRME ONAYI',
-            text: `${animalName} birimi için ${statType.toUpperCase()} takviyesi yapılacak. Maliyet: ${cost} BPL`,
+            title: 'İŞLEM ONAYI',
+            text: `${animalName} için ${actionText} yapılacak. Maliyet: ${cost} BPL`,
             icon: 'warning',
             showCancelButton: true,
             confirmButtonColor: '#39FF14',
@@ -213,7 +229,6 @@
             color: '#fff'
         }).then((result) => {
             if (result.isConfirmed) {
-                // API isteği gönderiliyor
                 fetch('/api/upgrade-stat', {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
@@ -223,20 +238,19 @@
                 .then(data => {
                     if (data.success) {
                         Swal.fire({
-                            title: 'İŞLEM BAŞARILI',
-                            text: `Karakterin güçlendirildi! Yeni Bakiyen: ${data.newBalance} BPL`,
+                            title: 'BAŞARILI',
+                            text: data.message || 'İşlem tamamlandı!',
                             icon: 'success',
                             confirmButtonColor: '#39FF14'
                         }).then(() => {
-                            location.reload(); // Sayfayı yenileyerek yeni değerleri göster
+                            location.reload();
                         });
                     } else {
-                        Swal.fire('BAŞARISIZ', data.error || 'İşlem gerçekleştirilemedi.', 'error');
+                        Swal.fire('HATA', data.error || 'İşlem başarısız.', 'error');
                     }
                 })
                 .catch(err => {
-                    console.error("Fetch Hatası:", err);
-                    Swal.fire('BAĞLANTI HATASI', 'Sunucuya ulaşılamadı. Lütfen internetinizi kontrol edin.', 'error');
+                    Swal.fire('BAĞLANTI HATASI', 'Sunucuya ulaşılamadı.', 'error');
                 });
             }
         });
