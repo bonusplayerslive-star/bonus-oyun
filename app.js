@@ -16,7 +16,7 @@ const server = http.createServer(app);
 const io = socketIo(server);
 
 // --- GLOBAL DEĞİŞKENLER ---
-const onlineUsers = new Map();
+
 let arenaQueue = [];
 let chatHistory = [];
 const BOTS = ['Lion', 'Kurd', 'Peregrinefalcon', 'Rhino'];
@@ -131,7 +131,7 @@ app.get('/logout', (req, res) => {
 });
 
 // --- SOCKET LOGIC ---
-const onlineUsers = new Map();
+
 
 io.on('connection', (socket) => {
     socket.on('update-online-status', (data) => {
@@ -189,4 +189,5 @@ io.on('connection', (socket) => {
 server.listen(PORT, () => {
     console.log(`🚀 BPL Sistemi Aktif: http://localhost:${PORT}`);
 });
+
 
