@@ -595,6 +595,8 @@ async function startBattle(p1, p2, io, roomId = null) {
         }
     } catch (err) { console.error("Savaş Hatası:", err); }
 }
+
+
 // --- BPL ENTEGRE SOKET SİSTEMİ ---
 io.on('connection', async (socket) => {
     const uId = socket.request.session?.userId;
@@ -692,7 +694,6 @@ io.on('connection', async (socket) => {
         broadcastOnlineList();
     });
 });
-
 // --- API ROTALARI (BSC YÜKLEME VE MANUEL ÇEKİM) ---
 
 // 1. Ödeme Doğrulama (BscScan)
@@ -747,6 +748,7 @@ app.post('/api/withdraw-request', async (req, res) => {
 
 const PORT = process.env.PORT || 3000;
 server.listen(PORT, () => console.log(`🚀 SİSTEM AKTİF: Port ${PORT}`));
+
 
 
 
