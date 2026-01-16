@@ -338,6 +338,50 @@ socket.on('send-challenge', async (data) => {
     } catch (e) { console.log(e); }
 });
 
+
+
+
+
+
+// Davet Gönderme Mantığı
+socket.on('send-invite', async (data) => {
+    const { to, type, cost } = data;
+    const senderNick = socket.handshake.session.nickname; // Davet edenin nicki
+    
+    // 1. Veritabanından bakiyeyi düş
+    const user = await User.findOne({ nickname: senderNick });
+    if (user.bpl < cost) {
+        return socket.emit('update-bpl-error', 'Yetersiz bakiye!');
+    }
+    
+    user.bpl -= cost;
+    await user.save();
+
+    // 2. Yeni bakiyeyi davet edene bildir
+    socket.emit('update-bpl', user.bpl);
+
+    // 3. Hedef kullanıcıya daveti gönder
+    // Oda ismi: Davet edenin nicki (Benzersiz olması için sonuna 'Room' ekleyebiliriz)
+    const targetRoomId = `${senderNick}_Room`;
+
+    socket.to(to).emit('receive-invite', {
+        from: senderNick,
+        type: type,
+        roomId: targetRoomId
+    });
+
+    // 4. Davet edeni kendi açtığı odaya hemen yönlendir
+    const redirectUrl = type === 'arena' ? `/arena?room=${targetRoomId}` : `/meeting?room=${targetRoomId}`;
+    socket.emit('redirect-to-room', redirectUrl);
+});
+
+
+
+
+
+
+
+    
 socket.on('invite-meeting', async (data) => {
     try {
         const sender = await User.findById(socket.userId);
@@ -370,6 +414,7 @@ const PORT = process.env.PORT || 3000;
 httpServer.listen(PORT, () => {
     console.log(`🌍 Sunucu Yayında: http://localhost:${PORT}`);
 });
+
 
 
 
