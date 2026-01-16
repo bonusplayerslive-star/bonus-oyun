@@ -596,7 +596,7 @@ async function startBattle(p1, p2, io, roomId = null) {
     } catch (err) { console.error("Savaş Hatası:", err); }
 }
 // --- 6. SOCKET.IO ---
-// --- TÜM SİSTEMİ KURTARAN TEK VÜCUT SOCKET BLOĞU ---
+// --- BPL ULTIMATE: TEK VÜCUT SİSTEM (ARENA & MEETING FIX) ---
 io.on('connection', async (socket) => {
     const uId = socket.request.session?.userId;
     if (!uId) return;
@@ -614,87 +614,113 @@ io.on('connection', async (socket) => {
     };
     broadcastOnlineList();
 
-    // 1. CHAT SİSTEMİ (Tekli Gönderim)
+    // 1. CHAT
     socket.on('chat-message', (data) => {
         if (!data.text) return;
         io.to("general-chat").emit('new-chat-message', { sender: socket.nickname, text: data.text });
     });
 
-    // 2. DAVET VE ÜCRET SİSTEMİ (50 BPL)
+    // 2. DAVET SİSTEMİ (Nickname Üzerinden Oda Kurma)
     socket.on('send-bpl-invite', async (data) => {
         const sender = await User.findById(socket.userId);
-        if (sender.bpl < 50) return socket.emit('error', 'En az 50 BPL lazım.');
-        const tSid = onlineUsers.get(data.target);
-        if (tSid) io.to(tSid).emit('receive-bpl-invite', { from: socket.nickname, type: data.type });
-    });
-
-    socket.on('accept-bpl-invite', async (data) => {
-        const senderSid = onlineUsers.get(data.from);
-        const host = await User.findOne({ nickname: data.from });
-        if (!host || host.bpl < 50) return;
-
-        host.bpl -= 50; // Ücreti kes
-        await host.save();
-
-        const roomId = `room_${Date.now()}`;
-        io.to(senderSid).emit('redirect-to-room', { type: data.type, roomId: roomId, role: 'host' });
-        socket.emit('redirect-to-room', { type: data.type, roomId: roomId, role: 'guest' });
-    });
-
-    // 3. MEETING & KAMERA (Buluşma Garantili)
-    socket.on('join-meeting', (data) => {
-        socket.join(data.roomId);
-        socket.to(data.roomId).emit('user-connected', { peerId: data.peerId, nickname: socket.nickname });
-    });
-
-    socket.on('meeting-message', (data) => {
-        if (data.room) io.to(data.room).emit('new-meeting-message', { sender: socket.nickname, text: data.text });
-    });
-
-    // 4. ARENA VE KAZANMA MANTIĞI (13 Saniye Bot Kuralı)
-    socket.on('arena-join-queue', async (data) => {
-        const u = await User.findById(socket.userId);
-        if (!u || u.bpl < (data.bet || 0)) return socket.emit('error', 'Bakiye yetersiz!');
-
-        u.bpl -= (data.bet || 0);
-        await u.save();
-        socket.emit('update-bpl', u.bpl);
-
-        const player = { 
-            nickname: u.nickname, 
-            socketId: socket.id, 
-            animal: u.selectedAnimal || 'Lion', 
-            dbData: { atk: u.atk || 10, def: u.def || 10, hp: 100 }, 
-            bet: data.bet 
-        };
-
-        if (arenaQueue.length > 0) {
-            const opponent = arenaQueue.shift();
-            startBattle(player, opponent, io);
-        } else {
-            arenaQueue.push(player);
-            setTimeout(async () => {
-                const idx = arenaQueue.findIndex(p => p.socketId === socket.id);
-                if (idx !== -1) {
-                    arenaQueue.splice(idx, 1);
-                    const botAnimal = BOTS[Math.floor(Math.random() * BOTS.length)];
-                    const botPlayer = { 
-                        nickname: `BOT_${botAnimal}`, 
-                        socketId: 'bot', 
-                        animal: botAnimal, 
-                        dbData: { atk: 12, def: 8, hp: 100 }, 
-                        bet: data.bet 
-                    };
-                    startBattle(player, botPlayer, io);
-                }
-            }, 13000); // TAM 13 SANİYE BEKLER
+        if (!sender || sender.bpl < 50) return socket.emit('error', 'Yetersiz BPL (Gerekli: 50)');
+        
+        const targetSid = onlineUsers.get(data.target);
+        if (targetSid) {
+            io.to(targetSid).emit('receive-bpl-invite', { 
+                from: socket.nickname, 
+                type: data.type 
+            });
         }
     });
 
-    // 5. HEDİYELEŞME (5500 BPL KURALI)
+    socket.on('accept-bpl-invite', async (data) => {
+        const hostNick = data.from; // Oda sahibi
+        const hostSid = onlineUsers.get(hostNick);
+        if (!hostSid) return socket.emit('error', 'Davet sahibi odadan ayrıldı.');
+
+        const hostUser = await User.findOne({ nickname: hostNick });
+        if (!hostUser || hostUser.bpl < 50) return socket.emit('error', 'Oda sahibinin parası yetersiz.');
+
+        // Ücreti peşin kes
+        hostUser.bpl -= 50;
+        await hostUser.save();
+
+        // ODA İSMİ DAVET EDENİN NİCKİ OLACAK (Hata payı sıfır)
+        const roomId = hostNick; 
+
+        // İkisini de aynı anda yönlendir
+        io.to(hostSid).emit('redirect-to-room', { 
+            type: data.type, 
+            roomId: roomId, 
+            role: 'host' 
+        });
+        socket.emit('redirect-to-room', { 
+            type: data.type, 
+            roomId: roomId, 
+            role: 'guest' 
+        });
+    });
+
+    // 3. MEETING & KAMERA (Karşılıklı Görüşme)
+    socket.on('join-meeting', (data) => {
+        socket.join(data.roomId);
+        // Odadaki diğer herkese "ben geldim" de ve PeerID gönder
+        socket.to(data.roomId).emit('user-connected', { 
+            peerId: data.peerId, 
+            nickname: socket.nickname 
+        });
+        
+        // Meeting içi mesajlaşma
+        socket.on('meeting-message', (msgData) => {
+            if (msgData.text) {
+                io.to(data.roomId).emit('new-meeting-message', { 
+                    sender: socket.nickname, 
+                    text: msgData.text 
+                });
+            }
+        });
+    });
+
+    // 4. ARENA (Geri Sayımsız, Direkt Kapışma)
+    socket.on('arena-join-queue', async (data) => {
+        const u = await User.findById(socket.userId);
+        if (!u) return;
+
+        // Özel odadan (davetle) mi geldi?
+        if (data.roomId) {
+            socket.join(data.roomId);
+            const clients = io.sockets.adapter.rooms.get(data.roomId);
+            
+            if (clients && clients.size >= 2) {
+                // Odada iki kişi var, direkt savaşı başlat
+                const players = Array.from(clients).map(id => io.sockets.sockets.get(id));
+                const p1 = players[0];
+                const p2 = players[1];
+
+                const fighter1 = { nickname: p1.nickname, socketId: p1.id, animal: 'Lion', dbData: { atk: 15, def: 10, hp: 100 }, prize: 100 };
+                const fighter2 = { nickname: p2.nickname, socketId: p2.id, animal: 'Wolf', dbData: { atk: 12, def: 12, hp: 100 }, prize: 100 };
+                
+                startBattle(fighter1, fighter2, io, data.roomId);
+            }
+        } else {
+            // Normal Sıra ve Bot Mantığı (Eski sistem çalışsın)
+            arenaQueue.push({ nickname: u.nickname, socketId: socket.id, animal: u.selectedAnimal, dbData: u });
+            setTimeout(() => {
+                const idx = arenaQueue.findIndex(p => p.socketId === socket.id);
+                if (idx !== -1) {
+                    const p = arenaQueue.splice(idx, 1)[0];
+                    const bot = { nickname: "BOT_Kurt", socketId: 'bot', animal: 'Kurd', dbData: { atk: 10, def: 10, hp: 100 } };
+                    startBattle(p, bot, io);
+                }
+            }, 5000); // Bot için bekleme süresini 5 saniyeye indirdim
+        }
+    });
+
+    // 5. HEDİYELEŞME (5500 KURALI)
     socket.on('send-gift-bpl', async (data) => {
         const sender = await User.findById(socket.userId);
-        if (sender.bpl < 5500) return socket.emit('error', 'Hediye göndermek için 5500 BPL üstü bakiye gerekir!');
+        if (!sender || sender.bpl < 5500) return socket.emit('error', 'Hediye sınırı 5500 BPL!');
         
         const receiver = await User.findOne({ nickname: data.to });
         if (receiver) {
@@ -710,7 +736,6 @@ io.on('connection', async (socket) => {
 
     socket.on('disconnect', () => {
         onlineUsers.delete(socket.nickname);
-        arenaQueue = arenaQueue.filter(p => p.socketId !== socket.id);
         broadcastOnlineList();
     });
 });
@@ -769,6 +794,7 @@ app.post('/api/withdraw-request', async (req, res) => {
 
 const PORT = process.env.PORT || 3000;
 server.listen(PORT, () => console.log(`🚀 SİSTEM AKTİF: Port ${PORT}`));
+
 
 
 
