@@ -34,13 +34,14 @@ app.use(express.json());
 app.use(helmet({ contentSecurityPolicy: false })); 
 app.use(mongoSanitize());
 
-// --- SESSION YÖNETİMİ ---
+// --- SESSION YÖNETİMİ (v6 Kesin Çözüm) ---
 app.use(session({
     secret: process.env.SESSION_SECRET || 'bpl_super_secret_2026',
     resave: false,
     saveUninitialized: false,
-    store: MongoStore.create({ 
+    store: new MongoStore({ 
         mongoUrl: process.env.MONGO_URI,
+        collectionName: 'sessions',
         ttl: 14 * 24 * 60 * 60
     }),
     cookie: { maxAge: 1000 * 60 * 60 * 24 } 
@@ -123,4 +124,5 @@ io.on('connection', (socket) => {
 server.listen(PORT, () => {
     console.log(`🚀 BPL Sistemi Aktif: http://localhost:${PORT}`);
 });
+
 
