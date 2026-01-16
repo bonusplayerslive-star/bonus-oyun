@@ -111,17 +111,6 @@ app.post('/api/buy-item', authRequired, async (req, res) => {
     }
 });
 
-// MEETING SOCKET MANTIĞI
-io.on('connection', (socket) => {
-    socket.on('join-meeting', ({ roomId, peerId, nickname }) => {
-        socket.join(roomId);
-        socket.to(roomId).emit('user-connected', { peerId, nickname });
-
-        socket.on('disconnect', () => {
-            socket.to(roomId).emit('user-disconnected', peerId);
-        });
-    });
-});
 
 
 
@@ -176,6 +165,22 @@ io.on('connection', async (socket) => {
     });
 });
 
+
+
+// MEETING SOCKET MANTIĞI
+io.on('connection', (socket) => {
+    socket.on('join-meeting', ({ roomId, peerId, nickname }) => {
+        socket.join(roomId);
+        socket.to(roomId).emit('user-connected', { peerId, nickname });
+
+        socket.on('disconnect', () => {
+            socket.to(roomId).emit('user-disconnected', peerId);
+        });
+    });
+});
+
+
 server.listen(PORT, () => console.log(`🚀 BPL ULTIMATE AKTİF: ${PORT}`));
+
 
 
