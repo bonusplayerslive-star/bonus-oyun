@@ -7,7 +7,8 @@ const app = express();
 
 // Modelleri Bağla
 const User = require('./models/User'); 
-const authController = require('./controllers/authController');
+// app.js içinde 12. satır civarı
+const authController = require('./views/authController'); // Yol ./views/ olmalı
 
 // Veritabanı Bağlantısı
 mongoose.connect(process.env.MONGO_URI)
@@ -36,3 +37,4 @@ const PORT = process.env.PORT || 3000;
 app.listen(PORT, () => {
     console.log(`✅ Sunucu ${PORT} portunda hazır.`);
 });
+
