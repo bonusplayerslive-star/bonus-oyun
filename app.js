@@ -1,100 +1,109 @@
+require('dotenv').config();
 const express = require('express');
 const mongoose = require('mongoose');
 const session = require('express-session');
 const MongoStore = require('connect-mongo');
-const http = require('http');
-const socketIo = require('socket.io');
 const path = require('path');
-const axios = require('axios');
+const helmet = require('helmet');
+const mongoSanitize = require('express-mongo-sanitize');
 
-const User = require('./models/User');
+// Uygulama Ayarları
+const app = express();
+const PORT = process.env.PORT || 3000;
 
-// --- 1. UYGULAMAYI BAŞLAT (SIRALAMA KRİTİK!) ---
-const app = express(); // ÖNCE BU SATIR ÇALIŞMALI
-const server = http.createServer(app);
-const io = socketIo(server);
+// Veritabanı Bağlantısı
+mongoose.connect(process.env.MONGO_URI)
+    .then(() => console.log('BPL Veritabanına Bağlanıldı'))
+    .catch(err => console.error('DB Bağlantı Hatası:', err));
 
-// --- 2. VERİTABANI VE SESSION ---
-const MONGO_URI = process.env.MONGO_URI;
+// View Engine Ayarı
+app.set('view engine', 'ejs');
+app.set('views', path.join(__dirname, 'views'));
 
-mongoose.connect(MONGO_URI)
-    .then(() => console.log('✅ Veritabanı Bağlandı'))
-    .catch(err => console.error('❌ DB Hatası:', err));
+// Middleware (Ara Yazılımlar)
+app.use(express.static(path.join(__dirname, 'public')));
+app.use(express.urlencoded({ extended: true }));
+app.use(express.json());
+app.use(helmet({ contentSecurityPolicy: false })); // CDN bağlantıları için CSP kapalı
+app.use(mongoSanitize());
 
-// Session yapılandırması - app tanımlandıktan SONRA olmalı
-const sessionMiddleware = session({
-    secret: process.env.SESSION_SECRET || 'bpl_ultimate_secret',
+// Oturum Yönetimi (Session)
+app.use(session({
+    secret: process.env.SESSION_SECRET || 'bpl_secret_key_2024',
     resave: false,
     saveUninitialized: false,
-    store: MongoStore.create({ 
-        mongoUrl: MONGO_URI,
-        collectionName: 'sessions'
-    }),
-    cookie: { secure: false, maxAge: 24 * 60 * 60 * 1000 }
-});
+    store: MongoStore.create({ mongoUrl: process.env.MONGO_URI }),
+    cookie: { maxAge: 1000 * 60 * 60 * 24 } // 24 Saat
+}));
 
-app.use(sessionMiddleware);
-app.use(express.json());
-app.use(express.urlencoded({ extended: true }));
-app.use(express.static(path.join(__dirname, 'public')));
-app.set('view engine', 'ejs');
+// --- AUTH MIDDLEWARE (Giriş Kontrolü) ---
+const isAuth = (req, res, next) => {
+    if (req.session.user) return next();
+    res.redirect('/');
+};
 
-// Socket.io Session Entegrasyonu
-io.use((socket, next) => {
-    sessionMiddleware(socket.request, {}, next);
-});
+// --- ROUTES (Sayfalar) ---
 
-// --- 3. SOKET MANTIĞI ---
-io.on('connection', async (socket) => {
-    const userId = socket.request.session?.userId;
-    if (!userId) return;
-
-    const user = await User.findById(userId);
-    if (!user) return;
-
-    socket.nickname = user.nickname;
-
-    socket.on('join-meeting', (data) => {
-        socket.join(data.roomId);
-        socket.peerId = data.peerId;
-        socket.currentRoom = data.roomId;
-        socket.to(data.roomId).emit('user-connected', { 
-            peerId: data.peerId, 
-            nickname: socket.nickname 
-        });
-    });
-
-    socket.on('meeting-message', (data) => {
-        io.to(data.roomId).emit('new-meeting-message', { 
-            sender: socket.nickname, 
-            text: data.text 
-        });
-    });
-
-    socket.on('disconnect', () => {
-        if (socket.currentRoom) {
-            socket.to(socket.currentRoom).emit('user-disconnected', socket.peerId);
-        }
-    });
-});
-
-// --- 4. ROTALAR ---
+// 1. İndex (Açılış / Login / Register)
 app.get('/', (req, res) => {
-    res.render('index'); // Ana sayfanın adını kontrol et
+    if (req.session.user) return res.redirect('/profil');
+    res.render('index'); // index.ejs dosyanızda login/register formu olduğu varsayıldı
 });
 
-app.get('/meeting', (req, res) => {
-    res.render('meeting', { 
-        roomId: req.query.room || 'global',
-        role: req.query.role || 'guest'
-    });
+// 2. Profil (Ana Üs)
+app.get('/profil', isAuth, (req, res) => {
+    // req.session.user verisini DB'den güncel çekmek her zaman daha güvenlidir
+    res.render('profil', { user: req.session.user });
 });
 
-app.get('/profil', async (req, res) => {
-    if (!req.session.userId) return res.redirect('/');
-    const user = await User.findById(req.session.userId);
-    res.render('profil', { user });
+// 3. Cüzdan (Wallet)
+app.get('/wallet', isAuth, (req, res) => {
+    res.render('wallet', { user: req.session.user });
 });
 
-const PORT = process.env.PORT || 3000;
-server.listen(PORT, () => console.log(`🚀 Sistem Aktif: ${PORT}`));
+// 4. Arena (Battle)
+app.get('/arena', isAuth, (req, res) => {
+    if (!req.session.user.selectedAnimal) {
+        // Eğer karakter seçilmediyse profile yönlendir
+        return res.redirect('/profil'); 
+    }
+    res.render('arena', { user: req.session.user });
+});
+
+// 5. Chat & Meeting
+app.get('/chat', isAuth, (req, res) => {
+    res.render('chat', { user: req.session.user });
+});
+
+app.get('/meeting', isAuth, (req, res) => {
+    res.render('meeting', { user: req.session.user });
+});
+
+// 6. Market & Development
+app.get('/market', isAuth, (req, res) => {
+    res.render('market', { user: req.session.user });
+});
+
+app.get('/development', isAuth, (req, res) => {
+    res.render('development', { user: req.session.user });
+});
+
+// --- API ROUTES (Örnek Giriş ve İşlemler) ---
+
+app.post('/api/login', async (req, res) => {
+    const { email, password } = req.body;
+    // Burada DB kontrolü ve bcrypt.compare yapılacak
+    // Başarılı ise:
+    // req.session.user = user;
+    // res.json({ success: true });
+});
+
+app.get('/logout', (req, res) => {
+    req.session.destroy();
+    res.redirect('/');
+});
+
+// Sunucuyu Başlat
+app.listen(PORT, () => {
+    console.log(`BPL Ana Sunucu aktif: http://localhost:${PORT}`);
+});
