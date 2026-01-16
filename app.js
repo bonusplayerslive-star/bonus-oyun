@@ -1,7 +1,7 @@
 const express = require('express');
 const mongoose = require('mongoose');
 const session = require('express-session');
-const MongoStore = require('connect-mongo'); // .default kullanma, aşağıda hallediyoruz
+const MongoStore = require('connect-mongo').default; // .default kullanma, aşağıda hallediyoruz
 const http = require('http');
 const socketIo = require('socket.io');
 const path = require('path');
@@ -85,3 +85,4 @@ app.get('/profil', async (req, res) => {
 // Port Dinleme
 const PORT = process.env.PORT || 3000;
 server.listen(PORT, () => console.log(`🚀 Sistem Aktif: ${PORT}`));
+
