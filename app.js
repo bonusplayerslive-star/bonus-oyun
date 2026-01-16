@@ -103,7 +103,20 @@ app.get('/logout', (req, res) => {
     res.redirect('/');
 });
 
+
+// Tüm sayfalarda çalışan ortak script
+const socket = io();
+socket.emit('update-online-status', { 
+    nickname: '<%= user.nickname %>', 
+    avatar: '<%= user.profileImage %>' 
+});
+
+
+
+
+
 // Sunucuyu Başlat
 app.listen(PORT, () => {
     console.log(`BPL Ana Sunucu aktif: http://localhost:${PORT}`);
 });
+
