@@ -420,7 +420,7 @@ io.on('connection', async (socket) => {
             winner: { nick: winner.nick, animal: winner.animal },
             prize: prize
         });
-    }
+    
 
     // BOT EŞLEŞTİRME
     async function createBotMatch(player) {
@@ -468,6 +468,7 @@ const PORT = process.env.PORT || 3000;
 httpServer.listen(PORT, () => {
     console.log(`🌍 Sunucu Yayında: http://localhost:${PORT}`);
 });
+
 
 
 
