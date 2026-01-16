@@ -13,17 +13,21 @@
             background: var(--bg); 
             color: white; 
             font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
-            overflow-x: hidden;
+            overflow: hidden; /* Taşmaları engellemek için */
+            height: 100vh;
+            display: flex;
+            flex-direction: column;
         }
 
-        /* Video Paneli - Esnek Izgara */
+        /* Video Paneli */
         #video-grid {
+            flex: 1;
             display: grid;
-            grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+            grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
             gap: 15px;
             padding: 15px;
-            max-width: 1400px;
-            margin: 0 auto;
+            overflow-y: auto;
+            align-content: start;
         }
 
         .video-container {
@@ -32,7 +36,7 @@
             border: 2px solid #1a2a3a;
             border-radius: 12px;
             overflow: hidden;
-            aspect-ratio: 4/3;
+            aspect-ratio: 16/9;
             box-shadow: 0 4px 15px rgba(0,0,0,0.5);
         }
 
@@ -50,16 +54,14 @@
             background: rgba(0,0,0,0.7);
             padding: 4px 10px;
             border-radius: 6px;
-            font-size: 13px;
+            font-size: 12px;
             border-left: 3px solid var(--neon);
             z-index: 10;
+            text-transform: uppercase;
         }
 
-        /* Sohbet ve Kontrol Paneli */
+        /* Alt UI Paneli */
         .ui-panel {
-            position: fixed;
-            bottom: 0;
-            width: 100%;
             background: rgba(13, 22, 31, 0.95);
             backdrop-filter: blur(10px);
             border-top: 1px solid #1a2a3a;
@@ -67,24 +69,21 @@
             display: flex;
             flex-direction: column;
             gap: 10px;
-            z-index: 100;
         }
 
         #chat-messages {
-            height: 100px;
+            height: 120px;
             overflow-y: auto;
             font-size: 14px;
-            margin-bottom: 5px;
-            padding-right: 5px;
+            background: rgba(0,0,0,0.2);
+            padding: 10px;
+            border-radius: 8px;
         }
 
-        .chat-row { margin-bottom: 4px; border-bottom: 1px solid #1a2a3a; padding-bottom: 2px; }
-        .chat-nick { color: var(--neon); font-weight: bold; }
+        .chat-row { margin-bottom: 6px; line-height: 1.4; border-bottom: 1px solid rgba(255,255,255,0.05); }
+        .chat-nick { color: var(--neon); font-weight: bold; margin-right: 5px; }
 
-        .controls {
-            display: flex;
-            gap: 10px;
-        }
+        .controls { display: flex; gap: 10px; }
 
         input {
             flex: 1;
@@ -100,19 +99,15 @@
             background: var(--neon);
             color: black;
             border: none;
-            padding: 12px 20px;
+            padding: 0 25px;
             border-radius: 8px;
             font-weight: bold;
             cursor: pointer;
-            transition: 0.3s;
         }
 
-        button:active { transform: scale(0.95); }
-
-        /* Mobil Uyumluluk Ayarı */
         @media (max-width: 600px) {
             #video-grid { grid-template-columns: 1fr; }
-            .ui-panel { padding-bottom: 30px; } /* iOS alt barı için */
+            .video-container { aspect-ratio: 4/3; }
         }
     </style>
 </head>
@@ -123,7 +118,7 @@
     <div class="ui-panel">
         <div id="chat-messages"></div>
         <div class="controls">
-            <input type="text" id="chat-input" placeholder="Mesaj gönder..." onkeypress="if(event.key==='Enter') sendMessage()">
+            <input type="text" id="chat-input" placeholder="Operasyon merkezine yaz..." onkeypress="if(event.key==='Enter') sendMessage()">
             <button onclick="sendMessage()">GÖNDER</button>
         </div>
     </div>
@@ -135,86 +130,117 @@
         const ROOM_ID = urlParams.get('room') || 'global';
         const peers = {};
 
+        // PeerJS Bağlantısı
         const myPeer = new Peer(undefined, {
             host: '/',
             port: '443',
-            secure: true
+            secure: true,
+            path: '/peerjs' // Peer server path'ini kontrol et
         });
 
-        async function startSystem() {
+        let myStream;
+
+        async function init() {
             try {
-                const stream = await navigator.mediaDevices.getUserMedia({ 
-                    video: { width: { ideal: 640 }, height: { ideal: 480 }, facingMode: "user" }, 
-                    audio: true 
+                myStream = await navigator.mediaDevices.getUserMedia({
+                    video: true,
+                    audio: true
                 });
+                
+                // 1. Kendi görüntünü ekle
+                addVideoStream(document.createElement('video'), myStream, "SİZ (KOMUTAN)");
 
-                // Kendi Videom
-                addVideoStream(document.createElement('video'), stream, "SİZ (KOMUTAN)");
-
-                // Aramaları Cevapla
+                // 2. Gelen aramaları karşıla
                 myPeer.on('call', call => {
-                    call.answer(stream);
+                    call.answer(myStream);
                     const video = document.createElement('video');
-                    call.on('stream', userStream => addVideoStream(video, userStream, "BİRLİK ÜYESİ"));
+                    call.on('stream', userVideoStream => {
+                        addVideoStream(video, userVideoStream, "BİRLİK ÜYESİ");
+                    });
                 });
 
-                // Yeni Kullanıcı Geldiğinde Ara
+                // 3. Yeni bir kullanıcı bağlandığında socket üzerinden haber al
                 socket.on('user-connected', data => {
-                    setTimeout(() => { // PeerJS el sıkışması için kısa gecikme
-                        const call = myPeer.call(data.peerId, stream);
-                        const video = document.createElement('video');
-                        call.on('stream', userStream => addVideoStream(video, userStream, data.nickname || "BİRLİK ÜYESİ"));
-                        peers[data.peerId] = call;
+                    // Kısa bir bekleme (PeerJS'in hazır olması için)
+                    setTimeout(() => {
+                        connectToNewUser(data.peerId, myStream, data.nickname);
                     }, 1000);
                 });
 
-                // Odaya Giriş Yap
+                // 4. Peer bağlandığında odaya gir
                 myPeer.on('open', id => {
                     socket.emit('join-meeting', { roomId: ROOM_ID, peerId: id });
                 });
 
             } catch (err) {
-                alert("Kamera veya Mikrofon erişimi reddedildi! Lütfen izin verin.");
+                console.error("Medya Erişim Hatası:", err);
+                alert("Kamera/Mikrofon erişimi sağlanamadı. Lütfen izinleri kontrol edin.");
             }
+        }
+
+        // Yeni kullanıcıya bağlanma fonksiyonu (Hataların çözümü burada)
+        function connectToNewUser(peerId, stream, nickname) {
+            const call = myPeer.call(peerId, stream);
+            const video = document.createElement('video');
+            
+            call.on('stream', userVideoStream => {
+                addVideoStream(video, userVideoStream, nickname || "BİRLİK ÜYESİ");
+            });
+
+            call.on('close', () => {
+                video.closest('.video-container').remove();
+            });
+
+            peers[peerId] = call;
         }
 
         function addVideoStream(video, stream, label) {
             video.srcObject = stream;
-            video.addEventListener('loadedmetadata', () => video.play());
-            
+            video.addEventListener('loadedmetadata', () => {
+                video.play();
+            });
+
             const container = document.createElement('div');
             container.className = 'video-container';
             const nameTag = document.createElement('div');
             nameTag.className = 'user-label';
             nameTag.innerText = label;
-            
-            container.append(video, nameTag);
+
+            container.append(video);
+            container.append(nameTag);
             videoGrid.append(container);
         }
 
+        // Chat Fonksiyonları
         function sendMessage() {
             const input = document.getElementById('chat-input');
-            if (input.value.trim()) {
-                socket.emit('meeting-message', { roomId: ROOM_ID, text: input.value });
+            const message = input.value.trim();
+            if (message) {
+                socket.emit('meeting-message', { roomId: ROOM_ID, text: message });
                 input.value = '';
             }
         }
 
         socket.on('new-meeting-message', data => {
-            const msgDiv = document.createElement('div');
-            msgDiv.className = 'chat-row';
-            msgDiv.innerHTML = `<span class="chat-nick">${data.sender}:</span> ${data.text}`;
-            const box = document.getElementById('chat-messages');
-            box.append(msgDiv);
-            box.scrollTop = box.scrollHeight;
+            const messages = document.getElementById('chat-messages');
+            const div = document.createElement('div');
+            div.className = 'chat-row';
+            div.innerHTML = `<span class="chat-nick">${data.sender}:</span> ${data.text}`;
+            messages.append(div);
+            messages.scrollTop = messages.scrollHeight;
         });
 
         socket.on('user-disconnected', peerId => {
-            if (peers[peerId]) peers[peerId].close();
-            window.location.reload(); // En güvenli temizlik yolu
+            if (peers[peerId]) {
+                peers[peerId].close();
+                delete peers[peerId];
+            }
+            // Sayfayı yenilemek yerine sadece o videoyu kaldırmak daha profesyoneldir
+            // Ancak Render/Peer stabilite sorunları için opsiyonel kalsın.
         });
 
-        startSystem();
+        // Başlat
+        init();
     </script>
 </body>
 </html>
