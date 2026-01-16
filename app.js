@@ -1,55 +1,74 @@
-require('dotenv').config();
+
 const express = require('express');
 const mongoose = require('mongoose');
 const session = require('express-session');
-const MongoStore = require('connect-mongo');
-const path = require('path');
+const MongoStore = require('connect-mongo').default; 
 const http = require('http');
 const socketIo = require('socket.io');
-const helmet = require('helmet');
-const mongoSanitize = require('express-mongo-sanitize');
-const bcrypt = require('bcrypt');
-const User = require('./models/User'); 
+const path = require('path');
+const bcrypt = require('bcryptjs');
+const axios = require('axios');
+
+const User = require('./models/User');
 
 const app = express();
 const server = http.createServer(app);
-const io = socketIo(server, {
-    cors: { origin: "*", methods: ["GET", "POST"] }
-});
+const io = socketIo(server);
 
-const PORT = process.env.PORT || 10000;
+// --- GLOBAL DEĞİŞKENLER ---
+const onlineUsers = new Map();
+let arenaQueue = [];
+let chatHistory = [];
+const BOTS = ['Lion', 'Kurd', 'Peregrinefalcon', 'Rhino'];
 
-// --- VERİTABANI BAĞLANTISI ---
-mongoose.connect(process.env.MONGO_URI)
-    .then(() => console.log('✅ BPL Veritabanı Aktif'))
-    .catch(err => console.error('❌ DB Hatası:', err));
+function addToHistory(sender, text) {
+    const msg = { sender, text, time: Date.now() };
+    chatHistory.push(msg);
+    if (chatHistory.length > 50) chatHistory.shift();
+}
 
-// --- GÜVENLİK VE AYARLAR ---
+// --- 1. VERİTABANI VE SESSION ---
+const MONGO_URI = process.env.MONGO_URI;
+const SESSION_SECRET = process.env.SESSION_SECRET || 'bpl_ultimate_megasecret_2024';
+
+mongoose.connect(MONGO_URI)
+    .then(() => console.log('✅ MongoDB Bağlantısı Başarılı'))
+    .catch(err => console.error('❌ MongoDB Hatası:', err));
+
 app.set('view engine', 'ejs');
-app.set('views', path.join(__dirname, 'views'));
 app.use(express.static(path.join(__dirname, 'public')));
-app.use(express.urlencoded({ extended: true }));
 app.use(express.json());
-app.use(helmet({ contentSecurityPolicy: false })); 
-app.use(mongoSanitize());
+app.use(express.urlencoded({ extended: true }));
 
-// --- SESSION YÖNETİMİ (DÜZELTİLDİ) ---
-app.use(session({
-    secret: process.env.SESSION_SECRET || 'bpl_super_secret_2026',
+const sessionMiddleware = session({
+    secret: SESSION_SECRET,
     resave: false,
     saveUninitialized: false,
-    store: MongoStore.create({ 
-        mongoUrl: process.env.MONGO_URI,
-        ttl: 14 * 24 * 60 * 60
-    }),
-    cookie: { maxAge: 1000 * 60 * 60 * 24 } 
-}));
+    store: MongoStore.create({ mongoUrl: MONGO_URI, ttl: 24 * 60 * 60 }),
+    cookie: { secure: false, maxAge: 24 * 60 * 60 * 1000 }
+});
+app.use(sessionMiddleware);
 
-const isAuth = (req, res, next) => {
-    if (req.session.user) return next();
+io.use((socket, next) => {
+    sessionMiddleware(socket.request, {}, next);
+});
+
+// --- 2. KULLANICI KONTROLÜ ---
+app.use(async (req, res, next) => {
+    res.locals.user = null;
+    if (req.session && req.session.userId) {
+        try {
+            const user = await User.findById(req.session.userId);
+            if (user) res.locals.user = user;
+        } catch (e) { console.error("Session Hatası:", e); }
+    }
+    next();
+});
+
+const authRequired = (req, res, next) => {
+    if (req.session && req.session.userId) return next();
     res.redirect('/');
 };
-
 // --- ROTALAR (ROUTES) ---
 app.get('/', (req, res) => {
     if (req.session.user) return res.redirect('/profil');
@@ -170,3 +189,4 @@ io.on('connection', (socket) => {
 server.listen(PORT, () => {
     console.log(`🚀 BPL Sistemi Aktif: http://localhost:${PORT}`);
 });
+
