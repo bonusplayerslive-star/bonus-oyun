@@ -2,14 +2,13 @@ require('dotenv').config();
 const express = require('express');
 const mongoose = require('mongoose');
 const session = require('express-session');
-const MongoStore = require('connect-mongo').default;
+const MongoStore = require('connect-mongo');
 const path = require('path');
 const http = require('http');
 const socketIo = require('socket.io');
 const helmet = require('helmet');
 const mongoSanitize = require('express-mongo-sanitize');
 const bcrypt = require('bcrypt');
-// Modeller (Yolun doğruluğundan emin ol)
 const User = require('./models/User'); 
 
 const app = express();
@@ -43,7 +42,6 @@ app.use(session({
     cookie: { maxAge: 1000 * 60 * 60 * 24 } // 24 Saat
 }));
 
-// Auth Kontrolü
 const isAuth = (req, res, next) => {
     if (req.session.user) return next();
     res.redirect('/');
@@ -75,127 +73,87 @@ app.get('/meeting', isAuth, async (req, res) => {
     res.render('meeting', { user, role: req.query.role || 'guest' });
 });
 
+// --- KAYIT & GİRİŞ ---
 app.post('/register', async (req, res) => {
     try {
         const { nickname, password } = req.body;
-        
-        // Şifreyi 10 tur şifrele
         const hashedPassword = await bcrypt.hash(password, 10);
-        
         const newUser = new User({ 
             nickname, 
-            password: hashedPassword, // Şifrelenmiş hali kaydet
+            password: hashedPassword,
             bpl: 1000,
             selectedAnimal: 'none'
         });
-        
         await newUser.save();
         res.redirect('/');
-    } catch (err) {
-        res.send("Kayıt sırasında hata oluştu.");
-    }
+    } catch (err) { res.send("Kayıt hatası veya kullanıcı adı dolu."); }
 });
 
-
-
-// --- GİRİŞ YAP (LOGIN) ---
 app.post('/login', async (req, res) => {
     try {
         const { nickname, password } = req.body;
-        // Önce kullanıcıyı sadece nickname ile bul
         const user = await User.findOne({ nickname });
-
-        if (user) {
-            // MongoDB'deki şifrelenmiş kod ile kullanıcının yazdığı şifreyi karşılaştır
-            const isMatch = await bcrypt.compare(password, user.password);
-            
-            if (isMatch) {
-                req.session.user = user;
-                return res.redirect('/profil');
-            }
+        if (user && await bcrypt.compare(password, user.password)) {
+            req.session.user = user;
+            return res.redirect('/profil');
         }
-        
-        // Eğer kullanıcı yoksa veya şifre eşleşmiyorsa
         res.send("Hatalı kullanıcı adı veya şifre!");
-        
-    } catch (err) {
-        console.error("Login Hatası:", err);
-        res.status(500).send("Sunucu hatası!");
-    }
+    } catch (err) { res.status(500).send("Sunucu hatası!"); }
 });
 
-// --- ÇIKIŞ YAP (LOGOUT) ---
 app.get('/logout', (req, res) => {
     req.session.destroy();
     res.redirect('/');
 });
 
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-// --- SOCKET LOGIC (TÜM SİSTEM) ---
-const onlineUsers = new Map(); // Nickname -> SocketID
+// --- SOCKET LOGIC ---
+const onlineUsers = new Map();
 
 io.on('connection', (socket) => {
-    console.log('Yeni Bağlantı:', socket.id);
-
     socket.on('update-online-status', (data) => {
         socket.nickname = data.nickname;
         onlineUsers.set(data.nickname, socket.id);
         io.emit('online-list', Array.from(onlineUsers.keys()));
     });
 
-    // 1. Chat Mesajlaşma
     socket.on('chat-message', (data) => {
-        io.emit('new-chat-message', data);
+        io.emit('new-chat-message', { from: socket.nickname, msg: data.msg });
     });
 
-    // 2. Hediye Sistemi (%30 Kesinti)
+    // Hediye Sistemi
     socket.on('send-gift', async (data) => {
         const sender = await User.findOne({ nickname: socket.nickname });
-        if (sender && sender.bpl >= 5500) {
+        if (sender && sender.bpl >= data.amount && data.amount >= 5500) {
             const netAmount = Math.floor(data.amount * 0.7);
             await User.findOneAndUpdate({ nickname: data.receiver }, { $inc: { bpl: netAmount } });
-            await User.findOneAndUpdate({ nickname: socket.nickname }, { $inc: { bpl: -data.amount } });
+            const updatedSender = await User.findOneAndUpdate({ nickname: socket.nickname }, { $inc: { bpl: -data.amount } }, { new: true });
 
             if (onlineUsers.has(data.receiver)) {
                 io.to(onlineUsers.get(data.receiver)).emit('gift-received', { from: socket.nickname, amount: netAmount });
-                const updatedTarget = await User.findOne({ nickname: data.receiver });
-                io.to(onlineUsers.get(data.receiver)).emit('update-balance', updatedTarget.bpl);
+                const target = await User.findOne({ nickname: data.receiver });
+                io.to(onlineUsers.get(data.receiver)).emit('update-balance', target.bpl);
             }
-            socket.emit('update-balance', sender.bpl - data.amount);
+            socket.emit('update-balance', updatedSender.bpl);
+        } else {
+            socket.emit('error-msg', 'Yetersiz bakiye veya geçersiz tutar.');
         }
     });
 
-    // 3. Meeting ve Arena Davet
+    // Arena & Meeting
+    socket.on('invite-to-arena', (target) => {
+        if (onlineUsers.has(target)) {
+            io.to(onlineUsers.get(target)).emit('arena-invitation', { from: socket.nickname });
+        }
+    });
+
     socket.on('create-meeting', async () => {
         const user = await User.findOne({ nickname: socket.nickname });
         if (user && user.bpl >= 50) {
-            await User.findOneAndUpdate({ nickname: socket.nickname }, { $inc: { bpl: -50 } });
+            const updated = await User.findOneAndUpdate({ nickname: socket.nickname }, { $inc: { bpl: -50 } }, { new: true });
             socket.emit('meeting-created', { roomId: `room_${socket.nickname}` });
-            socket.emit('update-balance', user.bpl - 50);
-        }
-    });
-
-    socket.on('invite-to-arena', (target) => {
-        if (onlineUsers.has(target)) {
-            io.to(onlineUsers.get(target)).emit('arena-invitation', { 
-                from: socket.nickname, 
-                roomId: `arena_${socket.nickname}` 
-            });
+            socket.emit('update-balance', updated.bpl);
+        } else {
+            socket.emit('error-msg', 'Oda açmak için 50 BPL gerekli.');
         }
     });
 
@@ -207,12 +165,6 @@ io.on('connection', (socket) => {
     });
 });
 
-// SERVER BAŞLATMA
 server.listen(PORT, () => {
     console.log(`🚀 BPL Sistemi Aktif: http://localhost:${PORT}`);
 });
-
-
-
-
-
