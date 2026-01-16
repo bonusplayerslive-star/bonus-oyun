@@ -1,4 +1,3 @@
-// Path: views\chat.ejs
 <!DOCTYPE html>
 <html lang="tr">
 <head>
@@ -11,139 +10,93 @@
     
     <style>
         :root { 
-            --neon-blue: #00f3ff; 
-            --neon-red: #ff003c; 
-            --neon-green: #39FF14; 
-            --terminal-dark: #0a0b0c;
-            --panel-bg: rgba(10, 11, 12, 0.95);
+            --neon-blue: #00f3ff; --neon-red: #ff003c; --neon-green: #39FF14; 
+            --terminal-dark: #0a0b0c; --panel-bg: rgba(10, 11, 12, 0.98);
         }
 
         body { 
             background: radial-gradient(circle at center, #1a1a1a 0%, #000 100%); 
-            color: #e0e0e0; 
-            font-family: 'Rajdhani', sans-serif; 
-            height: 100vh; 
-            overflow: hidden; 
-            display: flex; 
-            flex-direction: column; 
-            margin: 0;
+            color: #e0e0e0; font-family: 'Rajdhani', sans-serif; 
+            height: 100vh; overflow: hidden; display: flex; flex-direction: column; margin: 0;
         }
 
+        /* Üst Durum Çubuğu */
         .header-status { 
-            padding: 12px 20px; 
-            background: linear-gradient(90deg, #000 0%, #111 50%, #000 100%);
-            border-bottom: 2px solid var(--neon-green);
-            box-shadow: 0 0 15px rgba(57, 255, 20, 0.2);
-            z-index: 10;
+            height: 8vh; padding: 0 20px; background: #000; border-bottom: 2px solid var(--neon-green);
+            display: flex; align-items: center; justify-content: space-between; z-index: 100;
+        }
+        .status-item { font-family: 'Orbitron'; font-size: 0.75rem; }
+
+        /* Ana İçerik Alanı */
+        .main-layout { display: flex; height: 82vh; width: 100vw; }
+
+        /* Sol Dikey Menü (Online Kullanıcılar) */
+        .online-sidebar {
+            width: 80px; background: rgba(0,0,0,0.8); border-right: 1px solid #222;
+            display: flex; flex-direction: column; align-items: center; padding-top: 15px; overflow-y: auto;
+        }
+        .user-avatar {
+            width: 45px; height: 45px; border-radius: 50%; border: 2px solid var(--neon-green);
+            margin-bottom: 15px; cursor: pointer; transition: 0.3s; position: relative;
+        }
+        .user-avatar:hover { transform: scale(1.1); box-shadow: 0 0 10px var(--neon-green); }
+        .online-dot { 
+            position: absolute; bottom: 0; right: 0; width: 12px; height: 12px; 
+            background: var(--neon-green); border-radius: 50%; border: 2px solid #000;
         }
 
-        .status-item { font-family: 'Orbitron', sans-serif; font-size: 0.8rem; letter-spacing: 1px; }
-        .val-neon { color: var(--neon-green); text-shadow: 0 0 5px var(--neon-green); }
+        /* Chat Alanı */
+        .chat-area { flex: 1; display: flex; flex-direction: column; background: rgba(0,0,0,0.5); position: relative; }
+        #chatMessages { flex: 1; overflow-y: auto; padding: 15px; font-size: 0.9rem; }
 
-        .chat-container { 
-            flex: 1; 
-            display: flex; 
-            flex-direction: column; 
-            padding: 15px; 
-            background: url('https://www.transparenttextures.com/patterns/carbon-fibre.png');
-            position: relative;
-        }
+        .msg-entry { margin-bottom: 6px; padding: 6px 12px; border-radius: 4px; background: rgba(255,255,255,0.02); }
+        .sender-tag { color: #FFFF00; font-weight: bold; cursor: pointer; font-family: 'Orbitron'; font-size: 0.7rem; }
 
-        #chatMessages { 
-            flex: 1; 
-            overflow-y: auto; 
-            padding: 15px; 
-            background: rgba(0, 0, 0, 0.6); 
-            border: 1px solid rgba(57, 255, 20, 0.15); 
-            border-radius: 4px;
-        }
-
-        .msg-entry { 
-            margin-bottom: 8px; 
-            padding: 8px 12px; 
-            background: rgba(255, 255, 255, 0.03); 
-            border-left: 3px solid transparent;
-            transition: 0.3s;
-        }
-        .msg-entry:hover { background: rgba(57, 255, 20, 0.05); border-left-color: var(--neon-green); }
-        
-        .sender-tag { 
-            color: #FFFF00; 
-            font-weight: 700; 
-            cursor: pointer; 
-            text-transform: uppercase;
-            font-family: 'Orbitron', sans-serif;
-            font-size: 0.75rem;
-            margin-right: 8px;
-        }
-
+        /* Aksiyon Paneli */
         #userActionPanel { 
-            display: none; 
-            position: fixed; 
-            top: 50%; left: 50%; 
-            transform: translate(-50%, -50%);
-            width: 320px; 
-            background: var(--panel-bg); 
-            border: 1px solid var(--neon-blue);
-            box-shadow: 0 0 30px rgba(0, 243, 255, 0.3);
-            border-radius: 0; 
-            padding: 25px; 
-            z-index: 4000;
+            display: none; position: fixed; top: 50%; left: 50%; transform: translate(-50%, -50%);
+            width: 85vw; max-width: 320px; background: var(--panel-bg); border: 2px solid var(--neon-blue);
+            padding: 20px; z-index: 5000; box-shadow: 0 0 50px rgba(0,0,0,1);
         }
 
-        .btn-action {
-            width: 100%; padding: 12px; margin-bottom: 10px;
-            font-family: 'Orbitron', sans-serif; font-size: 0.8rem;
-            text-transform: uppercase; border-radius: 0; transition: 0.3s;
-        }
-        .btn-gift { border: 1px solid var(--neon-red); color: var(--neon-red); background: transparent; }
-        .btn-gift:hover:not(:disabled) { background: var(--neon-red); color: #fff; }
-        .btn-fight { border: 1px solid var(--neon-blue); color: var(--neon-blue); background: transparent; }
-        .btn-fight:hover { background: var(--neon-blue); color: #000; }
-        .btn-meeting { border: 1px solid #ffc107; color: #ffc107; background: transparent; }
-        .btn-meeting:hover { background: #ffc107; color: #000; }
+        /* Footer Giriş Alanı */
+        .input-footer { height: 10vh; background: #000; padding: 10px 15px; border-top: 1px solid #222; }
+        .terminal-input { background: #050505 !important; border: 1px solid #333 !important; color: var(--neon-green) !important; font-family: monospace; }
+        .btn-send { background: var(--neon-green) !important; color: #000 !important; font-weight: bold; }
 
-        .input-footer { padding: 15px; background: #000; border-top: 1px solid #222; }
-        .terminal-input {
-            background: #0a0a0a !important;
-            border: 1px solid #333 !important;
-            color: var(--neon-green) !important;
-            font-family: 'Courier New', monospace;
-        }
-        .btn-send { background: var(--neon-green) !important; color: #000 !important; font-weight: bold; border-radius: 0; }
+        @media (max-width: 600px) { .online-sidebar { width: 65px; } .user-avatar { width: 40px; height: 40px; } }
     </style>
 </head>
 <body>
 
-<div class="header-status d-flex justify-content-between">
-    <div class="status-item text-muted">USER: <span class="val-neon"><%= user.nickname %></span></div>
-    <div class="status-item text-muted">PEER_STATUS: <span id="peer-status" class="text-danger">BAĞLANIYOR...</span></div>
-    <div class="status-item text-muted">CREDITS: <span id="myBpl" class="text-warning"><%= user.bpl %></span> BPL</div>
+<div class="header-status">
+    <div class="status-item"><span class="val-neon"><%= user.nickname %></span></div>
+    <div class="status-item"><span id="myBpl" class="text-warning"><%= user.bpl %></span> BPL</div>
+    <div id="peer-status" class="status-item text-danger small">OFFLINE</div>
 </div>
 
-<div class="chat-container">
-    <div id="chatMessages">
-        <div class="msg-entry">
-            <span class="sender-tag" style="color:var(--neon-blue)">[SİSTEM]:</span>
-            <span class="text-info">Güvenli hat kuruldu. Komuta merkezine hoş geldiniz.</span>
+<div class="main-layout">
+    <div class="online-sidebar" id="onlineUsers">
         </div>
+
+    <div class="chat-area">
+        <div id="chatMessages"></div>
     </div>
 </div>
 
 <div id="userActionPanel">
-    <h5 id="selectedUserLabel" class="text-center text-white mb-4 fs-6">HEDEF SEÇİLDİ</h5>
-    <button id="giftBtn" class="btn btn-action btn-gift">🎁 LOJİSTİK DESTEK</button>
-    <button id="fightBtn" class="btn btn-action btn-fight">⚔️ ARENA DAVETİ</button>
-    <button id="meetBtn" class="btn btn-action btn-meeting">🏛️ ÖZEL ODA DAVETİ</button>
-    <button onclick="closePanel()" class="btn btn-sm text-muted w-100 mt-2">İPTAL</button>
+    <h6 id="selectedUserLabel" class="text-center text-info mb-3 font-orbitron">HEDEF SEÇİLDİ</h6>
+    <button id="giftBtn" class="btn btn-action btn-gift btn-outline-danger w-100 mb-2">🎁 HEDİYE GÖNDER (%25 Vergi)</button>
+    <button id="fightBtn" class="btn btn-action btn-fight btn-outline-info w-100 mb-2">⚔️ ARENA DÜELLO (-50 BPL)</button>
+    <button id="meetBtn" class="btn btn-action btn-meeting btn-outline-warning w-100 mb-2">🏛️ ÖZEL ODA (-30 BPL)</button>
+    <button onclick="closePanel()" class="btn btn-sm text-muted w-100">KAPAT</button>
 </div>
 
 <div class="input-footer">
     <form id="chatForm" onsubmit="return false;">
         <div class="input-group">
-            <span class="input-group-text bg-dark border-secondary text-success">></span>
-            <input type="text" id="messageInput" class="form-control terminal-input" placeholder="Komut veya mesaj girin..." autocomplete="off">
-            <button onclick="sendMessage()" class="btn btn-send"><i class="fas fa-bolt me-2"></i>GÖNDER</button>
+            <input type="text" id="messageInput" class="form-control terminal-input" placeholder="Mesaj yazın..." autocomplete="off">
+            <button onclick="sendMessage()" class="btn btn-send"><i class="fas fa-paper-plane"></i></button>
         </div>
     </form>
 </div>
@@ -155,144 +108,131 @@
 <script>
     const socket = io(); 
     const myNick = "<%= user.nickname %>";
-    const userId = "<%= user._id %>";
     let myBpl = <%= user.bpl %>;
     let selectedUser = "";
-    let inviteCount = 0;
 
-    // --- VİDEO PEER SİSTEMİ ---
-    const peer = new Peer(); 
-    let myVideoId = null;
-
-    peer.on('open', (id) => {
-        myVideoId = id;
-        document.getElementById('peer-status').innerText = "AKTİF";
-        document.getElementById('peer-status').className = "text-success";
-        socket.emit('register-user', { id: userId, nickname: myNick, videoId: id });
+    // 1. ONLINE LİSTESİ VE SOL MENÜ GÜNCELLEME
+    socket.on('update-user-list', (users) => {
+        const sidebar = document.getElementById('onlineUsers');
+        sidebar.innerHTML = '';
+        users.forEach(u => {
+            if(u.nickname !== myNick) {
+                const div = document.createElement('div');
+                div.className = 'user-avatar';
+                div.title = u.nickname;
+                div.innerHTML = `<img src="/caracter/page/logo.jpeg" style="width:100%; border-radius:50%">
+                                 <div class="online-dot"></div>`;
+                div.onclick = () => openUserMenu(u.nickname);
+                sidebar.appendChild(div);
+            }
+        });
     });
 
-    // PANEL AÇMA
+    // 2. PANEL AÇILIŞI
     function openUserMenu(nick) {
-        if(nick === myNick || nick === "SİSTEM") return;
         selectedUser = nick;
-        document.getElementById('selectedUserLabel').innerText = "HEDEF: " + nick;
+        document.getElementById('selectedUserLabel').innerText = nick;
         document.getElementById('userActionPanel').style.display = 'block';
         
-        // Hediye Buton Kontrolü
-        const giftBtn = document.getElementById('giftBtn');
-        if(myBpl < 6000) {
-            giftBtn.disabled = true;
-            giftBtn.classList.add('opacity-50');
-            giftBtn.innerHTML = "<small>Min 6000 BPL Gerekli</small>";
-        } else {
-            giftBtn.disabled = false;
-            giftBtn.classList.remove('opacity-50');
-            giftBtn.innerHTML = "🎁 LOJİSTİK DESTEK";
-            giftBtn.onclick = () => sendBplGift(nick);
-        }
-
-        document.getElementById('fightBtn').onclick = () => challengeToFight(nick);
-        document.getElementById('meetBtn').onclick = () => inviteToMeeting(nick);
+        document.getElementById('giftBtn').onclick = () => showGiftPrompt(nick);
+        document.getElementById('fightBtn').onclick = () => sendInvite(nick, 'arena', 50);
+        document.getElementById('meetBtn').onclick = () => sendInvite(nick, 'meeting', 30);
     }
 
     function closePanel() { document.getElementById('userActionPanel').style.display = 'none'; }
 
-    // HEDİYE SİSTEMİ
-    function executeGift(nick, amount) {
-        if (myBpl - amount < 5500) {
-            Swal.fire({ icon: 'error', title: 'Limit Engeli', text: 'Bakiyeniz 5500 BPL altına düşemez!', background: '#0a0a0a', color: '#fff' });
-            return;
-        }
-        socket.emit('transfer-bpl', { to: nick, amount: amount });
-        Swal.close();
-        closePanel();
-    }
-
-    function sendBplGift(nick) {
+    // 3. HEDİYE SİSTEMİ (LIMITLİ VE VERGİLİ)
+    function showGiftPrompt(nick) {
         Swal.fire({
-            title: 'LOJİSTİK TRANSFER',
-            html: `<div class="text-info mb-3">${nick} komutanına destek paketi seçin.</div>`,
-            background: '#0a0b0c', color: '#fff', showConfirmButton: false, showCancelButton: true,
-            footer: `<div class="d-flex justify-content-center gap-2 w-100">
-                        <button onclick="executeGift('${nick}', 50)" class="btn btn-outline-warning">50</button>
-                        <button onclick="executeGift('${nick}', 100)" class="btn btn-outline-warning">100</button>
-                    </div>`
+            title: 'HEDİYE MİKTARI',
+            input: 'number',
+            inputLabel: 'Gönderilecek BPL miktarını yazın',
+            footer: '⚠️ %25 transfer ücreti kesilir. Alt limit: 5500 BPL',
+            background: '#0a0a0a', color: '#fff',
+            showCancelButton: true,
+            confirmButtonText: 'GÖNDER'
+        }).then((res) => {
+            if(res.isConfirmed) {
+                const amount = parseInt(res.value);
+                if(amount <= 0) return;
+                
+                // Kural 1: 5500 Altına düşemez
+                if(myBpl - amount < 5500) {
+                    return Swal.fire('HATA', 'İşlem sonrası bakiyeniz 5500 BPL altına düşemez!', 'error');
+                }
+                
+                // Kural 2: 24 Saatlik 3000 Limit (Serverda da kontrol edilmeli)
+                socket.emit('gift-bpl', { to: nick, amount: amount });
+                closePanel();
+            }
         });
     }
 
-    // ARENA DAVETİ
-    function challengeToFight(nick) {
-        if (myBpl < 5505) {
-            Swal.fire({ icon: 'error', title: 'Hata', text: 'Yetersiz bakiye!', background: '#0a0a0a', color: '#fff' });
-            return;
-        }
-        socket.emit('send-challenge', { target: nick });
-        Swal.fire({ toast: true, position: 'top-end', icon: 'info', title: 'Düello daveti gönderildi!', showConfirmButton: false, timer: 2000 });
-        closePanel();
+    // 4. ARENA & MEETING DAVETİ
+    function sendInvite(nick, type, cost) {
+        if(myBpl < cost) return Swal.fire('HATA', 'Yetersiz bakiye!', 'error');
+        
+        Swal.fire({
+            title: 'EMİN MİSİN?',
+            text: `${nick} kullanıcısını davet etmek için ${cost} BPL kesilecek.`,
+            icon: 'warning',
+            showCancelButton: true,
+            background: '#0a0a0a', color: '#fff'
+        }).then((res) => {
+            if(res.isConfirmed) {
+                socket.emit('send-invite', { to: nick, type: type, cost: cost });
+                closePanel();
+            }
+        });
     }
 
-    // TOPLANTI DAVETİ (Video Kimliği ile)
-    function inviteToMeeting(nick) {
-        if (myBpl < 100) {
-            Swal.fire('Hata', 'Toplantı daveti için bakiye yetersiz!', 'error');
-            return;
-        }
-        // Kendi Video Kimliğimizi (pid) gönderiyoruz
-        socket.emit('invite-meeting', { target: nick, senderVideoId: myVideoId });
-        inviteCount++;
-        closePanel();
-    }
+    // 5. DAVET ALMA (SOCKET)
+    socket.on('receive-invite', (data) => {
+        Swal.fire({
+            title: data.type === 'arena' ? '⚔️ DÜELLO DAVETİ!' : '🏛️ ÖZEL ODA DAVETİ!',
+            text: `${data.from} seni çağırıyor.`,
+            showCancelButton: true,
+            confirmButtonText: 'KABUL ET',
+            background: '#0a0a0a', color: '#fff'
+        }).then((res) => {
+            if(res.isConfirmed) {
+                // Oda ismi davet edenin nickname'i olur
+                const targetUrl = data.type === 'arena' ? `/arena?room=${data.from}` : `/meeting?room=${data.from}`;
+                window.location.href = targetUrl;
+            }
+        });
+    });
 
-    // MESAJLAŞMA
+    // 6. CHAT FONKSİYONLARI
     function sendMessage() {
         const input = document.getElementById('messageInput');
-        const text = input.value.trim();
-        if(text) {
-            socket.emit('chat-message', { text: text });
-            input.value = "";
+        if(input.value.trim()) {
+            socket.emit('chat-message', { text: input.value });
+            input.value = '';
         }
     }
 
-    // --- SOCKET DINLEYICILERI ---
     socket.on('new-message', (data) => {
         const box = document.getElementById('chatMessages');
         const div = document.createElement('div');
         div.className = "msg-entry";
         div.innerHTML = `<span class="sender-tag" onclick="openUserMenu('${data.sender}')">${data.sender}:</span> 
-                         <span class="text-light">${data.text}</span>`;
+                         <span>${data.text}</span>`;
         box.appendChild(div);
         box.scrollTop = box.scrollHeight;
     });
 
-    socket.on('meeting-request', (data) => {
-        Swal.fire({
-            title: '🏛️ ÖZEL ODA DAVETİ!',
-            text: `${data.from} seninle konseyde görüşmek istiyor.`,
-            icon: 'info',
-            showCancelButton: true,
-            confirmButtonText: 'BAĞLAN',
-            background: '#0a0a0a', color: '#fff'
-        }).then((result) => {
-            if (result.isConfirmed) {
-                // Video kimliğimizi (myVideoId) URL'ye ekleyerek meeting'e gidiyoruz
-                window.location.href = `/meeting?room=${data.roomId}&pid=${myVideoId}`;
-            }
-        });
+    socket.on('update-bpl', (newBpl) => {
+        myBpl = newBpl;
+        document.getElementById('myBpl').innerText = newBpl;
     });
 
-    socket.on('redirect-to-meeting', (data) => {
-        window.location.href = `/meeting?room=${data.roomId}&pid=${myVideoId}`;
+    // PeerJS Bağlantı Durumu
+    const peer = new Peer();
+    peer.on('open', (id) => {
+        document.getElementById('peer-status').innerText = "ONLINE";
+        document.getElementById('peer-status').className = "status-item text-success small";
     });
-
-    socket.on('gift-result', (data) => {
-        if(data.newBalance !== undefined) {
-            myBpl = data.newBalance;
-            document.getElementById('myBpl').innerText = myBpl;
-        }
-        Swal.fire({ toast: true, position: 'top-end', icon: data.success ? 'success' : 'error', title: data.message, showConfirmButton: false, timer: 3000 });
-    });
-
-    document.getElementById('messageInput').addEventListener('keypress', (e) => { if (e.key === 'Enter') sendMessage(); });
 </script>
 </body>
 </html>
