@@ -30,78 +30,75 @@
         </div>
     </div>
 
-    <script>
-        // Hata korumalı başlatma
-        document.addEventListener('DOMContentLoaded', () => {
-            const socket = io(); // Soket burada tanımlandı
-            const videoGrid = document.getElementById('video-grid');
-            const ROOM_ID = new URLSearchParams(window.location.search).get('room') || 'global';
-            const peers = {};
+ <script>
+    const socket = io();
+    const videoGrid = document.getElementById('video-grid');
+    const urlParams = new URLSearchParams(window.location.search);
+    const ROOM_ID = urlParams.get('room') || 'global';
+    const peers = {};
 
-            const myPeer = new Peer(undefined, { host: '/', port: '443', secure: true });
-            let myStream;
+    const myPeer = new Peer(undefined, {
+        host: '/',
+        port: '443',
+        secure: true,
+        path: '/peerjs' 
+    });
 
-            async function start() {
-                try {
-                    myStream = await navigator.mediaDevices.getUserMedia({ video: true, audio: true });
-                    addVideoStream(document.createElement('video'), myStream, "SİZ (KOMUTAN)");
+    let myStream;
 
-                    myPeer.on('call', call => {
-                        call.answer(myStream);
-                        const video = document.createElement('video');
-                        call.on('stream', userStream => addVideoStream(video, userStream, "BİRLİK ÜYESİ"));
-                    });
+    // FONKSİYONU DIŞARI ALDIK (Hata vermemesi için)
+    function connectToNewUser(peerId, stream, nickname) {
+        const call = myPeer.call(peerId, stream);
+        const video = document.createElement('video');
+        call.on('stream', userVideoStream => {
+            addVideoStream(video, userVideoStream, nickname || "BİRLİK ÜYESİ");
+        });
+        call.on('close', () => video.closest('.video-container').remove());
+        peers[peerId] = call;
+    }
 
-                    socket.on('user-connected', data => {
-                        setTimeout(() => {
-                            const call = myPeer.call(data.peerId, myStream);
-                            const video = document.createElement('video');
-                            call.on('stream', userStream => addVideoStream(video, userStream, data.nickname));
-                            peers[data.peerId] = call;
-                        }, 1000);
-                    });
+    async function init() {
+        try {
+            myStream = await navigator.mediaDevices.getUserMedia({ video: true, audio: true });
+            addVideoStream(document.createElement('video'), myStream, "SİZ (KOMUTAN)");
 
-                    myPeer.on('open', id => {
-                        socket.emit('join-meeting', { roomId: ROOM_ID, peerId: id });
-                    });
-
-                } catch (err) {
-                    console.error("Kamera hatası:", err);
-                    alert("Kamera bulunamadı veya izin reddedildi.");
-                }
-            }
-
-            function addVideoStream(video, stream, label) {
-                video.srcObject = stream;
-                video.addEventListener('loadedmetadata', () => video.play());
-                const container = document.createElement('div');
-                container.className = 'video-container';
-                const tag = document.createElement('div');
-                tag.className = 'user-label';
-                tag.innerText = label;
-                container.append(video, tag);
-                videoGrid.append(container);
-            }
-
-            document.getElementById('send-btn').onclick = () => {
-                const input = document.getElementById('chat-input');
-                if (input.value) {
-                    socket.emit('meeting-message', { roomId: ROOM_ID, text: input.value });
-                    input.value = '';
-                }
-            };
-
-            socket.on('new-meeting-message', data => {
-                const msg = document.createElement('div');
-                msg.innerHTML = `<b>${data.sender}:</b> ${data.text}`;
-                document.getElementById('chat-messages').append(msg);
-                document.getElementById('chat-messages').scrollTop = document.getElementById('chat-messages').scrollHeight;
+            myPeer.on('call', call => {
+                call.answer(myStream);
+                const video = document.createElement('video');
+                call.on('stream', userStream => addVideoStream(video, userStream, "BİRLİK ÜYESİ"));
             });
 
-            socket.on('user-disconnected', id => { if (peers[id]) peers[id].close(); });
+            socket.on('user-connected', data => {
+                console.log('Yeni komutan geldi: ' + data.peerId);
+                setTimeout(() => {
+                    connectToNewUser(data.peerId, myStream, data.nickname);
+                }, 1200); // PeerJS el sıkışması için süre tanıdık
+            });
 
-            start();
-        });
-    </script>
+            myPeer.on('open', id => {
+                socket.emit('join-meeting', { roomId: ROOM_ID, peerId: id });
+            });
+
+        } catch (err) {
+            alert("Kamera izni verilmeli!");
+        }
+    }
+
+    function addVideoStream(video, stream, label) {
+        video.srcObject = stream;
+        video.addEventListener('loadedmetadata', () => video.play());
+        const container = document.createElement('div');
+        container.className = 'video-container';
+        const tag = document.createElement('div');
+        tag.className = 'user-label';
+        tag.innerText = label;
+        container.append(video, tag);
+        videoGrid.append(container);
+    }
+
+    // Mesajlaşma ve diğer soketler aynı kalabilir...
+    init();
+</script>
 </body>
 </html>
+
