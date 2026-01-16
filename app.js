@@ -6,7 +6,58 @@ const MongoStore = require('connect-mongo');
 const path = require('path');
 const helmet = require('helmet');
 const mongoSanitize = require('express-mongo-sanitize');
+// app.js veya chat-server.js içinde
+const onlineUsers = new Map(); // Nickname -> SocketId
 
+io.on('connection', (socket) => {
+    socket.on('update-online-status', (data) => {
+        socket.nickname = data.nickname;
+        onlineUsers.set(data.nickname, socket.id);
+        io.emit('online-list', Array.from(onlineUsers.keys()));
+    });
+
+    // --- HEDİYE SİSTEMİ ---
+    socket.on('send-gift', async (data) => {
+        const sender = await User.findOne({ nickname: socket.nickname });
+        if (sender.bpl > 5500) {
+            const netAmount = data.amount * 0.7; // %30 kesinti
+            await User.findOneAndUpdate({ nickname: data.receiver }, { $inc: { bpl: netAmount } });
+            await User.findOneAndUpdate({ nickname: socket.nickname }, { $inc: { bpl: -data.amount } });
+            
+            io.to(onlineUsers.get(data.receiver)).emit('gift-received', { 
+                from: socket.nickname, 
+                amount: netAmount 
+            });
+        }
+    });
+
+    // --- MEETING (TOPLANTI) SİSTEMİ ---
+    socket.on('create-meeting', async () => {
+        const user = await User.findOne({ nickname: socket.nickname });
+        if (user.bpl >= 50) {
+            await User.findOneAndUpdate({ nickname: socket.nickname }, { $inc: { bpl: -50 } });
+            const roomId = `meeting_${socket.nickname}`;
+            socket.join(roomId);
+            socket.emit('meeting-created', { roomId });
+        }
+    });
+
+    // --- ARENA DAVET SİSTEMİ ---
+    socket.on('invite-to-arena', (targetNickname) => {
+        const targetSocketId = onlineUsers.get(targetNickname);
+        if (targetSocketId) {
+            io.to(targetSocketId).emit('arena-invitation', { 
+                from: socket.nickname,
+                roomId: `arena_${socket.nickname}` 
+            });
+        }
+    });
+
+    socket.on('disconnect', () => {
+        onlineUsers.delete(socket.nickname);
+        io.emit('online-list', Array.from(onlineUsers.keys()));
+    });
+});
 // Uygulama Ayarları
 const app = express();
 const PORT = process.env.PORT || 3000;
@@ -110,7 +161,55 @@ socket.emit('update-online-status', {
     nickname: '<%= user.nickname %>', 
     avatar: '<%= user.profileImage %>' 
 });
+o.on('connection', (socket) => {
+    socket.on('update-online-status', (data) => {
+        socket.nickname = data.nickname;
+        onlineUsers.set(data.nickname, socket.id);
+        io.emit('online-list', Array.from(onlineUsers.keys()));
+    });
 
+    // --- HEDİYE SİSTEMİ ---
+    socket.on('send-gift', async (data) => {
+        const sender = await User.findOne({ nickname: socket.nickname });
+        if (sender.bpl > 5500) {
+            const netAmount = data.amount * 0.7; // %30 kesinti
+            await User.findOneAndUpdate({ nickname: data.receiver }, { $inc: { bpl: netAmount } });
+            await User.findOneAndUpdate({ nickname: socket.nickname }, { $inc: { bpl: -data.amount } });
+            
+            io.to(onlineUsers.get(data.receiver)).emit('gift-received', { 
+                from: socket.nickname, 
+                amount: netAmount 
+            });
+        }
+    });
+
+    // --- MEETING (TOPLANTI) SİSTEMİ ---
+    socket.on('create-meeting', async () => {
+        const user = await User.findOne({ nickname: socket.nickname });
+        if (user.bpl >= 50) {
+            await User.findOneAndUpdate({ nickname: socket.nickname }, { $inc: { bpl: -50 } });
+            const roomId = `meeting_${socket.nickname}`;
+            socket.join(roomId);
+            socket.emit('meeting-created', { roomId });
+        }
+    });
+
+    // --- ARENA DAVET SİSTEMİ ---
+    socket.on('invite-to-arena', (targetNickname) => {
+        const targetSocketId = onlineUsers.get(targetNickname);
+        if (targetSocketId) {
+            io.to(targetSocketId).emit('arena-invitation', { 
+                from: socket.nickname,
+                roomId: `arena_${socket.nickname}` 
+            });
+        }
+    });
+
+    socket.on('disconnect', () => {
+        onlineUsers.delete(socket.nickname);
+        io.emit('online-list', Array.from(onlineUsers.keys()));
+    });
+});
 
 
 
@@ -119,4 +218,5 @@ socket.emit('update-online-status', {
 app.listen(PORT, () => {
     console.log(`BPL Ana Sunucu aktif: http://localhost:${PORT}`);
 });
+
 
