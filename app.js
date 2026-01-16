@@ -1,11 +1,10 @@
 const express = require('express');
 const mongoose = require('mongoose');
 const session = require('express-session');
-const MongoStore = require('connect-mongo'); 
+const MongoStore = require('connect-mongo').default; 
 const http = require('http');
 const socketIo = require('socket.io');
 const path = require('path');
-const bcrypt = require('bcryptjs');
 const axios = require('axios');
 
 const User = require('./models/User');
@@ -20,7 +19,7 @@ const MONGO_URI = process.env.MONGO_URI;
 mongoose.connect(MONGO_URI).then(() => console.log('✅ Veritabanı Bağlandı'));
 
 const sessionMiddleware = session({
-    secret: process.env.SESSION_SECRET || 'bpl_secret_2024',
+    secret: process.env.SESSION_SECRET || 'bpl_ultimate_secret',
     resave: false,
     saveUninitialized: false,
     store: MongoStore.create({ mongoUrl: MONGO_URI }),
@@ -34,29 +33,26 @@ app.set('view engine', 'ejs');
 
 io.use((socket, next) => { sessionMiddleware(socket.request, {}, next); });
 
-// --- 2. BSC SCAN & ÖDEME SİSTEMİ ---
+// --- 2. BSC SCAN VERIFICATION ---
 app.post('/verify-payment', async (req, res) => {
     try {
         const { txid, bpl } = req.body;
         const user = await User.findById(req.session.userId);
-        if (!user) return res.json({ status: 'error', msg: 'Oturum yok.' });
-        if (user.usedHashes.includes(txid)) return res.json({ status: 'error', msg: 'Bu işlem zaten yapılmış!' });
+        if (!user || user.usedHashes.includes(txid)) return res.json({ status: 'error', msg: 'Hatalı işlem!' });
 
         const bscUrl = `https://api.bscscan.com/api?module=proxy&action=eth_getTransactionReceipt&txhash=${txid}&apikey=${process.env.BSCSCAN_API_KEY}`;
         const response = await axios.get(bscUrl);
-        const receipt = response.data.result;
-
-        if (receipt && receipt.status === "0x1") {
+        if (response.data.result?.status === "0x1") {
             user.bpl += parseInt(bpl);
             user.usedHashes.push(txid);
             await user.save();
-            return res.json({ status: 'success', msg: `${bpl} BPL eklendi!` });
+            return res.json({ status: 'success', msg: 'BPL Yüklendi!' });
         }
-        res.json({ status: 'error', msg: 'İşlem onaylanmadı.' });
-    } catch (err) { res.json({ status: 'error', msg: 'Sistem hatası.' }); }
+        res.json({ status: 'error', msg: 'Onaylanmadı.' });
+    } catch (err) { res.json({ status: 'error' }); }
 });
 
-// --- 3. GELİŞTİRME (STAT UPGRADE) ---
+// --- 3. STAT UPGRADE (GELİŞTİRME) ---
 app.post('/api/upgrade-stat', async (req, res) => {
     try {
         const { animalName, statType } = req.body;
@@ -64,7 +60,7 @@ app.post('/api/upgrade-stat', async (req, res) => {
         const animal = user.inventory.find(a => a.name === animalName);
         const cost = (statType === 'def') ? 10 : 15;
 
-        if (user.bpl < cost + 25) return res.json({ success: false, error: 'Limit 25 BPL!' });
+        if (user.bpl < cost + 25) return res.json({ success: false, error: 'Yetersiz BPL!' });
 
         if (statType === 'hp') { animal.hp += 10; animal.maxHp += 10; }
         else if (statType === 'atk') animal.atk += 5;
@@ -77,62 +73,81 @@ app.post('/api/upgrade-stat', async (req, res) => {
     } catch (err) { res.json({ success: false }); }
 });
 
-// --- 4. CÜZDAN KAYIT & ÇEKİM ---
-app.post('/api/save-wallet-address', async (req, res) => {
+// --- 4. SAVAŞ MANTIĞI (ARENA) ---
+async function startBattle(p1, p2, io) {
     try {
-        const { bnb_address } = req.body;
-        await User.findByIdAndUpdate(req.session.userId, { bnb_address });
-        res.json({ success: true });
-    } catch (err) { res.json({ success: false }); }
-});
+        const p1WinChance = 50 + ((p1.dbData.atk || 0) - (p2.dbData.def || 0));
+        const winner = Math.random() * 100 <= p1WinChance ? p1 : p2;
+        const prize = 100;
 
-app.post('/api/withdraw-request', async (req, res) => {
-    try {
-        const user = await User.findById(req.session.userId);
-        const amount = user.bpl - 5000;
-        if (amount <= 0) return res.json({ success: false, error: 'Minimum 5000 kalmalı.' });
+        if (winner.socketId !== 'bot') {
+            const winUser = await User.findById(winner.dbData._id);
+            winUser.bpl += prize;
+            await winUser.save();
+            io.to(winner.socketId).emit('update-bpl', winUser.bpl);
+        }
 
-        const request = new Withdraw({
-            userId: user._id, nickname: user.nickname,
-            requestedAmount: amount, finalAmount: amount * 0.75,
-            walletAddress: user.bnb_address
-        });
-        await request.save();
-        user.bpl = 5000;
-        await user.save();
-        res.json({ success: true, msg: 'Talep iletildi.' });
-    } catch (err) { res.json({ success: false }); }
-});
+        const data = { winnerNick: winner.nickname, prize, p1Nick: p1.nickname, p2Nick: p2.nickname };
+        if (p1.socketId !== 'bot') io.to(p1.socketId).emit('arena-match-found', data);
+        if (p2.socketId !== 'bot') io.to(p2.socketId).emit('arena-match-found', data);
+    } catch (e) { console.log(e); }
+}
 
-// --- 5. ARENA & CHAT & MEETING SOKET SİSTEMİ ---
+// --- 5. SOKET SİSTEMİ (CHATS, ARENA, MEETING) ---
 const onlineUsers = new Map();
 let arenaQueue = [];
 
 io.on('connection', async (socket) => {
     const user = await User.findById(socket.request.session?.userId);
     if (!user) return;
+
     socket.nickname = user.nickname;
     onlineUsers.set(user.nickname, socket.id);
     socket.join("general-chat");
 
-    // ARENA
     socket.on('arena-join-queue', () => {
         if (arenaQueue.find(p => p.socketId === socket.id)) return;
         arenaQueue.push({ nickname: socket.nickname, socketId: socket.id, dbData: user });
         if (arenaQueue.length >= 2) {
-            const p1 = arenaQueue.shift(); const p2 = arenaQueue.shift();
-            // startBattle fonksiyonunu buraya dahil et (Önceki kodda var)
+            startBattle(arenaQueue.shift(), arenaQueue.shift(), io);
+        } else {
+            setTimeout(() => {
+                const idx = arenaQueue.findIndex(p => p.socketId === socket.id);
+                if (idx !== -1) {
+                    const p = arenaQueue.splice(idx, 1)[0];
+                    startBattle(p, { nickname: "BOT_Kurt", socketId: 'bot', dbData: { atk: 10, def: 10 } }, io);
+                }
+            }, 5000);
         }
     });
 
-    // CHAT & MEETING (Önceki stabil kodun aynısı buraya gelecek)
-    socket.on('disconnect', () => onlineUsers.delete(socket.nickname));
+    socket.on('join-meeting', (data) => {
+        socket.join(data.roomId);
+        socket.peerId = data.peerId;
+        socket.currentRoom = data.roomId;
+        socket.to(data.roomId).emit('user-connected', { peerId: data.peerId, nickname: socket.nickname });
+    });
+
+    socket.on('meeting-message', (data) => {
+        io.to(data.roomId).emit('new-meeting-message', { sender: socket.nickname, text: data.text });
+    });
+
+    socket.on('disconnect', () => {
+        onlineUsers.delete(socket.nickname);
+        if (socket.currentRoom) socket.to(socket.currentRoom).emit('user-disconnected', socket.peerId);
+        arenaQueue = arenaQueue.filter(p => p.socketId !== socket.id);
+    });
 });
 
-// Rotalar
-app.get('/profil', (req, res) => res.render('profil'));
-app.get('/wallet', (req, res) => res.render('wallet'));
-app.get('/market', (req, res) => res.render('market'));
+// --- 6. ROTALAR ---
+app.get('/profil', async (req, res) => {
+    if (!req.session.userId) return res.redirect('/');
+    const user = await User.findById(req.session.userId);
+    res.render('profil', { user });
+});
 app.get('/arena', (req, res) => res.render('arena'));
+app.get('/chat', (req, res) => res.render('chat'));
+app.get('/meeting', (req, res) => res.render('meeting', { role: req.query.role || 'guest' }));
 
-server.listen(3000, () => console.log('🚀 BPL ULTIMATE FULL AKTİF!'));
+const PORT = process.env.PORT || 3000;
+server.listen(PORT, () => console.log(`🚀 Sistem Aktif: ${PORT}`));
