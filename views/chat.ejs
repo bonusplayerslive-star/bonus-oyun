@@ -258,9 +258,14 @@
         myBpl = newBpl;
         document.getElementById('myBpl').innerText = newBpl;
     });
+socket.on('redirect-to-room', (url) => {
+    console.log("Odaya yönlendiriliyorsunuz: " + url);
+    window.location.href = url;
+});
 
     document.getElementById('messageInput').addEventListener('keypress', (e) => { if (e.key === 'Enter') sendMessage(); });
 </script>
 </body>
 </html>
+
 
