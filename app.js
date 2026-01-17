@@ -287,27 +287,37 @@ socket.on('chat-message', (data) => {
 // --- BPL VIP KONSEY & ARENA SİSTEMİ (SUNUCU TARAFI) ---
 // ======================================================
 
-// 1. MEETING KATILIM (Oda Kilidi)
+// 1. MEETING KATILIM (Oda Kilidi ve Temiz Üye Yönetimi)
 socket.on('join-meeting', (roomId, peerId, nickname) => {
     if (!roomId) return;
 
-    socket.join(roomId); // Her iki kullanıcıyı da bu STRING odaya al
+    socket.join(roomId); // Fiziksel olarak odaya al
     
+    // Oda yoksa oluştur
     if (!activeRooms[roomId]) {
         activeRooms[roomId] = { leader: nickname, members: [], capacity: 5 };
     }
 
-    if (!activeRooms[roomId].members.includes(nickname)) {
-        activeRooms[roomId].members.push(nickname);
-    }
-    // Üye zaten yoksa listeye ekle
-    if (!activeRooms[roomId].members.includes(nickname)) {
-        if (activeRooms[roomId].members.length < activeRooms[roomId].capacity) {
-            activeRooms[roomId].members.push(nickname);
+    const room = activeRooms[roomId];
+
+    // Üye listede yoksa ekleme mantığını başlat
+    if (!room.members.includes(nickname)) {
+        // Kapasite kontrolünü burada tek seferde yapıyoruz
+        if (room.members.length < room.capacity) {
+            room.members.push(nickname);
+            console.log(`[BPL] ${nickname} listeye eklendi.`);
         } else {
+            // Masa doluysa hata gönder ve işlemi kes
             return socket.emit('error-msg', 'Bu masa dolu! Giriş engellendi.');
         }
     }
+
+    // ODA İLETİŞİMİ: Odadakilere listeyi ve Peer bilgisini gönder
+    io.to(roomId).emit('update-council-list', room.members);
+    socket.to(roomId).emit('user-connected', peerId, nickname);
+
+    console.log(`[VIP-ROOM] ${nickname}, ${roomId} odasına başarılı giriş yaptı.`);
+});
 
     // ODA İÇİNDEKİ HERKESE GÜNCEL ÜYE LİSTESİNİ GÖNDER
 // Odadakilere listeyi ve yeni gelenin PeerID'sini gönder
@@ -471,7 +481,7 @@ socket.on('disconnect', () => {
         arenaQueue = arenaQueue.filter(p => p.id !== socket.id);
     });
 
-}); // <--- io.on Connection BURADA BİTİYOR (Tüm olaylar içeride kaldı)
+
 
 // --- 3. SAVAŞ FONKSİYONLARI (DIŞARIDA OLMALI) ---
 
@@ -532,6 +542,7 @@ const PORT = process.env.PORT || 10000;
 httpServer.listen(PORT, () => {
     console.log(`🌍 Sunucu Yayında: http://localhost:${PORT}`);
 });
+
 
 
 
