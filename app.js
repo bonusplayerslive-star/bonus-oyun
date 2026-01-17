@@ -290,21 +290,25 @@ io.on('connection', (socket) => {
         console.log(`[ODA] ${nickname} -> ${roomId} odasına girdi.`);
     });
 
-    // --- 3. MESAJLAŞMA (İzole Sistem) ---
-    socket.on('chat-message', (data) => {
-        const msgObj = {
-            sender: socket.nickname || "Misafir",
-            text: data.text,
-            time: new Date().toLocaleTimeString('tr-TR', { hour: '2-digit', minute: '2-digit' }),
-            room: data.room || 'GENEL'
-        };
+socket.on('chat-message', (data) => {
+    // Boş mesajları engelle
+    if (!data.text || data.text.trim() === "") return;
 
-        if (data.room && data.room !== 'GENEL') {
-            io.to(data.room).emit('new-message', msgObj);
-        } else {
-            io.emit('new-message', msgObj);
-        }
-    });
+    const msgObj = {
+        sender: socket.nickname || "Misafir",
+        text: data.text.trim(),
+        time: new Date().toLocaleTimeString('tr-TR', { hour: '2-digit', minute: '2-digit' }),
+        room: data.room || 'GENEL'
+    };
+
+    if (data.room && data.room !== 'GENEL') {
+        // Sadece özel odaya bir kez gönder
+        io.to(data.room).emit('new-message', msgObj);
+    } else {
+        // Sadece genel chat'e bir kez gönder
+        io.emit('new-message', msgObj);
+    }
+});
 
     // --- 4. DAVET SİSTEMİ ---
     socket.on('send-invite', (data) => {
@@ -633,6 +637,7 @@ const PORT = process.env.PORT || 10000;
 httpServer.listen(PORT, () => {
     console.log(`🌍 Sunucu Yayında: http://localhost:${PORT}`);
 });
+
 
 
 
