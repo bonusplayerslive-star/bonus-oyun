@@ -129,23 +129,33 @@
         `).join('');
     });
 
-    // CHAT
-    function sendMsg() {
-        const inp = document.getElementById('chat-input');
-        if(!inp.value) return;
-        socket.emit('chat-message', { room: currentRoom, text: inp.value });
-        inp.value = "";
-    }
+   // meeting.ejs içindeki mesaj gönderme fonksiyonu
+function sendMsg() {
+    const inp = document.getElementById('chat-input');
+    if(!inp.value.trim()) return;
 
-    socket.on('new-message', d => {
+    // BURASI KRİTİK: currentRoom (URL'den alınan oda ID'si) gönderilmeli
+    socket.emit('chat-message', { 
+        room: currentRoom, 
+        text: inp.value 
+    });
+    
+    inp.value = "";
+}
+
+// meeting.ejs içindeki mesaj alma dinleyicisi
+socket.on('new-message', d => {
+    // Sadece şu an içinde bulunduğumuz oda ID'si ile eşleşen mesajları göster
+    if (d.room === currentRoom) {
         const box = document.getElementById('chat-messages');
         box.innerHTML += `<div><b style="color:var(--gold)">${d.sender}:</b> ${d.text}</div>`;
         box.scrollTop = box.scrollHeight;
-    });
-
+    }
+});
     socket.on('user-disconnected', id => { if(document.getElementById(id)) document.getElementById(id).remove(); });
 
     init();
 </script>
 </body>
 </html>
+
