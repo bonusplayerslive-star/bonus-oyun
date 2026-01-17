@@ -215,21 +215,20 @@
                 <h3 id="authTitle" class="mt-3" style="color: var(--neon-green); font-family: 'Orbitron';">ACCESS PANEL</h3>
             </div>
             
-            <form id="authForm" method="POST" action="/login">
-                <div id="nicknameGroup">
-                    <label class="small text-success fw-bold mb-1">OPERATOR NICKNAME</label>
-                    <input type="text" name="nickname" id="nicknameInput" class="form-control custom-input" placeholder="Komutan adınızı seçin...">
-                </div>
-                
-                <label class="small text-success fw-bold mb-1">EMAIL ADDRESS</label>
-                <input type="email" name="email" class="form-control custom-input" placeholder="name@example.com" required>
-                
-                <label class="small text-success fw-bold mb-1">SECURE PASSWORD</label>
-                <input type="password" name="password" class="form-control custom-input" placeholder="••••••••" required>
+         <form id="authForm" method="POST" action="/login">
+    <div id="nicknameGroup" style="display: none;"> <label class="small text-success fw-bold mb-1">OPERATOR NICKNAME</label>
+        <input type="text" name="nickname" id="nicknameInput" class="form-control custom-input" placeholder="Komutan adınızı seçin...">
+    </div>
+    
+    <label class="small text-success fw-bold mb-1">EMAIL ADDRESS</label>
+    <input type="email" name="email" id="emailInput" class="form-control custom-input" placeholder="name@example.com" required>
+    
+    <label class="small text-success fw-bold mb-1">SECURE PASSWORD</label>
+    <input type="password" name="password" id="passwordInput" class="form-control custom-input" placeholder="••••••••" required>
 
-                <button type="submit" class="btn btn-neon-green w-100 py-3 mt-2">INITIALIZE SYSTEM</button>
-                <button type="button" class="btn btn-link text-secondary w-100 mt-2 text-decoration-none" onclick="closeAuth()">ABORT MISSION</button>
-            </form>
+    <button type="submit" class="btn btn-neon-green w-100 py-3 mt-2">INITIALIZE SYSTEM</button>
+    <button type="button" class="btn btn-link text-secondary w-100 mt-2 text-decoration-none" onclick="closeAuth()">ABORT MISSION</button>
+</form>
         </div>
     </div>
 
@@ -274,3 +273,4 @@
     </script>
 </body>
 </html>
+
