@@ -245,26 +245,27 @@ let arenaQueue = [];
 const botNames = ["Alpha_Commander", "Cyber_Ghost", "Shadow_Warrior", "Neon_Striker", "Elite_Guard"];
 const botAnimalsList = ["Gorilla", "Eagle", "Lion", "Wolf", "Cobra"];
 
-// --- 2. SOCKET BAĞLANTISI (ANA BLOK) ---
-io.on('connection', async (socket) => {
-    const session = socket.request.session;
-    
-    if (session && session.userId) {
-        const user = await User.findById(session.userId);
-        if (user) {
-            socket.userId = user._id;
-            socket.nickname = user.nickname;
-            socket.join(user.nickname); 
-            console.log(`✅ Bağlantı: ${socket.nickname}`);
-        }
-    }
-// 1. ODA HAFIZASI (Dosyanın en üstünde, io.on dışında 1 kez kalsın)
+// --- 1. ODA HAFIZASI (En üstte, io.on dışında 1 kez kalsın) ---
 const activeRooms = {}; 
 
-io.on('connection', (socket) => {
-    console.log(`[BAĞLANTI] Bir kullanıcı bağlandı: ${socket.nickname || socket.id}`);
+// --- 2. ANA BAĞLANTI BLOK ---
+io.on('connection', async (socket) => {
+    // Session kontrolü ve Kullanıcı Tanımlama
+    const session = socket.request.session;
+    if (session && session.userId) {
+        try {
+            const user = await User.findById(session.userId);
+            if (user) {
+                socket.userId = user._id;
+                socket.nickname = user.nickname;
+                // Kullanıcıyı kendi adıyla bir odaya sok (Özel bildirimler için)
+                socket.join(user.nickname); 
+                console.log(`✅ Sistem Bağlantısı: ${socket.nickname}`);
+            }
+        } catch (err) { console.error("Socket User Auth Error:", err); }
+    }
 
-    // --- 2. ODAYA KATILIM (Meeting & Arena) ---
+    // --- 3. ODAYA KATILIM (Meeting & Arena) ---
     socket.on('join-meeting', (roomId, peerId, nickname) => {
         if (!roomId || !nickname) return;
         
@@ -273,54 +274,52 @@ io.on('connection', (socket) => {
         socket.nickname = nickname;
         socket.peerId = peerId;
 
-        if (!activeRooms[roomId]) {
-            activeRooms[roomId] = { members: [] };
-        }
+        if (!activeRooms[roomId]) activeRooms[roomId] = { members: [] };
         
-        // Üye listede yoksa ekle
+        // Listeye ekle (Yoksa)
         if (!activeRooms[roomId].members.find(m => m.nickname === nickname)) {
             activeRooms[roomId].members.push({ nickname, peerId });
         }
 
-        // Güncel listeyi odadakilere ve global online listesini herkese gönder
         updateAllLists(roomId);
-        
-        // Diğer üyelere görüntülü arama sinyali
         socket.to(roomId).emit('user-connected', peerId, nickname);
-        console.log(`[ODA] ${nickname} -> ${roomId} odasına girdi.`);
+        console.log(`[ODA] ${nickname} -> ${roomId} odasına giriş yaptı.`);
     });
 
-socket.on('chat-message', (data) => {
-    // Boş mesajları engelle
-    if (!data.text || data.text.trim() === "") return;
+    // --- 4. CHAT SİSTEMİ (Global & Özel Oda Ayrımı) ---
+    socket.on('chat-message', (data) => {
+        if (!data.text || data.text.trim() === "") return;
 
-    const msgObj = {
-        sender: socket.nickname || "Misafir",
-        text: data.text.trim(),
-        time: new Date().toLocaleTimeString('tr-TR', { hour: '2-digit', minute: '2-digit' }),
-        room: data.room || 'GENEL'
-    };
+        const msgObj = {
+            sender: socket.nickname || "Misafir",
+            text: data.text.trim(),
+            time: new Date().toLocaleTimeString('tr-TR', { hour: '2-digit', minute: '2-digit' }),
+            room: data.room || 'GENEL'
+        };
 
-    if (data.room && data.room !== 'GENEL') {
-        // Sadece özel odaya bir kez gönder
-        io.to(data.room).emit('new-message', msgObj);
-    } else {
-        // Sadece genel chat'e bir kez gönder
-        io.emit('new-message', msgObj);
-    }
-});
+        if (data.room && data.room !== 'GENEL') {
+            // SADECE O ODAYA GÖNDER
+            io.to(data.room).emit('new-message', msgObj);
+        } else {
+            // TÜM SUNUCUYA GÖNDER
+            io.emit('new-message', msgObj);
+        }
+    });
 
-    // --- 4. DAVET SİSTEMİ ---
+    // --- 5. DAVET SİSTEMİ (Işınlanma Dahil) ---
     socket.on('send-invite', (data) => {
         const { to, type } = data;
         const sharedRoomId = `KONSEY_${socket.nickname}_${Date.now().toString().slice(-4)}`;
         const link = `/${type}?room=${sharedRoomId}`;
         
+        // Karşı tarafa davet yolla
         io.to(to).emit('receive-invite-request', { 
             from: socket.nickname, 
             roomId: sharedRoomId, 
             type: type 
         });
+
+        // DAVET EDENİ ANINDA ODAYA SOK
         socket.emit('redirect-to-room', link);
     });
 
@@ -329,7 +328,7 @@ socket.on('chat-message', (data) => {
         socket.emit('redirect-to-room', link);
     });
 
-    // --- 5. BPL TRANSFER ---
+    // --- 6. LOJİSTİK (BPL) TRANSFER ---
     socket.on('transfer-bpl', async (data) => {
         try {
             if (!socket.userId) return;
@@ -346,12 +345,12 @@ socket.on('chat-message', (data) => {
 
                 socket.emit('update-bpl', sender.bpl);
                 io.to(receiver.nickname).emit('update-bpl', receiver.bpl);
-                socket.emit('gift-result', { success: true, message: `${netAmount} BPL gönderildi.` });
+                socket.emit('gift-result', { success: true, message: `${netAmount} BPL iletildi.` });
             }
         } catch (e) { console.error("Transfer Hatası:", e); }
     });
 
-    // --- 6. AYRILMA VE TEMİZLİK ---
+    // --- 7. AYRILMA VE TEMİZLİK (Tek Fonksiyon) ---
     socket.on('disconnect', () => {
         const rId = socket.roomId;
         if (rId && activeRooms[rId]) {
@@ -360,65 +359,23 @@ socket.on('chat-message', (data) => {
             updateAllLists(rId);
             if (activeRooms[rId].members.length === 0) delete activeRooms[rId];
         }
+        console.log(`❌ Ayrıldı: ${socket.nickname}`);
     });
 
-    // Yardımcı Fonksiyon (io.on içinde olmalı)
+    // --- YARDIMCI: LİSTE GÜNCELLEME ---
     async function updateAllLists(roomId) {
         const allSockets = await io.fetchSockets();
-        const globalOnline = allSockets.map(s => s.nickname).filter(n => n);
-        const roomMembers = activeRooms[roomId] ? activeRooms[roomId].members.map(m => m.nickname) : [];
+        const globalOnline = allSockets.map(s => ({ nickname: s.nickname }));
         
-        if(roomId) {
-            io.to(roomId).emit('update-lists', { globalOnline, roomMembers });
-            // Eski tip liste bekleyen sayfalar için:
+        // Global listeyi herkese yayınla
+        io.emit('update-user-list', globalOnline);
+
+        // Oda listesini sadece odadakilere yayınla
+        if (roomId && activeRooms[roomId]) {
+            const roomMembers = activeRooms[roomId].members.map(m => m.nickname);
             io.to(roomId).emit('update-council-list', roomMembers);
         }
-        io.emit('update-user-list', allSockets.map(s => ({ nickname: s.nickname })));
     }
-
-}); // <--- İŞTE UNUTTUĞUN KAPATMA PARANTEZİ BU!
-
-// 3. AYRILMA VE TEMİZLİK
-socket.on('disconnect', () => {
-    const rId = socket.roomId;
-    if (rId && activeRooms[rId]) {
-        // Üyeyi listeden çıkar
-        activeRooms[rId].members = activeRooms[rId].members.filter(m => m.nickname !== socket.nickname);
-        
-        // Kalanlara yeni listeyi bildir
-        const newList = activeRooms[rId].members.map(m => m.nickname);
-        io.to(rId).emit('update-council-list', newList);
-        
-        // Görüntüsünü kaldır
-        socket.to(rId).emit('user-disconnected', socket.peerId);
-
-        // Kimse kalmadıysa RAM'den temizle
-        if (activeRooms[rId].members.length === 0) delete activeRooms[rId];
-    }
-});
-// DAVET GÖNDERME
-socket.on('send-invite', async (data) => {
-    const { to, type } = data; // type: 'meeting' veya 'arena'
-    const sharedRoomId = `KONSEY_${socket.nickname}_${Date.now().toString().slice(-4)}`;
-    
-    // Davet edene link gönder
-    const link = `/${type}?room=${sharedRoomId}`;
-    
-    // Karşı tarafa onay kutusu gönder
-    io.to(to).emit('receive-invite-request', { 
-        from: socket.nickname, 
-        roomId: sharedRoomId, 
-        type: type 
-    });
-    
-    // Davet edeni de odaya yönlendirmek için emir ver
-    socket.emit('redirect-to-room', link);
-});
-
-// DAVET KABUL
-socket.on('accept-invite', (data) => {
-    const link = `/${data.type}?room=${data.roomId}`;
-    socket.emit('redirect-to-room', link);
 });
     
 // ======================================================
@@ -637,6 +594,7 @@ const PORT = process.env.PORT || 10000;
 httpServer.listen(PORT, () => {
     console.log(`🌍 Sunucu Yayında: http://localhost:${PORT}`);
 });
+
 
 
 
