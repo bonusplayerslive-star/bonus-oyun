@@ -139,6 +139,7 @@
 <script src="https://unpkg.com/peerjs@1.5.2/dist/peerjs.min.js"></script>
 
 <script>
+ 
     const myNick = "<%= user.nickname %>";
     const currentRoom = new URLSearchParams(window.location.search).get('room');
     const socket = io(); 
@@ -146,42 +147,66 @@
     let myStream;
     let selectedUser = null;
 
+    // Sistem mesajlarını yazdırmak için yardımcı fonksiyon (Hata vermemesi için)
+    function appendMsg(sender, text) {
+        const chatBox = document.getElementById('vip-chat');
+        if(!chatBox) return;
+        const time = new Date().toLocaleTimeString('tr-TR', { hour: '2-digit', minute: '2-digit' });
+        chatBox.innerHTML += `
+            <div style="margin-bottom:5px;">
+                <small style="color:#555">${time}</small> 
+                <b style="color:var(--gold)">${sender}:</b> 
+                <span style="color:#eee">${text}</span>
+            </div>`;
+        chatBox.scrollTop = chatBox.scrollHeight;
+    }
+
     // Kamera Başlatma
     async function initCouncil() {
         try {
             myStream = await navigator.mediaDevices.getUserMedia({ video: true, audio: true });
             document.getElementById('localVideo').srcObject = myStream;
-            myPeer.on('open', id => socket.emit('join-meeting', currentRoom, id, myNick));
+            
+            // Peer açıldığında odaya katıl
+            myPeer.on('open', id => {
+                console.log("Peer ID oluşturuldu, odaya giriliyor:", id);
+                socket.emit('join-meeting', currentRoom, id, myNick);
+            });
         } catch (e) {
-            alert("Kamera hatası! Lütfen izin verin.");
+            console.error("Kamera Hatası:", e);
+            alert("Kamera/Mikrofon izni verilmedi. Görüntülü görüşme yapılamaz.");
         }
     }
 
-    // Gelen Aramaları Yanıtla
+    // GELEN ARAMALARI YANITLA (Kavuşmanın ilk adımı)
     myPeer.on('call', call => {
+        console.log("Gelen arama yanıtlanıyor...");
         call.answer(myStream);
         call.on('stream', userStream => {
-            // Arayan kişinin nickini socket üzerinden alıyoruz aslında ama 
-            // şimdilik 'ÜYE' olarak ekle, socket'ten gelenle güncellenir.
-            addVideoSlot(call.peer, userStream, "ÜYE");
+            // Arayan kişinin peerId'sini kullanarak slot oluştur
+            addVideoSlot(call.peer, userStream, "ÜYE"); 
         });
     });
 
-socket.on('user-connected', (peerId, nick) => {
-    console.log("Yeni kullanıcı bağlandı, arıyorum:", nick);
-    // Kısa bir bekleme ekleyelim ki karşı tarafın kamerası hazır olsun
-    setTimeout(() => {
-        const call = myPeer.call(peerId, myStream);
-        call.on('stream', userStream => {
-            addVideoSlot(peerId, userStream, nick);
-        });
-    }, 1500); 
-    
-    appendMsg("SİSTEM", `${nick} masaya katıldı.`);
-});
+    // YENİ BİRİ GELDİĞİNDE ONU ARA (Kavuşmanın ikinci adımı)
+    socket.on('user-connected', (peerId, nick) => {
+        console.log("Yeni kullanıcı bağlandı, görüntülü aranıyor:", nick);
+        
+        // ÖNEMLİ: Biraz bekleyelim ki karşı tarafın answer() dinleyicisi hazır olsun
+        setTimeout(() => {
+            const call = myPeer.call(peerId, myStream);
+            call.on('stream', userStream => {
+                addVideoSlot(peerId, userStream, nick);
+            });
+        }, 2000); 
+        
+        appendMsg("SİSTEM", `${nick} masaya katıldı.`);
+    });
 
     function addVideoSlot(peerId, stream, nick) {
+        // Eğer bu peerId için zaten bir video varsa tekrar ekleme
         if (document.getElementById(peerId)) return;
+
         const slot = document.createElement('div');
         slot.className = "v-slot";
         slot.id = peerId;
@@ -191,18 +216,21 @@ socket.on('user-connected', (peerId, nick) => {
         video.srcObject = stream;
         video.autoplay = true;
         video.playsInline = true;
+        // Kendi sesimizin bize geri dönmemesi için (Echo önleme)
+        if(nick === myNick) video.muted = true;
 
         const label = document.createElement('div');
         label.className = "user-label";
         label.innerText = nick;
 
         slot.append(video, label);
-        document.getElementById('video-grid').prepend(slot); // Yeni geleni en üste ekle
+        document.getElementById('video-grid').prepend(slot);
     }
 
     // Oda İçindeki Listeyi Güncelle
     socket.on('update-council-list', (members) => {
         const listDiv = document.getElementById('member-names');
+        if(!listDiv) return;
         listDiv.innerHTML = members.map(m => `
             <div class="member-item" onclick="showMenu(event, '${m}')">
                 ${m === myNick ? '<b>SİZ</b>' : m}
@@ -210,29 +238,20 @@ socket.on('user-connected', (peerId, nick) => {
         `).join('');
     });
 
-    // Chat İşlemleri
+    // Chat Mesaj Gönderimi
     function sendMessage() {
         const input = document.getElementById('chat-input');
-        if(!input.value.trim()) return;
+        if(!input || !input.value.trim()) return;
         socket.emit('chat-message', { room: currentRoom, text: input.value });
         input.value = '';
     }
 
+    // Mesaj Geldiğinde
     socket.on('new-message', d => {
-        const chatBox = document.getElementById('vip-chat');
-        const color = d.sender === myNick ? "var(--gold)" : "#00ffcc";
-        const time = new Date().toLocaleTimeString('tr-TR', { hour: '2-digit', minute: '2-digit' });
-        
-        chatBox.innerHTML += `
-            <div style="margin-bottom:5px;">
-                <small style="color:#555">${time}</small> 
-                <b style="color:${color}">${d.sender}:</b> 
-                <span style="color:#eee">${d.text}</span>
-            </div>`;
-        chatBox.scrollTop = chatBox.scrollHeight;
+        appendMsg(d.sender, d.text);
     });
 
-    // Menü İşlemleri
+    // Menü ve Diğer Fonksiyonlar (Aynı kalabilir)
     function showMenu(e, nick) {
         if(nick === myNick) return;
         selectedUser = nick;
@@ -243,7 +262,10 @@ socket.on('user-connected', (peerId, nick) => {
         e.stopPropagation();
     }
 
-    function hideMenu() { document.getElementById('user-context-menu').style.display = 'none'; }
+    function hideMenu() { 
+        const menu = document.getElementById('user-context-menu');
+        if(menu) menu.style.display = 'none'; 
+    }
     
     function executeAction(action) {
         if(action === 'gift') socket.emit('transfer-bpl', { to: selectedUser, amount: 50 });
@@ -252,11 +274,16 @@ socket.on('user-connected', (peerId, nick) => {
     }
 
     window.onclick = hideMenu;
-    socket.on('room-closed', msg => { alert(msg); window.location.href = "/chat"; });
-    socket.on('user-disconnected', (peerId) => { if(document.getElementById(peerId)) document.getElementById(peerId).remove(); });
+
+    socket.on('user-disconnected', (peerId) => { 
+        const el = document.getElementById(peerId);
+        if(el) el.remove(); 
+    });
     
+    // Başlat
     initCouncil();
 </script>
 </body>
 </html>
+
 
