@@ -242,7 +242,9 @@
         }
     }
 
-    socket.on('new-message', (data) => {
+   socket.on('new-message', (data) => {
+    // SADECE odası olmayan veya odası 'GENEL' olan mesajları kabul et
+    if (!data.room || data.room === 'GENEL') {
         const box = document.getElementById('chatMessages');
         const div = document.createElement('div');
         div.className = "msg-entry";
@@ -250,8 +252,8 @@
                          <span class="text-light">${data.text}</span>`;
         box.appendChild(div);
         box.scrollTop = box.scrollHeight;
-    });
-
+    }
+});
     socket.on('update-bpl', (newBpl) => {
         myBpl = newBpl;
         document.getElementById('myBpl').innerText = newBpl;
@@ -261,3 +263,4 @@
 </script>
 </body>
 </html>
+
