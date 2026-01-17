@@ -248,9 +248,10 @@ const botAnimalsList = ["Gorilla", "Eagle", "Lion", "Wolf", "Cobra"];
 // --- 1. ODA HAFIZASI (En üstte, io.on dışında 1 kez kalsın) ---
 
 
-// --- 2. ANA BAĞLANTI BLOK ---
+// --- 2. ANA SOKET BLOĞU (Sadece bir kez açılmalı) ---
 io.on('connection', async (socket) => {
-    // Session kontrolü ve Kullanıcı Tanımlama
+    
+    // Kullanıcı Tanımlama (Session üzerinden)
     const session = socket.request.session;
     if (session && session.userId) {
         try {
@@ -258,38 +259,31 @@ io.on('connection', async (socket) => {
             if (user) {
                 socket.userId = user._id;
                 socket.nickname = user.nickname;
-                // Kullanıcıyı kendi adıyla bir odaya sok (Özel bildirimler için)
                 socket.join(user.nickname); 
-                console.log(`✅ Sistem Bağlantısı: ${socket.nickname}`);
+                console.log(`✅ Bağlı: ${socket.nickname}`);
             }
-        } catch (err) { console.error("Socket User Auth Error:", err); }
+        } catch (err) { console.error("Bağlantı Hatası:", err); }
     }
-
-    // --- 3. ODAYA KATILIM (Meeting & Arena) ---
+// --- ODAYA KATILIM (Bilet Sistemi) ---
     socket.on('join-meeting', (roomId, peerId, nickname) => {
         if (!roomId || !nickname) return;
-        
         socket.join(roomId);
         socket.roomId = roomId;
         socket.nickname = nickname;
         socket.peerId = peerId;
 
         if (!activeRooms[roomId]) activeRooms[roomId] = { members: [] };
-        
-        // Listeye ekle (Yoksa)
         if (!activeRooms[roomId].members.find(m => m.nickname === nickname)) {
             activeRooms[roomId].members.push({ nickname, peerId });
         }
 
         updateAllLists(roomId);
         socket.to(roomId).emit('user-connected', peerId, nickname);
-        console.log(`[ODA] ${nickname} -> ${roomId} odasına giriş yaptı.`);
     });
 
-    // --- 4. CHAT SİSTEMİ (Global & Özel Oda Ayrımı) ---
+   // --- MESAJLAŞMA (İzole Oda) ---
     socket.on('chat-message', (data) => {
         if (!data.text || data.text.trim() === "") return;
-
         const msgObj = {
             sender: socket.nickname || "Misafir",
             text: data.text.trim(),
@@ -298,12 +292,25 @@ io.on('connection', async (socket) => {
         };
 
         if (data.room && data.room !== 'GENEL') {
-            // SADECE O ODAYA GÖNDER
             io.to(data.room).emit('new-message', msgObj);
         } else {
-            // TÜM SUNUCUYA GÖNDER
             io.emit('new-message', msgObj);
         }
+    });
+
+    // --- DAVET VE IŞINLANMA ---
+    socket.on('send-invite', (data) => {
+        const { to, type } = data;
+        const sharedRoomId = `KONSEY_${socket.nickname}_${Date.now().toString().slice(-4)}`;
+        const link = `/${type}?room=${sharedRoomId}`;
+        
+        io.to(to).emit('receive-invite-request', { 
+            from: socket.nickname, 
+            roomId: sharedRoomId, 
+            type: type 
+        });
+        // Davet edeni anında odaya gönder
+        socket.emit('redirect-to-room', link);
     });
 
     // --- 5. DAVET SİSTEMİ (Işınlanma Dahil) ---
@@ -323,12 +330,12 @@ io.on('connection', async (socket) => {
         socket.emit('redirect-to-room', link);
     });
 
-    socket.on('accept-invite', (data) => {
+  socket.on('accept-invite', (data) => {
         const link = `/${data.type}?room=${data.roomId}`;
         socket.emit('redirect-to-room', link);
     });
 
-    // --- 6. LOJİSTİK (BPL) TRANSFER ---
+   // --- BPL TRANSFER ---
     socket.on('transfer-bpl', async (data) => {
         try {
             if (!socket.userId) return;
@@ -342,15 +349,14 @@ io.on('connection', async (socket) => {
                 receiver.bpl += netAmount;
                 await sender.save();
                 await receiver.save();
-
                 socket.emit('update-bpl', sender.bpl);
                 io.to(receiver.nickname).emit('update-bpl', receiver.bpl);
-                socket.emit('gift-result', { success: true, message: `${netAmount} BPL iletildi.` });
+                socket.emit('gift-result', { success: true, message: `${netAmount} BPL gönderildi.` });
             }
         } catch (e) { console.error("Transfer Hatası:", e); }
     });
 
-    // --- 7. AYRILMA VE TEMİZLİK (Tek Fonksiyon) ---
+    // --- AYRILMA ---
     socket.on('disconnect', () => {
         const rId = socket.roomId;
         if (rId && activeRooms[rId]) {
@@ -359,26 +365,18 @@ io.on('connection', async (socket) => {
             updateAllLists(rId);
             if (activeRooms[rId].members.length === 0) delete activeRooms[rId];
         }
-        console.log(`❌ Ayrıldı: ${socket.nickname}`);
     });
 
-    // --- YARDIMCI: LİSTE GÜNCELLEME ---
+    // --- LİSTE GÜNCELLEME ---
     async function updateAllLists(roomId) {
         const allSockets = await io.fetchSockets();
         const globalOnline = allSockets.map(s => ({ nickname: s.nickname }));
-        
-        // Global listeyi herkese yayınla
         io.emit('update-user-list', globalOnline);
-
-        // Oda listesini sadece odadakilere yayınla
         if (roomId && activeRooms[roomId]) {
             const roomMembers = activeRooms[roomId].members.map(m => m.nickname);
             io.to(roomId).emit('update-council-list', roomMembers);
         }
-    }
-});
-    
-// ======================================================
+    }// ======================================================
 // --- 3. LOJİSTİK DESTEK (BPL TRANSFERİ) ---
 // ======================================================
 
@@ -593,6 +591,7 @@ const PORT = process.env.PORT || 10000;
 httpServer.listen(PORT, () => {
     console.log(`🌍 Sunucu Yayında: http://localhost:${PORT}`);
 });
+
 
 
 
