@@ -161,6 +161,14 @@
     socket.emit('chat-message', { room: currentRoom, text: input.value });
     input.value = '';
 }
+
+
+socket.on('update-council-list', (members) => {
+    const listDiv = document.getElementById('member-names');
+    listDiv.innerHTML = members.map(m => `<div>• ${m}</div>`).join('');
+});
+
+
     socket.on('new-message', d => appendMsg(d.sender, d.text));
 
     function appendMsg(s, t) {
@@ -173,5 +181,6 @@
 </script>
 </body>
 </html>
+
 
 
