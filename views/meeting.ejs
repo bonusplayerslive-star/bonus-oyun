@@ -72,6 +72,21 @@
             .bottom-panel { height: 40vh; }
             .user-label { font-size: 0.6rem; }
         }
+
+/* Kameranın altındaki boşluğu chat alanı yapalım */
+    #vip-chat {
+        height: 150px; /* Panel yüksekliği */
+        overflow-y: auto;
+        padding: 10px;
+        background: rgba(0,0,0,0.5);
+        border-top: 1px solid var(--gold);
+        margin-bottom: 10px;
+        font-family: monospace;
+    }
+    .msg-line { margin-bottom: 5px; border-bottom: 1px solid #222; }
+
+
+
     </style>
 </head>
 <body>
@@ -104,6 +119,9 @@
     <div class="menu-btn" onclick="executeAction('gift')">🎁 50 BPL HEDİYE</div>
     <div class="menu-btn" onclick="executeAction('arena')">⚔️ ARENAYA DAVET</div>
     <div class="menu-btn text-danger" onclick="hideMenu()">KAPAT</div>
+</div>
+<div id="vip-chat">
+    <div style="color: #555;">[Sistem]: Konsey odasına bağlanıldı...</div>
 </div>
 
 <script src="/socket.io/socket.io.js"></script>
@@ -208,7 +226,40 @@
         chat.innerHTML += `<div><b style="color:${color}">${s}:</b> <span class="text-white">${t}</span></div>`;
         chat.scrollTop = chat.scrollHeight;
     }
+// MESAJLARI YAKALA VE EKRANA BAS
+    socket.on('new-message', d => {
+        const chatBox = document.getElementById('vip-chat');
+        const isMe = d.sender === myNick;
+        const color = isMe ? "var(--gold)" : "#00ffcc";
+        
+        chatBox.innerHTML += `
+            <div class="msg-line">
+                <small style="color:#666">${d.time}</small> 
+                <b style="color:${color}">${d.sender}:</b> 
+                <span style="color:#eee">${d.text}</span>
+            </div>`;
+        
+        // Otomatik aşağı kaydır
+        chatBox.scrollTop = chatBox.scrollHeight;
+    });
 
+    // MESAJ GÖNDERME FONKSİYONU
+    function sendMessage() {
+        const input = document.getElementById('chat-input');
+        if(!input.value) return;
+
+        // Arena mantığı: URL'den odayı al ve gönder
+        const params = new URLSearchParams(window.location.search);
+        const roomId = params.get('room');
+
+        socket.emit('chat-message', { 
+            room: roomId, 
+            text: input.value 
+        });
+        
+        input.value = '';
+    }
+</script>
     socket.on('room-closed', (msg) => { alert(msg); window.location.href = "/chat"; });
     socket.on('user-disconnected', peerId => { if(document.getElementById(peerId)) document.getElementById(peerId).remove(); });
     window.onclick = hideMenu;
@@ -216,3 +267,4 @@
 </script>
 </body>
 </html>
+
