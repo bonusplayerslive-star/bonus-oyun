@@ -246,7 +246,7 @@ const botNames = ["Alpha_Commander", "Cyber_Ghost", "Shadow_Warrior", "Neon_Stri
 const botAnimalsList = ["Gorilla", "Eagle", "Lion", "Wolf", "Cobra"];
 
 // --- 1. ODA HAFIZASI (En üstte, io.on dışında 1 kez kalsın) ---
-const activeRooms = {}; 
+
 
 // --- 2. ANA BAĞLANTI BLOK ---
 io.on('connection', async (socket) => {
@@ -594,6 +594,7 @@ const PORT = process.env.PORT || 10000;
 httpServer.listen(PORT, () => {
     console.log(`🌍 Sunucu Yayında: http://localhost:${PORT}`);
 });
+
 
 
 
