@@ -587,13 +587,13 @@ if (room && room.members.length === 0) {
         } // for döngüsü sonu
     }); // socket.on('disconnect') sonu
 
-}); // <--- BU ÇOK ÖNEMLİ! io.on('connection') ana bloğunu kapatır.
 
 // --- 4. SERVER BAŞLAT ---
 const PORT = process.env.PORT || 10000;
 httpServer.listen(PORT, () => {
     console.log(`🌍 Sunucu Yayında: http://localhost:${PORT}`);
 });
+
 
 
 
