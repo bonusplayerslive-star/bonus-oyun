@@ -228,18 +228,19 @@
         }
     }
 
-    socket.on('new-message', (data) => {
-        // SADECE global mesajları bu pencerede göster
-        if (!data.room || data.room === 'GENEL') {
-            const box = document.getElementById('chatMessages');
-            const div = document.createElement('div');
-            div.className = "msg-entry";
-            div.innerHTML = `<span class="sender-tag" onclick="openUserMenu('${data.sender}')">${data.sender}:</span> 
-                             <span class="text-light">${data.text}</span>`;
-            box.appendChild(div);
-            box.scrollTop = box.scrollHeight;
-        }
-    });
+// chat.ejs içindeki dinleyici
+socket.on('new-message', (data) => {
+    // SADECE 'GENEL' etiketli mesajları ana ekrana bas
+    if (data.room === 'GENEL') {
+        const box = document.getElementById('chatMessages');
+        const div = document.createElement('div');
+        div.className = "msg-entry";
+        div.innerHTML = `<span class="sender-tag" onclick="openUserMenu('${data.sender}')">${data.sender}:</span> 
+                         <span class="text-light">${data.text}</span>`;
+        box.appendChild(div);
+        box.scrollTop = box.scrollHeight;
+    }
+});
 
     socket.on('update-bpl', (newBpl) => {
         myBpl = newBpl;
@@ -267,4 +268,5 @@ socket.on('receive-invite-request', (data) => {
 </script>
 </body>
 </html>
+
 
