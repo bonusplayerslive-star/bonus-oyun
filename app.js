@@ -582,11 +582,59 @@ async function createBotMatch(player) {
     startBattle(player.id, player.cost, [player, botData]);
 }
 
+
+// --- BAĞLANTI KESİLME YÖNETİMİ ---
+    socket.on('disconnect', () => {
+        console.log(`[BPL-SİSTEM] Kullanıcı ayrıldı: ${socket.nickname}`);
+
+        // Tüm aktif odaları tara
+        for (const roomId in activeRooms) {
+            let room = activeRooms[roomId];
+            
+            // Eğer ayrılan kişi bu odanın üyesiyse
+            if (room.members.includes(socket.nickname)) {
+                // Üyeyi listeden temizle
+                room.members = room.members.filter(m => m !== socket.nickname);
+                
+                // Odada kalanlara güncel listeyi gönder (Sağdaki panel güncellensin)
+                io.to(roomId).emit('update-council-list', room.members);
+                
+                // Odadaki diğer üyelere görüntünün kapandığını bildir (PeerJS ID'si ile)
+                // Not: socket.peerId'yi join-meeting'de socket'e bağladıysan kullanabilirsin
+                io.to(roomId).emit('user-disconnected', socket.peerId);
+
+                // EĞER ODA LİDERİ AYRILDIYSA (Racon Gereği)
+                if (room.leader === socket.nickname) {
+                    io.to(roomId).emit('new-message', { 
+                        sender: "SİSTEM", 
+                        text: "Oda lideri konseyden ayrıldı. Masa dağıtılıyor..." 
+                    });
+                    
+                    // 5 saniye sonra odayı tamamen silmek istersen:
+                    setTimeout(() => {
+                        delete activeRooms[roomId];
+                    }, 5000);
+                }
+            }
+
+            // Odada hiç kimse kalmadıysa odayı RAM'den tamamen sil
+            if (room.members.length === 0) {
+                delete activeRooms[roomId];
+            }
+        }
+    });
+
+    
+
+
+
+    
 // --- 4. SERVER BAŞLAT ---
 const PORT = process.env.PORT || 10000;
 httpServer.listen(PORT, () => {
     console.log(`🌍 Sunucu Yayında: http://localhost:${PORT}`);
 });
+
 
 
 
