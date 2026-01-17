@@ -261,23 +261,23 @@ io.on('connection', async (socket) => {
 const activeRooms = {}; 
 
 // CHAT & MESAJLAŞMA (Geliştirilmiş Oda Sistemi)
+// CHAT & MESAJLAŞMA (Arena & Meeting Uyumlu)
 socket.on('chat-message', (data) => {
     const msgObj = {
-        sender: socket.nickname || "Bilinmeyen",
+        sender: socket.nickname || "Misafir",
         text: data.text,
         time: new Date().toLocaleTimeString('tr-TR', { hour: '2-digit', minute: '2-digit' }),
-        room: data.room // Hangi odadan geldiğini işaretliyoruz
+        room: data.room // Client'tan gelen oda bilgisi
     };
 
-    if (data.room && data.room !== 'GENEL') {
-        // SADECE O ODADAKİLERE GÖNDER (VIP Konsey veya Arena)
+    if (data.room) {
+        // Eğer bir odaya bağlıysa (Arena veya VIP Konsey) sadece o kanala gönder
         io.to(data.room).emit('new-message', msgObj);
     } else {
-        // GLOBAL CHAT - HERKESE GÖNDER
+        // Global chat - Herkese gönder
         io.emit('new-message', msgObj);
     }
 });
-
 // MEETING KATILIM (Oda Kilidi)
 // Oda takibi için global obje (Dosyanın en üstünde bir kez tanımlanmalı)
 
@@ -523,6 +523,7 @@ const PORT = process.env.PORT || 10000;
 httpServer.listen(PORT, () => {
     console.log(`🌍 Sunucu Yayında: http://localhost:${PORT}`);
 });
+
 
 
 
