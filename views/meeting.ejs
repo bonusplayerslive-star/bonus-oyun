@@ -167,12 +167,18 @@
         });
     });
 
-    socket.on('user-connected', (peerId, nick) => {
-        setTimeout(() => {
-            const call = myPeer.call(peerId, myStream);
-            call.on('stream', userStream => addVideoSlot(peerId, userStream, nick));
-        }, 1000);
-    });
+socket.on('user-connected', (peerId, nick) => {
+    console.log("Yeni kullanıcı bağlandı, arıyorum:", nick);
+    // Kısa bir bekleme ekleyelim ki karşı tarafın kamerası hazır olsun
+    setTimeout(() => {
+        const call = myPeer.call(peerId, myStream);
+        call.on('stream', userStream => {
+            addVideoSlot(peerId, userStream, nick);
+        });
+    }, 1500); 
+    
+    appendMsg("SİSTEM", `${nick} masaya katıldı.`);
+});
 
     function addVideoSlot(peerId, stream, nick) {
         if (document.getElementById(peerId)) return;
@@ -253,3 +259,4 @@
 </script>
 </body>
 </html>
+
