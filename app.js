@@ -280,11 +280,25 @@ socket.on('chat-message', (data) => {
 
 // MEETING KATILIM (Oda Kilidi)
 socket.on('join-meeting', (roomId, peerId, nickname) => {
-    socket.join(roomId);
+    // 1. ÖNEMLİ: Soketi fiziksel olarak odaya alıyoruz
+    socket.join(roomId); 
+    
+    // 2. Hafızada (RAM) odayı güncelle
     if (activeRooms[roomId]) {
         if (!activeRooms[roomId].members.includes(nickname)) {
             activeRooms[roomId].members.push(nickname);
         }
+    } else {
+        // Eğer oda yoksa (lider yeni girmişse) oluştur
+        activeRooms[roomId] = { leader: nickname, members: [nickname] };
+    }
+
+    // 3. ODA İÇİNDEKİ HERKESE GÜNCEL LİSTEYİ GÖNDER
+    io.to(roomId).emit('update-council-list', activeRooms[roomId].members);
+    
+    // 4. Peer bağlantısı için diğerlerine haber ver
+    socket.to(roomId).emit('user-connected', peerId, nickname);
+});
         // ODA İÇİNDEKİ HERKESE GÜNCEL LİSTEYİ GÖNDER
         io.to(roomId).emit('update-council-list', activeRooms[roomId].members);
     }
@@ -489,6 +503,7 @@ const PORT = process.env.PORT || 10000;
 httpServer.listen(PORT, () => {
     console.log(`🌍 Sunucu Yayında: http://localhost:${PORT}`);
 });
+
 
 
 
