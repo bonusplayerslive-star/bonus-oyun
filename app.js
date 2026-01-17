@@ -279,7 +279,57 @@ socket.on('chat-message', (data) => {
         io.emit('new-message', msgObj);
     }
 });
+const activeRooms = {}; 
 
+io.on('connection', (socket) => {
+    // Kullanıcı bağlandığında ismini sokete işle (Global liste için)
+    // socket.nickname zaten girişten geliyor olmalı
+
+    // 1. ODAYA KATILIM
+    socket.on('join-meeting', (roomId, peerId, nickname) => {
+        socket.join(roomId);
+        socket.roomId = roomId;
+        socket.peerId = peerId;
+        socket.nickname = nickname;
+
+        if (!activeRooms[roomId]) activeRooms[roomId] = { members: [] };
+        if (!activeRooms[roomId].members.find(m => m.nick === nickname)) {
+            activeRooms[roomId].members.push({ nick: nickname, peerId: peerId });
+        }
+
+        updateAllLists(roomId);
+        socket.to(roomId).emit('user-connected', peerId, nickname);
+    });
+
+    // 2. LİSTE GÜNCELLEME FONKSİYONU
+    async function updateAllLists(roomId) {
+        // Global Online Listesi (Tüm sunucu)
+        const allSockets = await io.fetchSockets();
+        const globalOnline = allSockets.map(s => s.nickname).filter(n => n);
+
+        // Oda Üyeleri
+        const roomMembers = activeRooms[roomId] ? activeRooms[roomId].members.map(m => m.nick) : [];
+
+        io.to(roomId).emit('update-lists', {
+            globalOnline: globalOnline,
+            roomMembers: roomMembers
+        });
+    }
+
+    // 3. MESAJLAŞMA
+    socket.on('chat-message', (data) => {
+        io.to(data.room).emit('new-message', { sender: socket.nickname, text: data.text });
+    });
+
+    // 4. AYRILMA
+    socket.on('disconnect', () => {
+        if(socket.roomId && activeRooms[socket.roomId]) {
+            activeRooms[socket.roomId].members = activeRooms[socket.roomId].members.filter(m => m.nick !== socket.nickname);
+            socket.to(socket.roomId).emit('user-disconnected', socket.peerId);
+            updateAllLists(socket.roomId);
+        }
+    });
+});
 
 
 // --- VIP ODA HAFIZASI (Dosyanın en üstünde kalsın) ---
@@ -584,6 +634,7 @@ const PORT = process.env.PORT || 10000;
 httpServer.listen(PORT, () => {
     console.log(`🌍 Sunucu Yayında: http://localhost:${PORT}`);
 });
+
 
 
 
