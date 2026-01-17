@@ -289,21 +289,53 @@ io.on('connection', async (socket) => {
     });
 
     // ÖZEL DAVETLER
-    socket.on('send-invite', async (data) => {
-        try {
-            const { to, type, cost } = data;
-            const sender = await User.findById(socket.userId);
-            if (!sender || sender.bpl < cost + 5500) return socket.emit('error-msg', 'Yetersiz bakiye!');
+   // Oda doluluk takibi için basit bir obje (Veritabanı yerine RAM'de tutmak daha hızlıdır)
+const activeRooms = {}; 
 
-            sender.bpl -= cost;
-            await sender.save();
-            socket.emit('update-bpl', sender.bpl);
+socket.on('send-invite', async (data) => {
+    try {
+        const { to, type, cost } = data;
+        const sender = await User.findById(socket.userId);
+        
+        if (!sender || sender.bpl < (cost + 5500)) {
+            return socket.emit('error-msg', 'Yetersiz bakiye (Minimum 5500 BPL gerekli)!');
+        }
 
-            const targetRoomId = `${socket.nickname}_Room`;
-            io.to(to).emit('receive-invite', { from: socket.nickname, type, roomId: targetRoomId });
-            socket.emit('redirect-to-room', type === 'arena' ? `/arena?room=${targetRoomId}` : `/meeting?room=${targetRoomId}`);
-        } catch (e) { console.log("Davet Hatası:", e); }
-    });
+        // Ücreti tahsil et
+        sender.bpl -= cost;
+        await sender.save();
+        socket.emit('update-bpl', sender.bpl);
+
+        const targetRoomId = `${socket.nickname}_Room`;
+        
+        // 1. Oda bilgilerini oluştur/güncelle
+        if (!activeRooms[targetRoomId]) {
+            activeRooms[targetRoomId] = { leader: socket.nickname, members: [], capacity: 5 };
+        }
+
+        // 2. ÖNCE DAVET EDENİ ODAYA GÖNDER
+        socket.emit('redirect-to-room', type === 'arena' ? `/arena?room=${targetRoomId}` : `/meeting?room=${targetRoomId}`);
+
+        // 3. SONRA HEDEFE DAVET GÖNDER (Kısa bir gecikmeyle ki lider odaya yerleşsin)
+        setTimeout(() => {
+            io.to(to).emit('receive-invite', { 
+                from: socket.nickname, 
+                type, 
+                roomId: targetRoomId 
+            });
+        }, 1000);
+
+    } catch (e) { console.log("Davet Hatası:", e); }
+});
+
+// Lider çıkarsa odayı dağıtma mantığı
+socket.on('disconnect', () => {
+    const userRoom = `${socket.nickname}_Room`;
+    if (activeRooms[userRoom]) {
+        io.to(userRoom).emit('room-closed', 'Lider masadan ayrıldı, konsey dağılıyor...');
+        delete activeRooms[userRoom];
+    }
+});
 
     // ARENA MOTORU
     socket.on('arena-ready', async (data) => {
@@ -419,4 +451,5 @@ const PORT = process.env.PORT || 10000;
 httpServer.listen(PORT, () => {
     console.log(`🌍 Sunucu Yayında: http://localhost:${PORT}`);
 });
+
 
