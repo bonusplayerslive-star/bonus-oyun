@@ -33,6 +33,7 @@ app.use(express.static(path.join(__dirname, 'public')));
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
 
+
 const sessionMiddleware = session({
     secret: process.env.SESSION_SECRET || 'bpl_cyber_secret_2025',
     resave: false,
@@ -103,21 +104,21 @@ app.post('/register', async (req, res) => {
 
 // Giriş İşlemi
 app.post('/login', async (req, res) => {
+    const { email, password } = req.body;
     try {
-        const { email, password } = req.body;
-        const user = await User.findOne({ email, password });
-        if (user) {
-            req.session.userId = user._id;
-            req.session.user = user;
-            res.redirect('/profil');
-        } else {
-            res.send("<script>alert('Hatalı giriş!'); window.location='/';</script>");
-        }
+        const user = await User.findOne({ email });
+        if (!user) return res.send("Kullanıcı bulunamadı.");
+
+        // Şifre kontrolü (bcrypt kullanıyorsan compare yapmalısın)
+        if (user.password !== password) return res.send("Hatalı şifre.");
+
+        req.session.userId = user._id; // Session kaydı
+        res.redirect('/profil'); // Başarılıysa profile git
     } catch (err) {
-        res.status(500).send("Giriş başarısız.");
+        console.log(err);
+        res.send("Bir hata oluştu.");
     }
 });
-
 // Sayfalar (Hepsini tek blokta topladım, karışıklık olmasın)
 app.get('/profil', isLoggedIn, async (req, res) => {
     const user = await User.findById(req.user._id); // Hayvanın görünmesi için DB'den taze veri çekiyoruz
@@ -418,3 +419,4 @@ const PORT = process.env.PORT || 10000;
 httpServer.listen(PORT, () => {
     console.log(`🌍 Sunucu Yayında: http://localhost:${PORT}`);
 });
+
