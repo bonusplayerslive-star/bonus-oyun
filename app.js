@@ -280,7 +280,7 @@ socket.on('chat-message', (data) => {
 
 // MEETING KATILIM (Oda Kilidi)
 // Oda takibi için global obje (Dosyanın en üstünde bir kez tanımlanmalı)
-const activeRooms = {}; 
+
 
 // --- VIP ODA VE DAVET SİSTEMİ ---
 
@@ -523,6 +523,7 @@ const PORT = process.env.PORT || 10000;
 httpServer.listen(PORT, () => {
     console.log(`🌍 Sunucu Yayında: http://localhost:${PORT}`);
 });
+
 
 
 
