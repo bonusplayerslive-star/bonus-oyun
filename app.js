@@ -280,7 +280,16 @@ socket.on('chat-message', (data) => {
 
 // MEETING KATILIM (Oda Kilidi)
 socket.on('join-meeting', (roomId, peerId, nickname) => {
-    socket.join(roomId); // Soketi odaya kilitler
+    socket.join(roomId);
+    if (activeRooms[roomId]) {
+        if (!activeRooms[roomId].members.includes(nickname)) {
+            activeRooms[roomId].members.push(nickname);
+        }
+        // ODA İÇİNDEKİ HERKESE GÜNCEL LİSTEYİ GÖNDER
+        io.to(roomId).emit('update-council-list', activeRooms[roomId].members);
+    }
+    socket.to(roomId).emit('user-connected', peerId, nickname);
+});
     
     if (activeRooms[roomId]) {
         // Odaya yeni birini ekle (Maksimum 5 kişi kontrolü)
@@ -480,6 +489,7 @@ const PORT = process.env.PORT || 10000;
 httpServer.listen(PORT, () => {
     console.log(`🌍 Sunucu Yayında: http://localhost:${PORT}`);
 });
+
 
 
 
