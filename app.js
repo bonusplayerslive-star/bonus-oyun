@@ -421,28 +421,36 @@ socket.on('send-invite', async (data) => {
         console.log("Davet Hatası:", e); 
     }
 });
+// ======================================================
+// --- 2. DAVET KABUL MEKANİZMASI (TEK VE NET BLOK) ---
+// ======================================================
 
-// 5. ONAY GELDİĞİNDE İKİ TARAFI DA AYNI ANDA FIRLAT
 socket.on('accept-invite', (data) => {
-    // data içinde: from (davet eden), roomId, type gelmeli
-    const targetUrl = `/${data.type === 'arena' ? 'arena' : 'meeting'}?room=${data.roomId}`;
-    
-    // Davet edene (Lider) git komutu gönder
-    io.to(data.from).emit('redirect-to-room', targetUrl);
-    
-    // Daveti kabul edene (Üye) git komutu gönder
-    socket.emit('redirect-to-room', targetUrl);
-});
-// Davet Kabul Edildiğinde Çalışacak Tetikleyici
-socket.on('accept-invite', (data) => {
-    const { from, roomId, type } = data;
-    const targetUrl = type === 'arena' ? `/arena?room=${roomId}` : `/meeting?room=${roomId}`;
-    
-    // Hem davet edeni hem kabul edeni AYNI URL'ye fırlat
-    io.to(from).emit('redirect-to-room', targetUrl);
-    socket.emit('redirect-to-room', targetUrl);
-});
+    try {
+        // Gelen veriyi parçalıyoruz
+        const { from, roomId, type } = data;
 
+        if (!from || !roomId || !type) {
+            console.error("[VIP-HATA] Davet kabul verisi eksik!");
+            return;
+        }
+
+        // Gidecekleri ortak adresi belirliyoruz
+        const targetUrl = `/${type}?room=${roomId}`;
+
+        console.log(`[VIP-ONAY] ${socket.nickname}, ${from} kişisinin davetini kabul etti. Oda: ${roomId}`);
+
+        // 1. DAVET EDENİ (Lideri) yönlendir
+        // io.to(from) kullanarak liderin soketine mesaj gönderiyoruz
+        io.to(from).emit('redirect-to-room', targetUrl);
+
+        // 2. KABUL EDENİ (Şu anki kullanıcıyı) yönlendir
+        socket.emit('redirect-to-room', targetUrl);
+
+    } catch (err) {
+        console.error("[VIP-HATA] accept-invite sırasında hata oluştu:", err);
+    }
+});
 
 // ======================================================
 // --- 3. LOJİSTİK DESTEK (BPL TRANSFERİ) ---
@@ -660,5 +668,6 @@ const PORT = process.env.PORT || 10000;
 httpServer.listen(PORT, () => {
     console.log(`🌍 Sunucu Yayında: http://localhost:${PORT}`);
 });
+
 
 
