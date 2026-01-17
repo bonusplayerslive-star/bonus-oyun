@@ -257,41 +257,64 @@ io.on('connection', async (socket) => {
             console.log(`✅ Bağlantı: ${socket.nickname}`);
         }
     }
-
-    // CHAT & MESAJLAŞMA
-    socket.on('chat-message', (data) => {
-        io.emit('new-message', {
-            sender: socket.nickname || "Bilinmeyen",
-            text: data.text,
-            time: new Date().toLocaleTimeString('tr-TR', { hour: '2-digit', minute: '2-digit' })
-        });
-    });
-
-    // LOJİSTİK DESTEK
-    socket.on('transfer-bpl', async (data) => {
-        try {
-            if (!socket.userId) return;
-            const sender = await User.findById(socket.userId);
-            const receiver = await User.findOne({ nickname: data.to });
-            const amount = parseInt(data.amount);
-
-            if (receiver && sender.bpl >= amount + 5500 && amount >= 50) {
-                sender.bpl -= amount;
-                receiver.bpl += (amount * 0.75);
-                await sender.save();
-                await receiver.save();
-                socket.emit('gift-result', { message: "Başarılı!", newBalance: sender.bpl });
-                io.to(receiver.nickname).emit('update-bpl', receiver.bpl);
-            } else {
-                socket.emit('gift-result', { message: "Limit (5500) yetersiz veya alıcı yok!" });
-            }
-        } catch (e) { console.log("Transfer Hatası:", e); }
-    });
-
-    // ÖZEL DAVETLER
-   // Oda doluluk takibi için basit bir obje (Veritabanı yerine RAM'de tutmak daha hızlıdır)
+// Oda doluluk ve lider takibi (Dosyanın üst kısımlarında bir kez tanımlanması yeterli)
 const activeRooms = {}; 
 
+// CHAT & MESAJLAŞMA (Geliştirilmiş Oda Sistemi)
+socket.on('chat-message', (data) => {
+    const msgObj = {
+        sender: socket.nickname || "Bilinmeyen",
+        text: data.text,
+        time: new Date().toLocaleTimeString('tr-TR', { hour: '2-digit', minute: '2-digit' }),
+        room: data.room // Hangi odadan geldiğini işaretliyoruz
+    };
+
+    if (data.room && data.room !== 'GENEL') {
+        // SADECE O ODADAKİLERE GÖNDER (VIP Konsey veya Arena)
+        io.to(data.room).emit('new-message', msgObj);
+    } else {
+        // GLOBAL CHAT - HERKESE GÖNDER
+        io.emit('new-message', msgObj);
+    }
+});
+
+// MEETING KATILIM (Oda Kilidi)
+socket.on('join-meeting', (roomId, peerId, nickname) => {
+    socket.join(roomId); // Soketi odaya kilitler
+    
+    if (activeRooms[roomId]) {
+        // Odaya yeni birini ekle (Maksimum 5 kişi kontrolü)
+        if (!activeRooms[roomId].members.includes(nickname)) {
+            activeRooms[roomId].members.push(nickname);
+        }
+    }
+    
+    // Odadaki diğerlerine haber ver
+    socket.to(roomId).emit('user-connected', peerId, nickname);
+});
+
+// LOJİSTİK DESTEK
+socket.on('transfer-bpl', async (data) => {
+    try {
+        if (!socket.userId) return;
+        const sender = await User.findById(socket.userId);
+        const receiver = await User.findOne({ nickname: data.to });
+        const amount = parseInt(data.amount);
+
+        if (receiver && sender.bpl >= amount + 5500 && amount >= 50) {
+            sender.bpl -= amount;
+            receiver.bpl += (amount * 0.75);
+            await sender.save();
+            await receiver.save();
+            socket.emit('gift-result', { message: "Başarılı!", newBalance: sender.bpl });
+            io.to(receiver.nickname).emit('update-bpl', receiver.bpl);
+        } else {
+            socket.emit('gift-result', { message: "Limit (5500) yetersiz veya alıcı yok!" });
+        }
+    } catch (e) { console.log("Transfer Hatası:", e); }
+});
+
+// ÖZEL DAVETLER
 socket.on('send-invite', async (data) => {
     try {
         const { to, type, cost } = data;
@@ -301,42 +324,48 @@ socket.on('send-invite', async (data) => {
             return socket.emit('error-msg', 'Yetersiz bakiye (Minimum 5500 BPL gerekli)!');
         }
 
-        // Ücreti tahsil et
         sender.bpl -= cost;
         await sender.save();
         socket.emit('update-bpl', sender.bpl);
 
         const targetRoomId = `${socket.nickname}_Room`;
         
-        // 1. Oda bilgilerini oluştur/güncelle
+        // 1. Oda bilgilerini oluştur
         if (!activeRooms[targetRoomId]) {
-            activeRooms[targetRoomId] = { leader: socket.nickname, members: [], capacity: 5 };
+            activeRooms[targetRoomId] = { 
+                leader: socket.nickname, 
+                members: [socket.nickname], 
+                capacity: 5 
+            };
         }
 
-        // 2. ÖNCE DAVET EDENİ ODAYA GÖNDER
+        // 2. DAVET EDENİ HEMEN ODAYA AL (Soket Seviyesinde)
+        socket.join(targetRoomId);
+
+        // 3. ÖNCE DAVET EDENİ YÖNLENDİR
         socket.emit('redirect-to-room', type === 'arena' ? `/arena?room=${targetRoomId}` : `/meeting?room=${targetRoomId}`);
 
-        // 3. SONRA HEDEFE DAVET GÖNDER (Kısa bir gecikmeyle ki lider odaya yerleşsin)
+        // 4. SONRA HEDEFE DAVET GÖNDER
         setTimeout(() => {
             io.to(to).emit('receive-invite', { 
                 from: socket.nickname, 
                 type, 
                 roomId: targetRoomId 
             });
-        }, 1000);
+        }, 800);
 
     } catch (e) { console.log("Davet Hatası:", e); }
 });
 
-// Lider çıkarsa odayı dağıtma mantığı
+// KOPMA VE TEMİZLİK
 socket.on('disconnect', () => {
     const userRoom = `${socket.nickname}_Room`;
     if (activeRooms[userRoom]) {
+        // Eğer çıkan kişi odanın lideriyse odayı yok et
         io.to(userRoom).emit('room-closed', 'Lider masadan ayrıldı, konsey dağılıyor...');
         delete activeRooms[userRoom];
     }
 });
-
     // ARENA MOTORU
     socket.on('arena-ready', async (data) => {
         try {
@@ -451,5 +480,6 @@ const PORT = process.env.PORT || 10000;
 httpServer.listen(PORT, () => {
     console.log(`🌍 Sunucu Yayında: http://localhost:${PORT}`);
 });
+
 
 
