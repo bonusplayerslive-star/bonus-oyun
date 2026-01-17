@@ -4,7 +4,7 @@ const { createServer } = require('http');
 const { Server } = require('socket.io');
 const mongoose = require('mongoose');
 const session = require('express-session');
-const MongoStore = require('connect-mongo');
+const MongoStore = require('connect-mongo').default;
 const path = require('path');
 require('dotenv').config();
 
@@ -163,3 +163,4 @@ io.on('connection', async (socket) => {
 // --- 5. SERVER BAŞLAT ---
 const PORT = process.env.PORT || 10000;
 httpServer.listen(PORT, () => console.log(`🌍 Sunucu Yayında: ${PORT}`));
+
