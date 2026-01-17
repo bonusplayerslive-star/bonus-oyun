@@ -380,46 +380,59 @@ socket.on('transfer-bpl', async (data) => {
 });
 
 // ======================================================
-// --- 2. ÖZEL DAVET MEKANİZMASI (GÜNCELLENMİŞ: ONAYLI) ---
+// --- 2. GÜNCELLENMİŞ DAVET MEKANİZMASI (KAVUŞMA GARANTİLİ) ---
 // ======================================================
 
 socket.on('send-invite', async (data) => {
     try {
-        const { to, type, cost } = data; // to: Karşı tarafın nickname'i
+        const { to, type, cost } = data;
         const sender = await User.findById(socket.userId);
         
         if (!sender || sender.bpl < (cost + 5500)) {
-            return socket.emit('error-msg', 'Yetersiz bakiye (Limit: 5500 BPL gerekli)!');
+            return socket.emit('error-msg', 'Yetersiz bakiye!');
         }
 
-        // 1. Ücreti tahsil et
+        // 1. Ücret Tahsili
         sender.bpl -= cost;
         await sender.save();
         socket.emit('update-bpl', sender.bpl);
 
-        // 2. Eşsiz Oda ID'sini sunucuda oluştur (Kavuşma garantisi)
-        const targetRoomId = `VIP_${socket.nickname}_${Math.floor(1000 + Math.random() * 9000)}`;
+        // 2. KAVUŞMA GARANTİSİ: Tek bir ortak ID oluşturuyoruz
+        const sharedRoomId = `KONSEY_${socket.nickname}_${Math.floor(1000 + Math.random() * 9000)}`;
         
-        // 3. Odayı RAM'de hazırla
-        activeRooms[targetRoomId] = { 
+        // 3. Odayı hafızaya al
+        activeRooms[sharedRoomId] = { 
             leader: socket.nickname, 
-            members: [], // Katılım sağlandıkça dolacak
+            members: [], 
             capacity: type === 'arena' ? 2 : 5 
         };
 
-        // 4. HEDEFE ONAY PENCERESİ GÖNDER (Direkt yönlendirme yerine soru sor)
+        // 4. HEDEFE DAVET GÖNDER
+        // to: Alıcının nickname'i (io.to(to) çalışması için socket.join(nickname) yapılmış olmalı)
         io.to(to).emit('receive-invite-request', { 
             from: socket.nickname, 
             type: type, 
-            roomId: targetRoomId,
-            cost: cost
+            roomId: sharedRoomId,
+            link: `/${type === 'arena' ? 'arena' : 'meeting'}?room=${sharedRoomId}`
         });
 
-        socket.emit('info-msg', 'Davet gönderildi, onay bekleniyor...');
-
-    } catch (e) { console.log("Davet Hatası:", e); }
+        socket.emit('info-msg', 'Davet iletildi, onay bekleniyor...');
+    } catch (e) { 
+        console.log("Davet Hatası:", e); 
+    }
 });
 
+// 5. ONAY GELDİĞİNDE İKİ TARAFI DA AYNI ANDA FIRLAT
+socket.on('accept-invite', (data) => {
+    // data içinde: from (davet eden), roomId, type gelmeli
+    const targetUrl = `/${data.type === 'arena' ? 'arena' : 'meeting'}?room=${data.roomId}`;
+    
+    // Davet edene (Lider) git komutu gönder
+    io.to(data.from).emit('redirect-to-room', targetUrl);
+    
+    // Daveti kabul edene (Üye) git komutu gönder
+    socket.emit('redirect-to-room', targetUrl);
+});
 // Davet Kabul Edildiğinde Çalışacak Tetikleyici
 socket.on('accept-invite', (data) => {
     const { from, roomId, type } = data;
@@ -647,4 +660,5 @@ const PORT = process.env.PORT || 10000;
 httpServer.listen(PORT, () => {
     console.log(`🌍 Sunucu Yayında: http://localhost:${PORT}`);
 });
+
 
