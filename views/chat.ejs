@@ -88,6 +88,81 @@
             .avatar-circle { width: 45px; height: 45px; }
         }
     </style>
+<style>
+    /* 1. Body'yi tam ekran ve esnek yapıyoruz */
+    body {
+        margin: 0;
+        padding: 0;
+        height: 100vh; /* Ekran yüksekliğini tam al */
+        display: flex;
+        flex-direction: column; /* Üstten aşağı diz */
+        background: #000;
+        overflow: hidden; /* Dışarı taşmayı engelle */
+    }
+
+    /* 2. Chat başlığı veya üst bar varsa buraya */
+    .chat-header {
+        padding: 15px;
+        background: #111;
+        border-bottom: 1px solid var(--gold);
+        text-align: center;
+    }
+
+    /* 3. Mesajların aktığı alan (Burayı esnek yapıyoruz) */
+    #chatMessages {
+        flex: 1; /* Ekranın kalan tüm boşluğunu bu kaplasın */
+        overflow-y: auto; /* Sadece burası kaydırılabilir olsun */
+        padding: 15px;
+        display: flex;
+        flex-direction: column;
+        gap: 8px;
+        -webkit-overflow-scrolling: touch; /* iOS'ta akıcı kaydırma */
+    }
+
+    /* 4. SENİN GÖREMEDİĞİN KRİTİK ALAN: Input Bar */
+    .input-wrapper {
+        padding: 15px;
+        background: #0a0a0a;
+        border-top: 1px solid #333;
+        /* Alttaki boşluk, telefonun güvenli alanını korur (Safari alt barı için) */
+        padding-bottom: calc(15px + env(safe-area-inset-bottom));
+        display: flex;
+        gap: 10px;
+    }
+
+    .msg-input {
+        flex: 1;
+        background: #222;
+        border: 1px solid #444;
+        color: #fff;
+        padding: 12px;
+        border-radius: 8px;
+        font-size: 16px; /* 16px altı iPhone'da zoom yapar, 16px idealdir */
+    }
+
+    .send-btn {
+        background: var(--gold);
+        color: #000;
+        border: none;
+        padding: 0 20px;
+        border-radius: 8px;
+        font-weight: bold;
+    }
+</style>
+
+<body>
+    <div class="chat-header">
+        <h5 style="color: gold; margin:0;">GLOBAL CHAT</h5>
+    </div>
+
+    <div id="chatMessages">
+        </div>
+
+    <div class="input-wrapper">
+        <input type="text" id="chatInput" class="msg-input" placeholder="Mesajınızı yazın...">
+        <button onclick="sendMessage()" class="send-btn">GÖNDER</button>
+    </div>
+</body>
 </head>
 <body>
 
@@ -267,5 +342,6 @@ socket.on('redirect-to-room', (url) => {
 </script>
 </body>
 </html>
+
 
 
