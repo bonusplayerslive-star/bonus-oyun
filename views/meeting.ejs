@@ -67,7 +67,11 @@
         <button onclick="sendMessage()" class="btn btn-warning fw-bold px-4">BİLDİR</button>
     </div>
 </div>
-
+<div id="council-list" style="position:fixed; right:20px; top:80px; width:150px; background:rgba(0,0,0,0.8); border:1px solid var(--gold); padding:10px; border-radius:5px; z-index:100;">
+    <h6 style="color:var(--gold); font-size:0.7rem; border-bottom:1px solid #333; padding-bottom:5px;">KONSEY ÜYELERİ</h6>
+    <div id="member-names" style="font-size:0.75rem; color:#fff;">
+        </div>
+</div>
 <script src="/socket.io/socket.io.js"></script>
 <script src="https://unpkg.com/peerjs@1.5.2/dist/peerjs.min.js"></script>
 
@@ -169,4 +173,5 @@
 </script>
 </body>
 </html>
+
 
