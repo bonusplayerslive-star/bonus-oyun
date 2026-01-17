@@ -11,133 +11,244 @@
     <style>
         :root { 
             --neon-blue: #00f3ff; --neon-red: #ff003c; --neon-green: #39FF14; 
-            --terminal-dark: #0a0b0c; --panel-bg: rgba(10, 11, 12, 0.98); --gold: #ffcc00;
+            --terminal-dark: #0a0b0c; --panel-bg: rgba(10, 11, 12, 0.98);
         }
 
-        /* FHD+ EKRANLAR İÇİN TAM ESNEK YAPI */
         body { 
-            background: #000; color: #e0e0e0; font-family: 'Rajdhani', sans-serif; 
-            height: 100vh; margin: 0; display: flex; flex-direction: column; overflow: hidden;
+            background: radial-gradient(circle at center, #1a1a1a 0%, #000 100%); 
+            color: #e0e0e0; font-family: 'Rajdhani', sans-serif; 
+            height: 100vh; overflow: hidden; display: flex; flex-direction: column; margin: 0;
         }
 
+        /* ÜST STATUS BAR */
         .header-status { 
-            height: 60px; background: #000; border-bottom: 2px solid var(--neon-green);
-            display: flex; align-items: center; justify-content: space-between; padding: 0 15px;
+            height: 60px; padding: 0 20px; background: #000; border-bottom: 2px solid var(--neon-green);
+            display: flex; align-items: center; justify-content: space-between; z-index: 100;
         }
+        .status-item { font-family: 'Orbitron'; font-size: 0.8rem; letter-spacing: 1px; }
 
-        .main-content { display: flex; flex: 1; overflow: hidden; }
+        /* ANA İÇERİK ALANI */
+        .main-content { display: flex; flex: 1; height: calc(100vh - 140px); overflow: hidden; }
 
+        /* SOL USER LİSTESİ */
         .online-sidebar {
-            width: 80px; background: rgba(0,0,0,0.5); border-right: 1px solid #222;
-            display: flex; flex-direction: column; align-items: center; padding: 10px 0;
-            overflow-y: auto;
+            width: 90px; background: rgba(0, 0, 0, 0.8); border-right: 1px solid #222;
+            display: flex; flex-direction: column; align-items: center; padding: 15px 0;
+            overflow-y: auto; scrollbar-width: none;
         }
+        .online-sidebar::-webkit-scrollbar { display: none; }
 
-        .chat-window { flex: 1; display: flex; flex-direction: column; background: rgba(0,0,0,0.2); }
+        .user-node {
+            display: flex; flex-direction: column; align-items: center; margin-bottom: 20px;
+            cursor: pointer; transition: 0.3s; width: 100%;
+        }
+        .avatar-circle {
+            width: 50px; height: 50px; border-radius: 50%; border: 2px solid var(--neon-blue);
+            background: #111; display: flex; align-items: center; justify-content: center;
+            position: relative; overflow: hidden;
+        }
+        .avatar-circle img { width: 100%; height: 100%; object-fit: cover; }
+        .online-status {
+            position: absolute; bottom: 2px; right: 2px; width: 12px; height: 12px;
+            background: var(--neon-green); border-radius: 50%; border: 2px solid #000;
+        }
+        .node-name { font-size: 0.65rem; color: #aaa; margin-top: 5px; text-transform: uppercase; text-align: center; }
 
-        /* Mesajların Aktığı Alan */
+        /* CHAT PENCERESİ */
+        .chat-window { flex: 1; display: flex; flex-direction: column; background: rgba(0,0,0,0.3); }
         #chatMessages { 
-            flex: 1; overflow-y: auto; padding: 15px; 
+            flex: 1; overflow-y: auto; padding: 20px; 
             display: flex; flex-direction: column; gap: 10px;
             -webkit-overflow-scrolling: touch;
         }
+        
+        .msg-entry { margin-bottom: 5px; padding: 10px; background: rgba(255,255,255,0.03); border-left: 3px solid var(--neon-blue); }
+        .sender-tag { color: #FFFF00; font-weight: bold; cursor: pointer; font-family: 'Orbitron'; font-size: 0.75rem; margin-right: 10px; }
 
-        .msg-entry { padding: 8px; border-left: 3px solid var(--neon-blue); background: rgba(255,255,255,0.02); }
-
-        /* TELEFONDA KAYBOLAN INPUT ALANI BURASI */
+        /* FHD+ EKRANLARDA GÜVENLİ INPUT ALANI */
         .input-footer { 
-            background: #0a0a0a; padding: 15px; border-top: 1px solid #333;
-            /* iPhone alt barı için koruma alanı */
+            background: #000; padding: 15px; border-top: 1px solid #222;
+            /* iPhone alt barı ve FHD+ telefonlar için koruma */
             padding-bottom: calc(15px + env(safe-area-inset-bottom));
         }
-
         .terminal-input { 
-            background: #1a1a1a !important; border: 1px solid #444 !important; 
-            color: var(--neon-green) !important; height: 45px; font-size: 16px; 
+            background: #0a0a0a !important; border: 1px solid #333 !important; 
+            color: var(--neon-green) !important; font-family: 'Courier New', monospace; 
+            height: 50px; font-size: 16px; /* 16px iPhone zoom hatasını önler */
         }
+        .btn-send { background: var(--neon-green) !important; color: #000 !important; font-weight: bold; padding: 0 25px; }
 
+        /* AKSİYON PANELİ */
         #userActionPanel { 
             display: none; position: fixed; top: 50%; left: 50%; transform: translate(-50%, -50%);
-            width: 90%; max-width: 320px; background: var(--panel-bg); border: 2px solid var(--neon-blue);
-            padding: 20px; z-index: 5000; text-align: center;
+            width: 300px; background: var(--panel-bg); border: 2px solid var(--neon-blue);
+            padding: 25px; z-index: 5000; box-shadow: 0 0 40px rgba(0,0,0,0.9); text-align: center;
         }
-        #userActionPanel button { width: 100%; margin-bottom: 8px; font-family: 'Orbitron'; padding: 12px; background: transparent; }
+        #userActionPanel button { 
+            width: 100%; margin-bottom: 10px; padding: 10px; 
+            font-family: 'Orbitron'; font-size: 0.8rem; background: transparent;
+        }
+        #giftBtn { border: 1px solid var(--neon-red); color: var(--neon-red); }
+        #fightBtn { border: 1px solid var(--neon-blue); color: var(--neon-blue); }
+        #meetBtn { border: 1px solid #ffc107; color: #ffc107; }
+
+        @media (max-width: 768px) {
+            .online-sidebar { width: 75px; }
+            .avatar-circle { width: 45px; height: 45px; }
+        }
     </style>
 </head>
 <body>
 
 <div class="header-status">
-    <div class="status-item">USER: <span style="color:var(--neon-blue)"><%= user.nickname %></span></div>
-    <div class="status-item">CREDITS: <span id="myBpl" style="color:var(--gold)"><%= user.bpl %></span></div>
+    <div class="status-item text-muted">USER: <span class="val-neon" style="color:var(--neon-blue)"><%= user.nickname %></span></div>
+    <div class="status-item text-muted">CREDITS: <span id="myBpl" class="text-warning"><%= user.bpl %></span> BPL</div>
+    <div class="status-item text-muted">STATUS: <span id="peer-status" class="text-success small">AKTİF</span></div>
 </div>
 
 <div class="main-content">
     <div class="online-sidebar" id="onlineUsersList"></div>
+
     <div class="chat-window">
         <div id="chatMessages">
-            <div class="msg-entry"><span style="color:var(--neon-green)">[SİSTEM]: Komuta merkezi aktif.</span></div>
+            <div class="msg-entry">
+                <span class="sender-tag">[SİSTEM]:</span>
+                <span class="text-info">Komuta merkezi aktif.</span>
+            </div>
         </div>
     </div>
 </div>
 
 <div class="input-footer">
     <div class="input-group">
-        <input type="text" id="messageInput" class="form-control terminal-input" placeholder="Mesaj..." autocomplete="off">
-        <button onclick="sendMessage()" class="btn" style="background:var(--neon-green); color:#000; font-weight:bold;">GÖNDER</button>
+        <input type="text" id="messageInput" class="form-control terminal-input" placeholder="Komut girin..." autocomplete="off">
+        <button onclick="sendMessage()" class="btn btn-send"><i class="fas fa-bolt me-2"></i>GÖNDER</button>
     </div>
 </div>
 
 <div id="userActionPanel">
-    <h5 id="selectedUserLabel" class="text-white">HEDEF</h5>
-    <button id="giftBtn" style="border:1px solid var(--neon-red); color:var(--neon-red);">🎁 LOJİSTİK DESTEK</button>
-    <button id="fightBtn" style="border:1px solid var(--neon-blue); color:var(--neon-blue);">⚔️ ARENA (-50)</button>
-    <button id="meetBtn" style="border:1px solid gold; color:gold;">🏛️ ÖZEL ODA (-30)</button>
-    <button onclick="closePanel()" style="border:none; color:#666; margin-top:10px;">[ İPTAL ]</button>
+    <h5 id="selectedUserLabel" class="mb-4 text-white" style="font-family: 'Orbitron'; font-size: 1rem;">HEDEF</h5>
+    <button id="giftBtn">🎁 LOJİSTİK DESTEK</button>
+    <button id="fightBtn">⚔️ ARENA DÜELLO (-50)</button>
+    <button id="meetBtn">🏛️ ÖZEL ODA (-30)</button>
+    <button onclick="closePanel()" style="border: none; color: #666; font-size: 0.7rem; background:transparent;">[ İPTAL ]</button>
 </div>
 
 <script src="/socket.io/socket.io.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
 
 <script>
-    const socket = io();
+    const socket = io(); 
     const myNick = "<%= user.nickname %>";
     let myBpl = <%= user.bpl %>;
     let selectedUser = "";
 
-    // Mesaj Gönderme (Arena Mantığıyla Aynı)
-    function sendMessage() {
-        const input = document.getElementById('messageInput');
-        if(!input.value.trim()) return;
-
-        // URL'den oda varsa al (Meeting/Arena içindeyse)
-        const params = new URLSearchParams(window.location.search);
-        const roomId = params.get('room');
-
-        socket.emit('chat-message', { 
-            text: input.value,
-            room: roomId // Varsa oda ID'si, yoksa null gider (Global olur)
+    // 1. ONLINE LISTESI GÜNCELLEME
+    socket.on('update-user-list', (users) => {
+        const listContainer = document.getElementById('onlineUsersList');
+        listContainer.innerHTML = ''; 
+        users.forEach(u => {
+            if(u.nickname !== myNick) {
+                const userDiv = document.createElement('div');
+                userDiv.className = 'user-node';
+                userDiv.onclick = () => openUserMenu(u.nickname);
+                userDiv.innerHTML = `
+                    <div class="avatar-circle">
+                        <img src="/caracter/page/logo.jpeg" alt="user">
+                        <div class="online-status"></div>
+                    </div>
+                    <div class="node-name">${u.nickname}</div>
+                `;
+                listContainer.appendChild(userDiv);
+            }
         });
-        input.value = '';
+    });
+
+    // 2. PANEL FONKSIYONLARI
+    function openUserMenu(nick) {
+        selectedUser = nick;
+        document.getElementById('selectedUserLabel').innerText = nick;
+        document.getElementById('userActionPanel').style.display = 'block';
+        
+        document.getElementById('giftBtn').onclick = () => { closePanel(); sendGift(nick); };
+        document.getElementById('fightBtn').onclick = () => { handleInvite(nick, 'arena', 50); };
+        document.getElementById('meetBtn').onclick = () => { handleInvite(nick, 'meeting', 30); };
     }
 
-    // Mesaj Alma
-    socket.on('new-message', (data) => {
-        const params = new URLSearchParams(window.location.search);
-        const currentRoom = params.get('room');
+    function closePanel() { document.getElementById('userActionPanel').style.display = 'none'; }
 
-        // Mantık: Mesaj odaya aitse ve ben o odadaysam VEYA mesaj globalsyse ve ben globaldeysem göster
-        if (data.room === currentRoom) {
+    // 3. HEDİYE TRANSFERİ
+    function sendGift(nick) {
+        Swal.fire({
+            title: 'LOJİSTİK TRANSFER',
+            text: `${nick} için BPL miktarı (%25 transfer ücreti kesilir)`,
+            input: 'number',
+            background: '#0a0b0c', color: '#fff',
+            showCancelButton: true,
+            confirmButtonText: 'GÖNDER'
+        }).then((result) => {
+            if (result.isConfirmed) {
+                const amount = parseInt(result.value);
+                if(isNaN(amount) || amount <= 0) return;
+                socket.emit('transfer-bpl', { to: nick, amount: amount });
+            }
+        });
+    }
+
+    // 4. DAVET GÖNDERME
+    function handleInvite(nick, type, cost) {
+        closePanel();
+        socket.emit('send-invite', { to: nick, type: type, cost: cost });
+        Swal.fire({ toast: true, position: 'top-end', icon: 'success', title: 'Davet iletildi', showConfirmButton: false, timer: 1500 });
+    }
+
+    // 5. DAVET ALMA
+    socket.on('receive-invite', (data) => {
+        Swal.fire({
+            title: data.type === 'arena' ? '⚔️ ARENA DÜELLO!' : '🏛️ ÖZEL ODA DAVETİ!',
+            text: `${data.from} seni çağırıyor.`,
+            showCancelButton: true,
+            confirmButtonText: 'KATIL',
+            cancelButtonText: 'REDDET',
+            background: '#0a0a0a', color: '#fff'
+        }).then((res) => {
+            if(res.isConfirmed) {
+                window.location.href = data.type === 'arena' ? `/arena?room=${data.roomId}` : `/meeting?room=${data.roomId}`;
+            }
+        });
+    } );
+
+    // 6. CHAT MESAJLAŞMA (Arena Uyumlu)
+    function sendMessage() {
+        const input = document.getElementById('messageInput');
+        if(input.value.trim()) {
+            // Global chatte olduğumuz için room göndermiyoruz (veya 'GENEL' gönderiyoruz)
+            socket.emit('chat-message', { text: input.value, room: null });
+            input.value = '';
+        }
+    }
+
+    socket.on('new-message', (data) => {
+        // SADECE global mesajları bu pencerede göster
+        if (!data.room || data.room === 'GENEL') {
             const box = document.getElementById('chatMessages');
             const div = document.createElement('div');
             div.className = "msg-entry";
-            div.innerHTML = `<b style="color:gold">${data.sender}:</b> <span class="text-light">${data.text}</span>`;
+            div.innerHTML = `<span class="sender-tag" onclick="openUserMenu('${data.sender}')">${data.sender}:</span> 
+                             <span class="text-light">${data.text}</span>`;
             box.appendChild(div);
             box.scrollTop = box.scrollHeight;
         }
     });
 
-    // ... Diğer Online Liste ve Davet Kodların Aynı Kalabilir ...
-    // Sadece sendMessage içindeki oda kontrolü ve CSS değişikliği FHD+ sorununu çözer.
+    socket.on('update-bpl', (newBpl) => {
+        myBpl = newBpl;
+        document.getElementById('myBpl').innerText = newBpl;
+    });
+
+    socket.on('redirect-to-room', (url) => { window.location.href = url; });
+
+    document.getElementById('messageInput').addEventListener('keypress', (e) => { if (e.key === 'Enter') sendMessage(); });
 </script>
 </body>
 </html>
