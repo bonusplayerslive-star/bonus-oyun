@@ -316,19 +316,24 @@ io.on('connection', (socket) => {
         });
     }
 
-    // 3. MESAJLAŞMA
     socket.on('chat-message', (data) => {
-        io.to(data.room).emit('new-message', { sender: socket.nickname, text: data.text });
-    });
+    // Mesaj objesini zenginleştiriyoruz
+    const msgObj = {
+        sender: socket.nickname || "Misafir",
+        text: data.text,
+        time: new Date().toLocaleTimeString('tr-TR', { hour: '2-digit', minute: '2-digit' }),
+        room: data.room || 'GENEL' // Eğer oda yoksa 'GENEL' etiketini biz vuruyoruz
+    };
 
-    // 4. AYRILMA
-    socket.on('disconnect', () => {
-        if(socket.roomId && activeRooms[socket.roomId]) {
-            activeRooms[socket.roomId].members = activeRooms[socket.roomId].members.filter(m => m.nick !== socket.nickname);
-            socket.to(socket.roomId).emit('user-disconnected', socket.peerId);
-            updateAllLists(socket.roomId);
-        }
-    });
+    if (data.room && data.room !== 'GENEL') {
+        // ÖZEL ODA: Sadece o odadaki (Arena/Meeting) kişilere gider
+        io.to(data.room).emit('new-message', msgObj);
+        console.log(`[ÖZEL MESAJ] Oda: ${data.room} | Gönderen: ${msgObj.sender}`);
+    } else {
+        // GLOBAL CHAT: Sunucudaki herkese gider
+        io.emit('new-message', msgObj);
+        console.log(`[GLOBAL MESAJ] Gönderen: ${msgObj.sender}`);
+    }
 });
 
 
@@ -634,6 +639,7 @@ const PORT = process.env.PORT || 10000;
 httpServer.listen(PORT, () => {
     console.log(`🌍 Sunucu Yayında: http://localhost:${PORT}`);
 });
+
 
 
 
