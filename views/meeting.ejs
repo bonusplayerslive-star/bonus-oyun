@@ -150,13 +150,13 @@
         if(el) el.remove();
     });
 
-    function sendMessage() {
-        const input = document.getElementById('chat-input');
-        if(!input.value) return;
-        socket.emit('chat-message', { room: currentRoom, text: input.value });
-        input.value = '';
-    }
-
+   function sendMessage() {
+    const input = document.getElementById('chat-input');
+    if(!input.value) return;
+    // currentRoom değişkeni URL'den çekilen oda adıdır
+    socket.emit('chat-message', { room: currentRoom, text: input.value });
+    input.value = '';
+}
     socket.on('new-message', d => appendMsg(d.sender, d.text));
 
     function appendMsg(s, t) {
@@ -169,3 +169,4 @@
 </script>
 </body>
 </html>
+
