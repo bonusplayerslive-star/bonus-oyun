@@ -2,126 +2,137 @@
 <html lang="tr">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
     <title>BPL | VIP KONSEY</title>
     <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
     <link href="https://fonts.googleapis.com/css2?family=Orbitron:wght@400;700&display=swap" rel="stylesheet">
     <style>
         :root { --gold: #ffd700; --gold-dark: #d4af37; --neon-red: #ff4444; }
+        
+        * { box-sizing: border-box; }
+        
         body { 
             background: radial-gradient(circle, #1a1a1a 0%, #000 100%); 
             color: #fff; height: 100vh; overflow: hidden; font-family: 'Orbitron', sans-serif; 
             margin: 0; display: flex; flex-direction: column;
         }
 
-        /* ÜST ALAN: VİDEO GRID */
+        /* ANA KONTEYNER: ÜST (Kameralar + Liste) */
+        .top-section {
+            display: flex;
+            height: 65vh; /* Ekranın %65'i */
+            width: 100%;
+            border-bottom: 2px solid var(--gold-dark);
+        }
+
+        /* SOL DİKEY: VİDEO GRID */
         #video-grid {
-            flex: 1; display: grid; 
-            grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
-            gap: 15px; padding: 20px; overflow-y: auto; align-items: center; justify-content: center;
+            flex: 1;
+            display: flex;
+            flex-direction: column; /* Dikey sıralama */
+            gap: 10px;
+            padding: 10px;
+            overflow-y: auto;
+            align-items: center;
         }
 
         .v-slot { 
-            aspect-ratio: 1/1; max-width: 220px; width: 100%;
-            border: 3px solid var(--gold-dark); border-radius: 50%; 
+            width: 120px; height: 120px; /* Sabit dikey slot boyutu */
+            min-height: 120px;
+            border: 2px solid var(--gold-dark); border-radius: 50%; 
             overflow: hidden; position: relative; background: #111;
-            box-shadow: 0 0 15px rgba(212, 175, 55, 0.2); transition: 0.3s;
+            box-shadow: 0 0 10px rgba(212, 175, 55, 0.3);
         }
-        .v-slot:hover { transform: scale(1.05); border-color: #fff; }
-
         video { width: 100%; height: 100%; object-fit: cover; }
         .user-label { 
             position: absolute; bottom: 0; width: 100%; 
-            background: rgba(0,0,0,0.8); color: var(--gold); 
-            font-size: 0.7rem; text-align: center; padding: 4px 0; font-weight: bold;
+            background: rgba(0,0,0,0.7); color: var(--gold); 
+            font-size: 0.6rem; text-align: center; padding: 2px 0;
         }
 
-        /* SAĞ PANEL: KONSEY LİSTESİ */
-        #council-list {
-            position: fixed; right: 10px; top: 10px; width: 180px;
-            background: rgba(0,0,0,0.9); border: 1px solid var(--gold);
-            padding: 10px; border-radius: 8px; z-index: 1000;
+        /* SAĞ DİKEY: KONSEY LİSTESİ */
+        #council-sidebar {
+            width: 150px;
+            background: rgba(0,0,0,0.5);
+            border-left: 1px solid var(--gold-dark);
+            display: flex;
+            flex-direction: column;
+            padding: 10px;
         }
         .member-item {
-            font-size: 0.8rem; padding: 8px; border-bottom: 1px solid #222;
-            cursor: pointer; display: flex; justify-content: space-between; align-items: center;
+            font-size: 0.75rem; padding: 8px 5px; border-bottom: 1px solid #333;
+            color: #ccc; cursor: pointer;
         }
-        .member-item:hover { background: rgba(255, 215, 0, 0.1); color: var(--gold); }
+        .member-item:hover { color: var(--gold); }
 
-        /* ALT PANEL: CHAT & MOBİL UYUM */
+        /* ALT PANEL: CHAT */
         .bottom-panel {
-            height: 35vh; background: #0a0a0a; border-top: 2px solid var(--gold-dark);
-            display: flex; flex-direction: column;
+            height: 35vh; /* Ekranın %35'i */
+            display: flex;
+            flex-direction: column;
+            background: #050505;
         }
-        #vip-chat { flex: 1; overflow-y: auto; padding: 10px; font-size: 0.85rem; border-bottom: 1px solid #222; }
-        .input-bar { padding: 10px; display: flex; gap: 8px; background: #000; }
 
-        /* ÖZEL TIKLAMA MENÜSÜ */
+        #vip-chat {
+            flex: 1;
+            overflow-y: auto;
+            padding: 10px;
+            font-family: 'Courier New', monospace;
+            font-size: 0.85rem;
+            -webkit-overflow-scrolling: touch;
+        }
+
+        .input-bar {
+            padding: 10px;
+            display: flex;
+            gap: 10px;
+            background: #000;
+            padding-bottom: calc(10px + env(safe-area-inset-bottom));
+        }
+
         #user-context-menu {
             position: fixed; display: none; background: #111; border: 1px solid var(--gold);
-            z-index: 2000; border-radius: 5px; min-width: 150px;
+            z-index: 5000; border-radius: 5px; min-width: 160px;
         }
-        .menu-btn { padding: 10px; cursor: pointer; border-bottom: 1px solid #333; font-size: 0.8rem; text-align: center; }
+        .menu-btn { padding: 12px; cursor: pointer; border-bottom: 1px solid #333; font-size: 0.8rem; text-align: center; color: white; }
         .menu-btn:hover { background: var(--gold-dark); color: #000; }
 
-        /* MOBİL DÜZENLEMELER */
         @media (max-width: 768px) {
-            #video-grid { grid-template-columns: repeat(2, 1fr); padding: 10px; }
-            .v-slot { max-width: 140px; }
-            #council-list { width: 140px; font-size: 0.7rem; top: 5px; right: 5px; }
-            .bottom-panel { height: 40vh; }
-            .user-label { font-size: 0.6rem; }
+            #council-sidebar { width: 100px; font-size: 0.6rem; }
+            .v-slot { width: 90px; height: 90px; min-height: 90px; }
         }
-
-/* Kameranın altındaki boşluğu chat alanı yapalım */
-    #vip-chat {
-        height: 150px; /* Panel yüksekliği */
-        overflow-y: auto;
-        padding: 10px;
-        background: rgba(0,0,0,0.5);
-        border-top: 1px solid var(--gold);
-        margin-bottom: 10px;
-        font-family: monospace;
-    }
-    .msg-line { margin-bottom: 5px; border-bottom: 1px solid #222; }
-
-
-
     </style>
 </head>
 <body>
 
-<div id="council-list" class="d-none d-md-block">
-    <h6 class="text-warning small border-bottom border-warning mb-2 pb-1">KONSEY ÜYELERİ</h6>
-    <div id="member-names"></div>
-</div>
+<div class="top-section">
+    <div id="video-grid">
+        <div class="v-slot" id="slot-me">
+            <video id="localVideo" autoplay muted playsinline></video>
+            <div class="user-label">SİZ</div>
+        </div>
+    </div>
 
-<div id="video-grid">
-    <div class="v-slot" id="slot-me">
-        <video id="localVideo" autoplay muted playsinline></video>
-        <div class="user-label">SİZ (<%= user.nickname %>)</div>
+    <div id="council-sidebar">
+        <h6 style="color:var(--gold); font-size: 0.7rem; text-align: center;">ÜYELER</h6>
+        <div id="member-names"></div>
     </div>
 </div>
 
 <div class="bottom-panel">
-    <div id="vip-chat"></div>
+    <div id="vip-chat">
+        <div style="color: #666;">[SİSTEM]: Güvenli konsey hattı açıldı.</div>
+    </div>
     <div class="input-bar">
-        <div class="d-flex flex-column justify-content-center text-warning px-2 border-end border-secondary">
-            <small style="font-size: 0.6rem;">BAKİYE</small>
-            <span class="fw-bold" id="my-bpl"><%= user.bpl %></span>
-        </div>
-        <input type="text" id="chat-input" class="form-control bg-dark text-white border-warning" placeholder="Mesaj yazın...">
+        <input type="text" id="chat-input" class="form-control bg-dark text-white border-warning" placeholder="Mesaj..." autocomplete="off">
         <button onclick="sendMessage()" class="btn btn-warning fw-bold">GÖNDER</button>
     </div>
 </div>
 
 <div id="user-context-menu">
     <div class="menu-btn" onclick="executeAction('gift')">🎁 50 BPL HEDİYE</div>
-    <div class="menu-btn" onclick="executeAction('arena')">⚔️ ARENAYA DAVET</div>
+    <div class="menu-btn" onclick="executeAction('arena')">⚔️ ARENA DAVET</div>
     <div class="menu-btn text-danger" onclick="hideMenu()">KAPAT</div>
-</div>
-<div id="vip-chat">
-    <div style="color: #555;">[Sistem]: Konsey odasına bağlanıldı...</div>
 </div>
 
 <script src="/socket.io/socket.io.js"></script>
@@ -135,20 +146,25 @@
     let myStream;
     let selectedUser = null;
 
+    // Kamera Başlatma
     async function initCouncil() {
         try {
             myStream = await navigator.mediaDevices.getUserMedia({ video: true, audio: true });
             document.getElementById('localVideo').srcObject = myStream;
             myPeer.on('open', id => socket.emit('join-meeting', currentRoom, id, myNick));
         } catch (e) {
-            alert("Kamera izni gerekli!");
-            window.location.href = "/chat";
+            alert("Kamera hatası! Lütfen izin verin.");
         }
     }
 
+    // Gelen Aramaları Yanıtla
     myPeer.on('call', call => {
         call.answer(myStream);
-        call.on('stream', userStream => addVideoSlot(call.peer, userStream, "KOMUTAN"));
+        call.on('stream', userStream => {
+            // Arayan kişinin nickini socket üzerinden alıyoruz aslında ama 
+            // şimdilik 'ÜYE' olarak ekle, socket'ten gelenle güncellenir.
+            addVideoSlot(call.peer, userStream, "ÜYE");
+        });
     });
 
     socket.on('user-connected', (peerId, nick) => {
@@ -156,7 +172,6 @@
             const call = myPeer.call(peerId, myStream);
             call.on('stream', userStream => addVideoSlot(peerId, userStream, nick));
         }, 1000);
-        appendMsg("SİSTEM", `${nick} masaya katıldı.`);
     });
 
     function addVideoSlot(peerId, stream, nick) {
@@ -176,95 +191,65 @@
         label.innerText = nick;
 
         slot.append(video, label);
-        document.getElementById('video-grid').append(slot);
+        document.getElementById('video-grid').prepend(slot); // Yeni geleni en üste ekle
     }
 
-    // KONSEY LİSTESİ GÜNCELLEME VE TIKLAMA
+    // Oda İçindeki Listeyi Güncelle
     socket.on('update-council-list', (members) => {
         const listDiv = document.getElementById('member-names');
         listDiv.innerHTML = members.map(m => `
             <div class="member-item" onclick="showMenu(event, '${m}')">
-                <span>• ${m}</span>
-                <span style="color:#0f0">●</span>
+                ${m === myNick ? '<b>SİZ</b>' : m}
             </div>
         `).join('');
     });
 
+    // Chat İşlemleri
+    function sendMessage() {
+        const input = document.getElementById('chat-input');
+        if(!input.value.trim()) return;
+        socket.emit('chat-message', { room: currentRoom, text: input.value });
+        input.value = '';
+    }
+
+    socket.on('new-message', d => {
+        const chatBox = document.getElementById('vip-chat');
+        const color = d.sender === myNick ? "var(--gold)" : "#00ffcc";
+        const time = new Date().toLocaleTimeString('tr-TR', { hour: '2-digit', minute: '2-digit' });
+        
+        chatBox.innerHTML += `
+            <div style="margin-bottom:5px;">
+                <small style="color:#555">${time}</small> 
+                <b style="color:${color}">${d.sender}:</b> 
+                <span style="color:#eee">${d.text}</span>
+            </div>`;
+        chatBox.scrollTop = chatBox.scrollHeight;
+    });
+
+    // Menü İşlemleri
     function showMenu(e, nick) {
-        if(nick === myNick || nick === "SİZ") return;
+        if(nick === myNick) return;
         selectedUser = nick;
         const menu = document.getElementById('user-context-menu');
         menu.style.display = 'block';
-        menu.style.left = e.pageX + 'px';
+        menu.style.left = (e.pageX > window.innerWidth - 160 ? e.pageX - 160 : e.pageX) + 'px';
         menu.style.top = e.pageY + 'px';
         e.stopPropagation();
     }
 
     function hideMenu() { document.getElementById('user-context-menu').style.display = 'none'; }
-
+    
     function executeAction(action) {
-        if(action === 'gift') {
-            socket.emit('transfer-bpl', { to: selectedUser, amount: 50 });
-        } else if(action === 'arena') {
-            socket.emit('send-invite', { to: selectedUser, type: 'arena', cost: 1000 });
-        }
+        if(action === 'gift') socket.emit('transfer-bpl', { to: selectedUser, amount: 50 });
+        if(action === 'arena') socket.emit('send-invite', { to: selectedUser, type: 'arena', cost: 50 });
         hideMenu();
     }
 
-    function sendMessage() {
-        const input = document.getElementById('chat-input');
-        if(!input.value) return;
-        socket.emit('chat-message', { room: currentRoom, text: input.value });
-        input.value = '';
-    }
-
-    socket.on('new-message', d => appendMsg(d.sender, d.text));
-
-    function appendMsg(s, t) {
-        const chat = document.getElementById('vip-chat');
-        const color = s === "SİSTEM" ? "var(--neon-red)" : "var(--gold)";
-        chat.innerHTML += `<div><b style="color:${color}">${s}:</b> <span class="text-white">${t}</span></div>`;
-        chat.scrollTop = chat.scrollHeight;
-    }
-// MESAJLARI YAKALA VE EKRANA BAS
-    socket.on('new-message', d => {
-        const chatBox = document.getElementById('vip-chat');
-        const isMe = d.sender === myNick;
-        const color = isMe ? "var(--gold)" : "#00ffcc";
-        
-        chatBox.innerHTML += `
-            <div class="msg-line">
-                <small style="color:#666">${d.time}</small> 
-                <b style="color:${color}">${d.sender}:</b> 
-                <span style="color:#eee">${d.text}</span>
-            </div>`;
-        
-        // Otomatik aşağı kaydır
-        chatBox.scrollTop = chatBox.scrollHeight;
-    });
-
-    // MESAJ GÖNDERME FONKSİYONU
-    function sendMessage() {
-        const input = document.getElementById('chat-input');
-        if(!input.value) return;
-
-        // Arena mantığı: URL'den odayı al ve gönder
-        const params = new URLSearchParams(window.location.search);
-        const roomId = params.get('room');
-
-        socket.emit('chat-message', { 
-            room: roomId, 
-            text: input.value 
-        });
-        
-        input.value = '';
-    }
-</script>
-    socket.on('room-closed', (msg) => { alert(msg); window.location.href = "/chat"; });
-    socket.on('user-disconnected', peerId => { if(document.getElementById(peerId)) document.getElementById(peerId).remove(); });
     window.onclick = hideMenu;
+    socket.on('room-closed', msg => { alert(msg); window.location.href = "/chat"; });
+    socket.on('user-disconnected', (peerId) => { if(document.getElementById(peerId)) document.getElementById(peerId).remove(); });
+    
     initCouncil();
 </script>
 </body>
 </html>
-
