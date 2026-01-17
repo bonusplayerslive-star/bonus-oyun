@@ -279,59 +279,104 @@ socket.on('chat-message', (data) => {
     }
 });
 // MEETING KATILIM (Oda Kilidi)
-// Oda takibi için global obje (Dosyanın en üstünde bir kez tanımlanmalı)
-
-
 // --- VIP ODA VE DAVET SİSTEMİ ---
-// ======================================================
-// --- BPL VIP KONSEY & ARENA SİSTEMİ (SUNUCU TARAFI) ---
-// ======================================================
 
-// 1. MEETING KATILIM (Oda Kilidi ve Temiz Üye Yönetimi)
+// 1. MEETING KATILIM (Oda Kilidi ve Liste Güncelleme)
 socket.on('join-meeting', (roomId, peerId, nickname) => {
     if (!roomId) return;
 
-    socket.join(roomId); // Fiziksel olarak odaya al
+    // Soketi fiziksel olarak odaya al
+    socket.join(roomId); 
     
-    // Oda yoksa oluştur
+    // Hafızada odayı yoksa oluştur, varsa üyeyi ekle
     if (!activeRooms[roomId]) {
         activeRooms[roomId] = { leader: nickname, members: [], capacity: 5 };
     }
 
     const room = activeRooms[roomId];
 
-    // Üye listede yoksa ekleme mantığını başlat
+    // Üye zaten yoksa ve kapasite varsa ekle
     if (!room.members.includes(nickname)) {
-        // Kapasite kontrolünü burada tek seferde yapıyoruz
         if (room.members.length < room.capacity) {
             room.members.push(nickname);
-            console.log(`[BPL] ${nickname} listeye eklendi.`);
         } else {
-            // Masa doluysa hata gönder ve işlemi kes
-            return socket.emit('error-msg', 'Bu masa dolu! Giriş engellendi.');
+            return socket.emit('error-msg', 'Bu masa dolu!');
         }
     }
 
-    // ODA İLETİŞİMİ: Odadakilere listeyi ve Peer bilgisini gönder
+    // ODA İÇİNDEKİ HERKESE GÜNCEL LİSTEYİ GÖNDER
     io.to(roomId).emit('update-council-list', room.members);
-    socket.to(roomId).emit('user-connected', peerId, nickname);
-
-    console.log(`[VIP-ROOM] ${nickname}, ${roomId} odasına başarılı giriş yaptı.`);
-});
-
-    // ODA İÇİNDEKİ HERKESE GÜNCEL ÜYE LİSTESİNİ GÖNDER
-// Odadakilere listeyi ve yeni gelenin PeerID'sini gönder
-    io.to(roomId).emit('update-council-list', activeRooms[roomId].members);
-    // ÖNEMLİ: socket.to(roomId) kendisi dışındakilere haber verir
-    socket.to(roomId).emit('user-connected', peerId, nickname);
-
-    console.log(`[VIP] ${nickname} -> ${roomId} odasına bağlandı.`);
-});
     
     // Diğer üyelere görüntülü bağlantı (PeerJS) sinyalini gönder
+    // socket.to(roomId) kullanarak kendisi hariç herkese göndeririz
     socket.to(roomId).emit('user-connected', peerId, nickname);
 
-    console.log(`[BPL-ROOM] ${nickname}, ${roomId} odasına katıldı.`);
+    console.log(`[VIP-ROOM] ${nickname}, ${roomId} odasına katıldı.`);
+});
+
+// 2. ÖZEL DAVET MEKANİZMASI
+socket.on('send-invite', async (data) => {
+    try {
+        const { to, type, cost } = data;
+        const sender = await User.findById(socket.userId);
+        
+        if (!sender || sender.bpl < (cost + 5500)) {
+            return socket.emit('error-msg', 'Yetersiz bakiye (Limit: 5500 BPL gerekli)!');
+        }
+
+        sender.bpl -= cost;
+        await sender.save();
+        socket.emit('update-bpl', sender.bpl);
+
+        const targetRoomId = `${socket.nickname}_Room_${Date.now().toString().slice(-4)}`;
+        
+        activeRooms[targetRoomId] = { 
+            leader: socket.nickname, 
+            members: [socket.nickname], 
+            capacity: 5 
+        };
+
+        const targetUrl = type === 'arena' ? `/arena?room=${targetRoomId}` : `/meeting?room=${targetRoomId}`;
+        socket.emit('redirect-to-room', targetUrl);
+
+        setTimeout(() => {
+            io.to(to).emit('receive-invite', { 
+                from: socket.nickname, 
+                type, 
+                roomId: targetRoomId 
+            });
+        }, 800);
+
+    } catch (e) { console.log("Davet Hatası:", e); }
+});
+
+// 3. LOJİSTİK DESTEK (BPL Transferi)
+socket.on('transfer-bpl', async (data) => {
+    try {
+        if (!socket.userId) return;
+        const sender = await User.findById(socket.userId);
+        const receiver = await User.findOne({ nickname: data.to });
+        const amount = parseInt(data.amount);
+
+        if (receiver && sender.bpl >= amount + 5500 && amount >= 50) {
+            sender.bpl -= amount;
+            receiver.bpl += (amount * 0.75); 
+            
+            await sender.save();
+            await receiver.save();
+
+            socket.emit('update-bpl', sender.bpl);
+            io.to(receiver.nickname).emit('update-bpl', receiver.bpl);
+            
+            const userRoom = Array.from(socket.rooms).find(r => r.includes('_Room'));
+            if(userRoom) {
+                io.to(userRoom).emit('new-message', { 
+                    sender: "SİSTEM", 
+                    text: `${sender.nickname}, ${receiver.nickname} kullanıcısına BPL desteği sağladı!` 
+                });
+            }
+        }
+    } catch (e) { console.log("Transfer Hatası:", e); }
 });
 
 // 2. ÖZEL DAVET MEKANİZMASI (Oda Kurma ve Yönlendirme)
@@ -542,6 +587,7 @@ const PORT = process.env.PORT || 10000;
 httpServer.listen(PORT, () => {
     console.log(`🌍 Sunucu Yayında: http://localhost:${PORT}`);
 });
+
 
 
 
