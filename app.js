@@ -278,180 +278,73 @@ socket.on('chat-message', (data) => {
         io.emit('new-message', msgObj);
     }
 });
-// MEETING KATILIM (Oda Kilidi)
-// --- VIP ODA VE DAVET SİSTEMİ ---
 
-// 1. MEETING KATILIM (Oda Kilidi ve Liste Güncelleme)
+
+
+// --- VIP ODA HAFIZASI (Dosyanın en üstünde kalsın) ---
+const activeRooms = {}; 
+
+// socket.io 'connection' bloğunun içini şu 3 fonksiyonla doldur:
+
+// 1. ODAYA GİRİŞ (PeerJS ve Liste Yönetimi)
 socket.on('join-meeting', (roomId, peerId, nickname) => {
-    if (!roomId) return;
+    if (!roomId || !nickname) return;
 
-    // Soketi fiziksel olarak odaya al
-    socket.join(roomId); 
-    
-    // Hafızada odayı yoksa oluştur, varsa üyeyi ekle
+    // Soketi bu odaya kilitle (Mesajlar karışmasın diye)
+    socket.join(roomId);
+    socket.roomId = roomId;
+    socket.nickname = nickname;
+    socket.peerId = peerId;
+
+    // Oda hafızasını yönet
     if (!activeRooms[roomId]) {
-        activeRooms[roomId] = { leader: nickname, members: [], capacity: 5 };
+        activeRooms[roomId] = { members: [] };
     }
-
-    const room = activeRooms[roomId];
-
-    // Üye zaten yoksa ve kapasite varsa ekle
-    if (!room.members.includes(nickname)) {
-        if (room.members.length < room.capacity) {
-            room.members.push(nickname);
-        } else {
-            return socket.emit('error-msg', 'Bu masa dolu!');
-        }
-    }
-
-    // ODA İÇİNDEKİ HERKESE GÜNCEL LİSTEYİ GÖNDER
-    io.to(roomId).emit('update-council-list', room.members);
     
-    // Diğer üyelere görüntülü bağlantı (PeerJS) sinyalini gönder
-    // socket.to(roomId) kullanarak kendisi hariç herkese göndeririz
+    // Üye zaten yoksa listeye ekle
+    if (!activeRooms[roomId].members.find(m => m.nickname === nickname)) {
+        activeRooms[roomId].members.push({ nickname, peerId });
+    }
+
+    // Odadaki HERKESE güncel listeyi gönder
+    const membersList = activeRooms[roomId].members.map(m => m.nickname);
+    io.to(roomId).emit('update-council-list', membersList);
+
+    // Diğer üyelere "Beni ara" sinyali gönder (Görüntü için)
     socket.to(roomId).emit('user-connected', peerId, nickname);
-
-    console.log(`[VIP-ROOM] ${nickname}, ${roomId} odasına katıldı.`);
+    
+    console.log(`[VIP-SİSTEM] ${nickname}, ${roomId} masasına bağlandı.`);
 });
 
-// 2. ÖZEL DAVET MEKANİZMASI
-socket.on('send-invite', async (data) => {
-    try {
-        const { to, type, cost } = data;
-        const sender = await User.findById(socket.userId);
-        
-        if (!sender || sender.bpl < (cost + 5500)) {
-            return socket.emit('error-msg', 'Yetersiz bakiye (Limit: 5500 BPL gerekli)!');
-        }
-
-        sender.bpl -= cost;
-        await sender.save();
-        socket.emit('update-bpl', sender.bpl);
-
-        const targetRoomId = `${socket.nickname}_Room_${Date.now().toString().slice(-4)}`;
-        
-        activeRooms[targetRoomId] = { 
-            leader: socket.nickname, 
-            members: [socket.nickname], 
-            capacity: 5 
-        };
-
-        const targetUrl = type === 'arena' ? `/arena?room=${targetRoomId}` : `/meeting?room=${targetRoomId}`;
-        socket.emit('redirect-to-room', targetUrl);
-
-        setTimeout(() => {
-            io.to(to).emit('receive-invite', { 
-                from: socket.nickname, 
-                type, 
-                roomId: targetRoomId 
-            });
-        }, 800);
-
-    } catch (e) { console.log("Davet Hatası:", e); }
+// 2. İZOLE ODA SOHBETİ (Sadece odaya özel)
+socket.on('chat-message', (data) => {
+    // data.room: Bulunulan oda ID'si
+    io.to(data.room).emit('new-message', {
+        sender: socket.nickname,
+        text: data.text
+    });
 });
 
-// 3. LOJİSTİK DESTEK (BPL Transferi)
-socket.on('transfer-bpl', async (data) => {
-    try {
-        if (!socket.userId) return;
-        const sender = await User.findById(socket.userId);
-        const receiver = await User.findOne({ nickname: data.to });
-        const amount = parseInt(data.amount);
-
-        if (receiver && sender.bpl >= amount + 5500 && amount >= 50) {
-            sender.bpl -= amount;
-            receiver.bpl += (amount * 0.75); 
-            
-            await sender.save();
-            await receiver.save();
-
-            socket.emit('update-bpl', sender.bpl);
-            io.to(receiver.nickname).emit('update-bpl', receiver.bpl);
-            
-            const userRoom = Array.from(socket.rooms).find(r => r.includes('_Room'));
-            if(userRoom) {
-                io.to(userRoom).emit('new-message', { 
-                    sender: "SİSTEM", 
-                    text: `${sender.nickname}, ${receiver.nickname} kullanıcısına BPL desteği sağladı!` 
-                });
-            }
-        }
-    } catch (e) { console.log("Transfer Hatası:", e); }
-});
-
-// ======================================================
-// --- 2. GÜNCELLENMİŞ DAVET MEKANİZMASI (KAVUŞMA GARANTİLİ) ---
-// ======================================================
-
-socket.on('send-invite', async (data) => {
-    try {
-        const { to, type, cost } = data;
-        const sender = await User.findById(socket.userId);
+// 3. AYRILMA VE TEMİZLİK
+socket.on('disconnect', () => {
+    const rId = socket.roomId;
+    if (rId && activeRooms[rId]) {
+        // Üyeyi listeden çıkar
+        activeRooms[rId].members = activeRooms[rId].members.filter(m => m.nickname !== socket.nickname);
         
-        if (!sender || sender.bpl < (cost + 5500)) {
-            return socket.emit('error-msg', 'Yetersiz bakiye!');
-        }
-
-        // 1. Ücret Tahsili
-        sender.bpl -= cost;
-        await sender.save();
-        socket.emit('update-bpl', sender.bpl);
-
-        // 2. KAVUŞMA GARANTİSİ: Tek bir ortak ID oluşturuyoruz
-        const sharedRoomId = `KONSEY_${socket.nickname}_${Math.floor(1000 + Math.random() * 9000)}`;
+        // Kalanlara yeni listeyi bildir
+        const newList = activeRooms[rId].members.map(m => m.nickname);
+        io.to(rId).emit('update-council-list', newList);
         
-        // 3. Odayı hafızaya al
-        activeRooms[sharedRoomId] = { 
-            leader: socket.nickname, 
-            members: [], 
-            capacity: type === 'arena' ? 2 : 5 
-        };
+        // Görüntüsünü kaldır
+        socket.to(rId).emit('user-disconnected', socket.peerId);
 
-        // 4. HEDEFE DAVET GÖNDER
-        // to: Alıcının nickname'i (io.to(to) çalışması için socket.join(nickname) yapılmış olmalı)
-        io.to(to).emit('receive-invite-request', { 
-            from: socket.nickname, 
-            type: type, 
-            roomId: sharedRoomId,
-            link: `/${type === 'arena' ? 'arena' : 'meeting'}?room=${sharedRoomId}`
-        });
-
-        socket.emit('info-msg', 'Davet iletildi, onay bekleniyor...');
-    } catch (e) { 
-        console.log("Davet Hatası:", e); 
-    }
-});
-// ======================================================
-// --- 2. DAVET KABUL MEKANİZMASI (TEK VE NET BLOK) ---
-// ======================================================
-
-socket.on('accept-invite', (data) => {
-    try {
-        // Gelen veriyi parçalıyoruz
-        const { from, roomId, type } = data;
-
-        if (!from || !roomId || !type) {
-            console.error("[VIP-HATA] Davet kabul verisi eksik!");
-            return;
-        }
-
-        // Gidecekleri ortak adresi belirliyoruz
-        const targetUrl = `/${type}?room=${roomId}`;
-
-        console.log(`[VIP-ONAY] ${socket.nickname}, ${from} kişisinin davetini kabul etti. Oda: ${roomId}`);
-
-        // 1. DAVET EDENİ (Lideri) yönlendir
-        // io.to(from) kullanarak liderin soketine mesaj gönderiyoruz
-        io.to(from).emit('redirect-to-room', targetUrl);
-
-        // 2. KABUL EDENİ (Şu anki kullanıcıyı) yönlendir
-        socket.emit('redirect-to-room', targetUrl);
-
-    } catch (err) {
-        console.error("[VIP-HATA] accept-invite sırasında hata oluştu:", err);
+        // Kimse kalmadıysa RAM'den temizle
+        if (activeRooms[rId].members.length === 0) delete activeRooms[rId];
     }
 });
 
+    
 // ======================================================
 // --- 3. LOJİSTİK DESTEK (BPL TRANSFERİ) ---
 // ======================================================
@@ -668,6 +561,7 @@ const PORT = process.env.PORT || 10000;
 httpServer.listen(PORT, () => {
     console.log(`🌍 Sunucu Yayında: http://localhost:${PORT}`);
 });
+
 
 
 
