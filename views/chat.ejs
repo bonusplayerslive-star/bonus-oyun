@@ -246,9 +246,25 @@
         document.getElementById('myBpl').innerText = newBpl;
     });
 
+
+// Davet İsteği Penceresi
+socket.on('receive-invite-request', (data) => {
+    const onay = confirm(`${data.from} seni özel odaya davet ediyor. Katılmak ister misin?`);
+    
+    if (onay) {
+        // Sunucuya "Kabul ettim, bizi odaya sok" de
+        socket.emit('accept-invite', { 
+            from: data.from, 
+            roomId: data.roomId, 
+            type: data.type 
+        });
+    }
+});
+
     socket.on('redirect-to-room', (url) => { window.location.href = url; });
 
     document.getElementById('messageInput').addEventListener('keypress', (e) => { if (e.key === 'Enter') sendMessage(); });
 </script>
 </body>
 </html>
+
