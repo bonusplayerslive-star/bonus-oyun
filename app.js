@@ -283,80 +283,89 @@ socket.on('chat-message', (data) => {
 
 
 // --- VIP ODA VE DAVET SİSTEMİ ---
+// ======================================================
+// --- BPL VIP KONSEY & ARENA SİSTEMİ (SUNUCU TARAFI) ---
+// ======================================================
 
-// 1. MEETING KATILIM (Oda Kilidi ve Liste Güncelleme)
+// 1. MEETING/ARENA KATILIM VE ODA YÖNETİMİ
 socket.on('join-meeting', (roomId, peerId, nickname) => {
     if (!roomId) return;
 
-    // Soketi fiziksel olarak odaya al
+    // Soketi fiziksel olarak Socket.io odasına sok (Mesajlaşma için şart)
     socket.join(roomId); 
     
-    // Hafızada odayı yoksa oluştur, varsa üyeyi ekle
+    // RAM'de oda verisi yoksa oluştur (Lider ataması)
     if (!activeRooms[roomId]) {
-        activeRooms[roomId] = { leader: nickname, members: [], capacity: 5 };
+        activeRooms[roomId] = { 
+            leader: nickname, 
+            members: [], 
+            capacity: 5,
+            type: roomId.includes('Arena') ? 'arena' : 'meeting'
+        };
     }
 
+    // Üye zaten yoksa listeye ekle
     if (!activeRooms[roomId].members.includes(nickname)) {
-        // Kapasite kontrolü
         if (activeRooms[roomId].members.length < activeRooms[roomId].capacity) {
             activeRooms[roomId].members.push(nickname);
         } else {
-            return socket.emit('error-msg', 'Bu masa dolu!');
+            return socket.emit('error-msg', 'Bu masa dolu! Giriş engellendi.');
         }
     }
 
-    // ODA İÇİNDEKİ HERKESE GÜNCEL LİSTEYİ GÖNDER
+    // ODA İÇİNDEKİ HERKESE GÜNCEL ÜYE LİSTESİNİ GÖNDER
     io.to(roomId).emit('update-council-list', activeRooms[roomId].members);
     
-    // Diğer üyelere yeni görüntülü bağlantı için sinyal gönder
+    // Diğer üyelere görüntülü bağlantı (PeerJS) sinyalini gönder
     socket.to(roomId).emit('user-connected', peerId, nickname);
 
-    console.log(`[BPL] ${nickname}, ${roomId} odasına giriş yaptı.`);
+    console.log(`[BPL-ROOM] ${nickname}, ${roomId} odasına katıldı.`);
 });
 
-// 2. ÖZEL DAVETLER (Oda Kurma ve Yönlendirme)
+// 2. ÖZEL DAVET MEKANİZMASI (Oda Kurma ve Yönlendirme)
 socket.on('send-invite', async (data) => {
     try {
-        const { to, type, cost } = data;
+        const { to, type, cost } = data; // to: Hedef Nickname
         const sender = await User.findById(socket.userId);
         
-        // Bakiye ve Limit Kontrolü
         if (!sender || sender.bpl < (cost + 5500)) {
-            return socket.emit('error-msg', 'Yetersiz bakiye (Limit: 5500 BPL gerekli)!');
+            return socket.emit('error-msg', 'Yetersiz bakiye (5500 limit + davet bedeli gerekli)!');
         }
 
-        // Ücreti tahsil et
+        // Ücret Tahsili
         sender.bpl -= cost;
         await sender.save();
         socket.emit('update-bpl', sender.bpl);
 
-        const targetRoomId = `${socket.nickname}_Room`;
+        // Oda ID Oluşturma (Liderin nickine bağlı eşsiz oda)
+        const targetRoomId = `${socket.nickname}_Room_${Date.now().toString().slice(-4)}`;
         
-        // Odayı RAM'de rezerve et
+        // Odayı rezerve et
         activeRooms[targetRoomId] = { 
             leader: socket.nickname, 
             members: [socket.nickname], 
-            capacity: 5 
+            capacity: type === 'arena' ? 2 : 5 
         };
 
-        // ÖNCE DAVET EDENİ ODAYA AL VE YÖNLENDİR
-        socket.join(targetRoomId);
+        // DAVET EDENİ YÖNLENDİR
         const targetUrl = type === 'arena' ? `/arena?room=${targetRoomId}` : `/meeting?room=${targetRoomId}`;
         socket.emit('redirect-to-room', targetUrl);
 
-        // SONRA HEDEFE DAVET GÖNDER (Liderin odaya yerleşmesi için kısa gecikme)
+        // HEDEFE DAVET GÖNDER (Kısa gecikme ile liderin odaya varmasını bekle)
         setTimeout(() => {
             io.to(to).emit('receive-invite', { 
                 from: socket.nickname, 
-                type, 
+                type: type, 
                 roomId: targetRoomId 
             });
-        }, 800);
+        }, 1000);
 
-    } catch (e) { console.log("Davet Hatası:", e); }
+    } catch (e) { 
+        console.error("Davet Sistemi Hatası:", e); 
+    }
 });
 
-// 3. LOJİSTİK DESTEK (BPL Transferi)
+// 3. LOJİSTİK DESTEK (BPL Transferi ve Oda Bildirimi)
 socket.on('transfer-bpl', async (data) => {
     try {
         if (!socket.userId) return;
@@ -364,49 +373,56 @@ socket.on('transfer-bpl', async (data) => {
         const receiver = await User.findOne({ nickname: data.to });
         const amount = parseInt(data.amount);
 
-        if (receiver && sender.bpl >= amount + 5500 && amount >= 50) {
+        if (receiver && sender.bpl >= (amount + 5500) && amount >= 50) {
             sender.bpl -= amount;
-            receiver.bpl += (amount * 0.75); // %25 Komisyon (BPL raconu)
+            // %25 Racon kesintisi
+            const netAmount = Math.floor(amount * 0.75);
+            receiver.bpl += netAmount;
             
             await sender.save();
             await receiver.save();
 
-            // Gönderene yeni bakiyesini söyle
+            // Bakiyeleri anlık güncelle
             socket.emit('update-bpl', sender.bpl);
-            socket.emit('gift-result', { message: "BPL Başarıyla Gönderildi!", newBalance: sender.bpl });
-            
-            // Alıcıya yeni bakiyesini bildir (Eğer onlinedaysa)
             io.to(receiver.nickname).emit('update-bpl', receiver.bpl);
             
-            // Konsey chatine bilgi geç
-            const userRoom = Array.from(socket.rooms).find(r => r.includes('_Room'));
-            if(userRoom) {
-                io.to(userRoom).emit('new-message', { 
+            socket.emit('gift-result', { success: true, message: `${netAmount} BPL başarıyla iletildi.` });
+
+            // Sadece bulunulan odaya bildirim at (Arena veya Konsey)
+            const currentRoom = Array.from(socket.rooms).find(r => r.includes('_Room'));
+            if (currentRoom) {
+                io.to(currentRoom).emit('new-message', { 
                     sender: "SİSTEM", 
-                    text: `${sender.nickname}, ${receiver.nickname} kullanıcısına BPL desteği sağladı!` 
+                    text: `📢 LOJİSTİK DESTEK: ${sender.nickname} -> ${receiver.nickname} (${netAmount} BPL)`,
+                    time: new Date().toLocaleTimeString('tr-TR', { hour: '2-digit', minute: '2-digit' })
                 });
             }
         } else {
-            socket.emit('gift-result', { message: "İşlem reddedildi: Yetersiz bakiye veya limit!" });
+            socket.emit('error-msg', 'Transfer reddedildi. Bakiye veya limit yetersiz.');
         }
-    } catch (e) { console.log("Transfer Hatası:", e); }
-});
-
-// 4. KOPMA VE TEMİZLİK
-socket.on('disconnect', () => {
-    const userRoom = `${socket.nickname}_Room`;
-    if (activeRooms[userRoom]) {
-        io.to(userRoom).emit('room-closed', 'Lider masadan ayrıldı, konsey dağılıyor...');
-        delete activeRooms[userRoom];
+    } catch (e) { 
+        console.error("BPL Transfer Hatası:", e); 
     }
 });
-// KOPMA VE TEMİZLİK
+
+// 4. AYRILMA VE ODA TEMİZLİĞİ
 socket.on('disconnect', () => {
-    const userRoom = `${socket.nickname}_Room`;
-    if (activeRooms[userRoom]) {
-        // Eğer çıkan kişi odanın lideriyse odayı yok et
-        io.to(userRoom).emit('room-closed', 'Lider masadan ayrıldı, konsey dağılıyor...');
-        delete activeRooms[userRoom];
+    for (const roomId in activeRooms) {
+        if (activeRooms[roomId].members.includes(socket.nickname)) {
+            activeRooms[roomId].members = activeRooms[roomId].members.filter(m => m !== socket.nickname);
+            
+            // Odada kimse kalmadıysa sil
+            if (activeRooms[roomId].members.length === 0) {
+                delete activeRooms[roomId];
+            } else {
+                // Kalanlara listeyi güncelle
+                io.to(roomId).emit('update-council-list', activeRooms[roomId].members);
+                // Lider çıktıysa bilgilendir
+                if (activeRooms[roomId].leader === socket.nickname) {
+                    io.to(roomId).emit('new-message', { sender: "SİSTEM", text: "Oda lideri ayrıldı." });
+                }
+            }
+        }
     }
 });
     // ARENA MOTORU
@@ -523,6 +539,7 @@ const PORT = process.env.PORT || 10000;
 httpServer.listen(PORT, () => {
     console.log(`🌍 Sunucu Yayında: http://localhost:${PORT}`);
 });
+
 
 
 
