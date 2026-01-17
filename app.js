@@ -616,7 +616,7 @@ async function createBotMatch(player) {
                     }, 5000);
                 }
             }
-
+});
             // Odada hiç kimse kalmadıysa odayı RAM'den tamamen sil
             if (room.members.length === 0) {
                 delete activeRooms[roomId];
@@ -634,6 +634,7 @@ const PORT = process.env.PORT || 10000;
 httpServer.listen(PORT, () => {
     console.log(`🌍 Sunucu Yayında: http://localhost:${PORT}`);
 });
+
 
 
 
