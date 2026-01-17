@@ -21,6 +21,7 @@ const io = new Server(httpServer, {
 
 // --- 2. VERİTABANI BAĞLANTISI ---
 const MONGO_URI = process.env.MONGO_URI || "mongodb+srv://bonusplayerslive_db_user:1nB1QyAsh3qVafpE@bonus.x39zlzq.mongodb.net/?appName=Bonus";
+const activeRooms = {}; 
 
 mongoose.connect(MONGO_URI)
     .then(() => console.log('✅ MongoDB Bağlantısı Başarılı'))
@@ -282,7 +283,6 @@ socket.on('chat-message', (data) => {
 
 
 // --- VIP ODA HAFIZASI (Dosyanın en üstünde kalsın) ---
-const activeRooms = {}; 
 
 // socket.io 'connection' bloğunun içini şu 3 fonksiyonla doldur:
 
@@ -343,7 +343,30 @@ socket.on('disconnect', () => {
         if (activeRooms[rId].members.length === 0) delete activeRooms[rId];
     }
 });
+// DAVET GÖNDERME
+socket.on('send-invite', async (data) => {
+    const { to, type } = data; // type: 'meeting' veya 'arena'
+    const sharedRoomId = `KONSEY_${socket.nickname}_${Date.now().toString().slice(-4)}`;
+    
+    // Davet edene link gönder
+    const link = `/${type}?room=${sharedRoomId}`;
+    
+    // Karşı tarafa onay kutusu gönder
+    io.to(to).emit('receive-invite-request', { 
+        from: socket.nickname, 
+        roomId: sharedRoomId, 
+        type: type 
+    });
+    
+    // Davet edeni de odaya yönlendirmek için emir ver
+    socket.emit('redirect-to-room', link);
+});
 
+// DAVET KABUL
+socket.on('accept-invite', (data) => {
+    const link = `/${data.type}?room=${data.roomId}`;
+    socket.emit('redirect-to-room', link);
+});
     
 // ======================================================
 // --- 3. LOJİSTİK DESTEK (BPL TRANSFERİ) ---
@@ -561,6 +584,7 @@ const PORT = process.env.PORT || 10000;
 httpServer.listen(PORT, () => {
     console.log(`🌍 Sunucu Yayında: http://localhost:${PORT}`);
 });
+
 
 
 
