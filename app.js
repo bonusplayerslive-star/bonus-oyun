@@ -616,35 +616,16 @@ async function createBotMatch(player) {
                     }, 5000);
                 }
             }
-});
-            // Odada hiç kimse kalmadıysa odayı RAM'den tamamen sil
-            if (room.members.length === 0) {
+if (room && room.members.length === 0) {
                 delete activeRooms[roomId];
             }
-        }
-    });
+        } // for döngüsü sonu
+    }); // socket.on('disconnect') sonu
 
-    
+}); // <--- BU ÇOK ÖNEMLİ! io.on('connection') ana bloğunu kapatır.
 
-
-
-    
 // --- 4. SERVER BAŞLAT ---
 const PORT = process.env.PORT || 10000;
 httpServer.listen(PORT, () => {
     console.log(`🌍 Sunucu Yayında: http://localhost:${PORT}`);
 });
-
-
-
-
-
-
-
-
-
-
-
-
-
-
