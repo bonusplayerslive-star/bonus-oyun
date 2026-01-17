@@ -279,7 +279,7 @@ socket.on('chat-message', (data) => {
         io.emit('new-message', msgObj);
     }
 });
-const activeRooms = {}; 
+
 
 io.on('connection', (socket) => {
     // Kullanıcı bağlandığında ismini sokete işle (Global liste için)
@@ -639,6 +639,7 @@ const PORT = process.env.PORT || 10000;
 httpServer.listen(PORT, () => {
     console.log(`🌍 Sunucu Yayında: http://localhost:${PORT}`);
 });
+
 
 
 
