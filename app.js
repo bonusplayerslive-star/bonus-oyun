@@ -87,6 +87,9 @@ app.post('/login', async (req, res) => {
     } catch (err) { res.send("Hata oluştu."); }
 });
 
+
+
+
 app.get('/profil', isLoggedIn, async (req, res) => {
     const user = await User.findById(req.user._id);
     res.render('profil', { user });
@@ -97,6 +100,60 @@ app.get('/chat', isLoggedIn, (req, res) => res.render('chat', { user: req.user }
 app.get('/arena', isLoggedIn, (req, res) => res.render('arena', { user: req.user, opponentNick: req.query.opponent || null }));
 app.get('/meeting', isLoggedIn, (req, res) => res.render('meeting', { user: req.user, roomId: req.query.room || "GENEL_KONSEY" }));
 app.get('/logout', (req, res) => { req.session.destroy(); res.redirect('/'); });
+
+app.post('/buy-animal', isLoggedIn, async (req, res) => {
+    try {
+        const { animalName, price } = req.body;
+        const user = await User.findById(req.user._id);
+        const animalPrice = parseInt(price);
+
+        // 1. BPL Kontrolü
+        if (user.bpl < animalPrice) {
+            return res.json({ success: false, message: "Yetersiz BPL bakiyesi!" });
+        }
+
+        // 2. Aynı hayvandan zaten var mı kontrolü (Opsiyonel)
+        const hasAnimal = user.inventory.find(item => item.name === animalName);
+        if (hasAnimal) {
+            return res.json({ success: false, message: "Bu hayvana zaten sahipsin!" });
+        }
+
+        // 3. BPL Düş ve Envantere Ekle
+        user.bpl -= animalPrice;
+        user.inventory.push({
+            name: animalName,
+            level: 1,
+            stats: { 
+                power: 10 + Math.floor(Math.random() * 5), 
+                defense: 10 + Math.floor(Math.random() * 5) 
+            }
+        });
+
+        await user.save();
+        res.json({ success: true, message: `${animalName} başarıyla satın alındı!`, newBalance: user.bpl });
+
+    } catch (err) {
+        console.error(err);
+        res.status(500).json({ success: false, message: "Sunucu hatası oluştu." });
+    }
+});
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 
 // --- 4. SOCKET.IO (TEK VE ANA BLOK) ---
 io.on('connection', async (socket) => {
@@ -243,6 +300,7 @@ async function createBotMatch(p) {
 // --- 6. SERVER START ---
 const PORT = process.env.PORT || 10000;
 httpServer.listen(PORT, () => console.log(`🌍 BPL Sunucu Hazır: ${PORT}`));
+
 
 
 
