@@ -38,7 +38,10 @@ const sessionMiddleware = session({
     secret: 'bpl_cyber_secret_2025',
     resave: false,
     saveUninitialized: false,
-    store: MongoStore.create({ mongoUrl: MONGO_URI }),
+    store: MongoStore.create({ 
+        mongoUrl: MONGO_URI,
+        collectionName: 'sessions' 
+    }),
     cookie: { secure: false, maxAge: 1000 * 60 * 60 * 24 }
 });
 
@@ -240,4 +243,5 @@ async function createBotMatch(p) {
 // --- 6. SERVER START ---
 const PORT = process.env.PORT || 10000;
 httpServer.listen(PORT, () => console.log(`🌍 BPL Sunucu Hazır: ${PORT}`));
+
 
