@@ -35,7 +35,7 @@ app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
 
 const sessionMiddleware = session({
-    secret: process.env.SESSION_SECRET || 'bpl_cyber_secret_2025',
+    secret: 'bpl_cyber_secret_2025',
     resave: false,
     saveUninitialized: false,
     store: MongoStore.create({ mongoUrl: MONGO_URI }),
@@ -58,7 +58,7 @@ async function isLoggedIn(req, res, next) {
     res.redirect('/login');
 }
 
-// --- 3. ROTALAR (ROUTES) ---
+// --- 3. ROTALAR (Giriş, Kayıt, Market, Arena, Chat) ---
 app.get('/', (req, res) => req.session.userId ? res.redirect('/profil') : res.render('index'));
 app.get('/login', (req, res) => res.render('index'));
 
@@ -69,7 +69,7 @@ app.post('/register', async (req, res) => {
         await newUser.save();
         req.session.userId = newUser._id;
         res.redirect('/profil');
-    } catch (err) { res.status(500).send("Hata: " + err.message); }
+    } catch (err) { res.status(500).send("Kayıt Hatası: " + err.message); }
 });
 
 app.post('/login', async (req, res) => {
@@ -80,8 +80,8 @@ app.post('/login', async (req, res) => {
             req.session.userId = user._id;
             return res.redirect('/profil');
         }
-        res.send("Hatalı giriş.");
-    } catch (err) { res.send("Bir hata oluştu."); }
+        res.send("<script>alert('Hatalı Giriş!'); window.location='/';</script>");
+    } catch (err) { res.send("Hata oluştu."); }
 });
 
 app.get('/profil', isLoggedIn, async (req, res) => {
@@ -89,12 +89,13 @@ app.get('/profil', isLoggedIn, async (req, res) => {
     res.render('profil', { user });
 });
 
+app.get('/market', isLoggedIn, (req, res) => res.render('market', { user: req.user }));
 app.get('/chat', isLoggedIn, (req, res) => res.render('chat', { user: req.user }));
 app.get('/arena', isLoggedIn, (req, res) => res.render('arena', { user: req.user, opponentNick: req.query.opponent || null }));
 app.get('/meeting', isLoggedIn, (req, res) => res.render('meeting', { user: req.user, roomId: req.query.room || "GENEL_KONSEY" }));
 app.get('/logout', (req, res) => { req.session.destroy(); res.redirect('/'); });
 
-// --- 4. SOCKET.IO ANA BLOK (Tüm Mantık Burada) ---
+// --- 4. SOCKET.IO (TEK VE ANA BLOK) ---
 io.on('connection', async (socket) => {
     const s = socket.request.session;
     if (s && s.userId) {
@@ -103,13 +104,12 @@ io.on('connection', async (socket) => {
             socket.userId = user._id;
             socket.nickname = user.nickname;
             socket.join(user.nickname);
-            console.log(`✅ Bağlı: ${socket.nickname}`);
+            console.log(`📡 Bağlantı: ${socket.nickname}`);
         }
     }
 
-    // ODAYA KATILIM
+    // Odalar ve Toplantılar
     socket.on('join-meeting', (roomId, peerId, nickname) => {
-        if (!roomId || !nickname) return;
         socket.join(roomId);
         socket.roomId = roomId;
         socket.nickname = nickname;
@@ -123,47 +123,59 @@ io.on('connection', async (socket) => {
         socket.to(roomId).emit('user-connected', peerId, nickname);
     });
 
-    // MESAJLAŞMA (Döşemeyi Engelleyen Temiz Yapı)
+    // Mesajlaşma (Döşeme yapmayan temiz mantık)
     socket.on('chat-message', (data) => {
-        if (!data.text || data.text.trim() === "") return;
-        const msgObj = {
+        if (!data.text) return;
+        const msg = {
             sender: socket.nickname || "Misafir",
             text: data.text.trim(),
             time: new Date().toLocaleTimeString('tr-TR', { hour: '2-digit', minute: '2-digit' }),
             room: data.room || 'GENEL'
         };
-        if (msgObj.room !== 'GENEL') io.to(msgObj.room).emit('new-message', msgObj);
-        else io.emit('new-message', msgObj);
+        if (msg.room !== 'GENEL') io.to(msg.room).emit('new-message', msg);
+        else io.emit('new-message', msg);
     });
 
-    // DAVET & IŞINLANMA
+    // Davet Sistemi
     socket.on('send-invite', (data) => {
-        const sharedRoomId = `KONSEY_${socket.nickname}_${Date.now().toString().slice(-4)}`;
-        const link = `/${data.type}?room=${sharedRoomId}`;
-        io.to(data.to).emit('receive-invite-request', { from: socket.nickname, roomId: sharedRoomId, type: data.type });
-        socket.emit('redirect-to-room', link);
+        const rId = `KONSEY_${Date.now().toString().slice(-4)}`;
+        io.to(data.to).emit('receive-invite-request', { from: socket.nickname, roomId: rId, type: data.type });
+        socket.emit('redirect-to-room', `/${data.type}?room=${rId}`);
     });
 
-    socket.on('accept-invite', (data) => {
-        socket.emit('redirect-to-room', `/${data.type}?room=${data.roomId}`);
+    // BPL Transferi
+    socket.on('transfer-bpl', async (data) => {
+        try {
+            const sender = await User.findById(socket.userId);
+            const receiver = await User.findOne({ nickname: data.to });
+            const amount = parseInt(data.amount);
+            if (receiver && sender.bpl >= (amount + 5500)) {
+                sender.bpl -= amount;
+                receiver.bpl += Math.floor(amount * 0.75);
+                await sender.save(); await receiver.save();
+                socket.emit('update-bpl', sender.bpl);
+                io.to(receiver.nickname).emit('update-bpl', receiver.bpl);
+            }
+        } catch (e) { console.log("Transfer Hatası"); }
     });
 
-    // ARENA READY SİNYALİ
+    // ARENA MOTORU (Senin orijinal kuyruk mantığın)
     socket.on('arena-ready', async (data) => {
         const { mult, room, nick, animal } = data;
         const sender = await User.findById(socket.userId);
-        if (!sender || sender.bpl < (25 * mult)) return socket.emit('error-msg', 'Yetersiz BPL!');
+        const fee = 25 * (mult || 1);
         
-        sender.bpl -= (25 * mult);
-        await sender.save();
+        if (!sender || sender.bpl < fee) return socket.emit('error-msg', 'Yetersiz BPL!');
+
+        sender.bpl -= fee; await sender.save();
         socket.emit('update-bpl', sender.bpl);
 
-        const playerData = { id: socket.id, userId: sender._id, nick, animal, stats: { power: sender.power || 10, attack: sender.attack || 10, defense: sender.defense || 10 }, cost: 25 * mult };
+        const playerData = { id: socket.id, userId: sender._id, nick, animal, cost: fee };
 
         if (room) {
             socket.join(room);
             const clients = io.sockets.adapter.rooms.get(room);
-            if (clients && clients.size === 2) startBattle(room, 25 * mult);
+            if (clients && clients.size === 2) startBattle(room, fee);
         } else {
             arenaQueue.push(playerData);
             if (arenaQueue.length >= 2) {
@@ -176,33 +188,29 @@ io.on('connection', async (socket) => {
                 setTimeout(() => {
                     const idx = arenaQueue.findIndex(p => p.id === socket.id);
                     if (idx > -1) createBotMatch(arenaQueue.splice(idx, 1)[0]);
-                }, 10000);
+                }, 8000);
             }
         }
     });
 
-    // AYRILMA
     socket.on('disconnect', () => {
-        const rId = socket.roomId;
-        if (rId && activeRooms[rId]) {
-            activeRooms[rId].members = activeRooms[rId].members.filter(m => m.nickname !== socket.nickname);
-            socket.to(rId).emit('user-disconnected', socket.peerId);
-            updateAllLists(rId);
+        if (socket.roomId && activeRooms[socket.roomId]) {
+            activeRooms[socket.roomId].members = activeRooms[socket.roomId].members.filter(m => m.nickname !== socket.nickname);
+            updateAllLists(socket.roomId);
         }
         arenaQueue = arenaQueue.filter(p => p.id !== socket.id);
     });
 
-    async function updateAllLists(roomId) {
-        const allSockets = await io.fetchSockets();
-        const globalOnline = allSockets.map(s => ({ nickname: s.nickname }));
-        io.emit('update-user-list', globalOnline);
-        if (roomId && activeRooms[roomId]) {
-            io.to(roomId).emit('update-council-list', activeRooms[roomId].members.map(m => m.nickname));
+    async function updateAllLists(rId) {
+        const all = await io.fetchSockets();
+        io.emit('update-user-list', all.map(s => ({ nickname: s.nickname })));
+        if (rId && activeRooms[rId]) {
+            io.to(rId).emit('update-council-list', activeRooms[rId].members.map(m => m.nickname));
         }
     }
 });
 
-// --- 5. SAVAŞ FONKSİYONLARI (DIŞARIDA) ---
+// --- 5. SAVAŞ FONKSİYONLARI ---
 async function startBattle(roomId, cost, players = null) {
     try {
         if (!players) {
@@ -210,22 +218,25 @@ async function startBattle(roomId, cost, players = null) {
             players = [];
             for (const s of sockets) {
                 const u = await User.findById(s.userId);
-                if(u) players.push({ id: s.id, userId: u._id, nick: u.nickname, animal: u.inventory[0]?.name, stats: { p: 10, a: 10, d: 10 } });
+                if(u) players.push({ id: s.id, userId: u._id, nick: u.nickname, animal: u.inventory[0]?.name || "Wolf" });
             }
         }
         if (players.length < 2) return;
-        const winner = players[0]; // Basit mantık, senin orijinal calc'ını buraya ekle
+        
+        const winner = players[0]; // Basit örnek, senin güç hesaplamanı buraya koyabilirsin
         const prize = Math.floor(cost * 1.8);
-        const winnerUser = await User.findById(winner.userId);
-        if (winnerUser) { winnerUser.bpl += prize; await winnerUser.save(); }
-        io.to(roomId).emit('match-started', { players, winner: { nick: winner.nick }, prize });
+        const winUser = await User.findById(winner.userId);
+        if (winUser) { winUser.bpl += prize; await winUser.save(); }
+
+        io.to(roomId).emit('match-started', { players, winner: { nick: winner.nick, animal: winner.animal }, prize });
     } catch (e) { console.log(e); }
 }
 
-async function createBotMatch(player) {
-    const botData = { nick: botNames[0], animal: botAnimalsList[0], stats: { power: 10, attack: 10, defense: 10 }, userId: null };
-    startBattle(player.id, player.cost, [player, botData]);
+async function createBotMatch(p) {
+    const bot = { nick: botNames[0], animal: botAnimalsList[0], userId: null };
+    startBattle(p.id, p.cost, [p, bot]);
 }
 
+// --- 6. SERVER START ---
 const PORT = process.env.PORT || 10000;
-httpServer.listen(PORT, () => console.log(`🚀 BPL Online on ${PORT}`));
+httpServer.listen(PORT, () => console.log(`🌍 BPL Sunucu Hazır: ${PORT}`));
